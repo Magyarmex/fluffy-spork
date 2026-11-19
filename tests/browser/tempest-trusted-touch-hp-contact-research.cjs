@@ -1,6 +1,6 @@
 'use strict';
 // #648 RESEARCH ONLY: trusted Chromium right-stick -> actual composed Tempest
-// projectile -> real tank HP contact. This controlled geometry is not a
+// projectile -> preplaced tank HP contact. This controlled geometry is not a
 // natural match, short-pulse FPS comparison, or physical-device latency.
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
@@ -27,16 +27,6 @@ const {chromium}=require('playwright');
      const born=this.bullets.slice(before);
      report.births.push(...born.map(b=>({id:b.id,ownerId:b.ownerId,at:performance.now(),
       gameTime:this.time,x:b.x,y:b.y,vx:b.vx,vy:b.vy})));
-     if(!report.targetReady){
-      const b=born.find(b=>!b.beam&&b.ownerId===this.player.id);
-      if(b){
-       const target=window.__novaTempestHpTarget;
-       target.x=b.x+b.vx*.06;target.y=b.y+b.vy*.06;
-       target.vx=0;target.vy=0;
-       report.targetReady=true;
-       report.targetAt={x:target.x,y:target.y,at:performance.now()};
-      }
-     }
     }
     return out;
    };
@@ -67,10 +57,12 @@ const {chromium}=require('playwright');
    g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;
    const target=g.tanks.find(t=>t!==p&&t.ai);
    if(!target)throw Error('no real AI target available');
-   Object.assign(target,{cls:'scout',isPlayer:true,alive:true,x:2000,y:2000,
+   Object.assign(target,{cls:'scout',isPlayer:true,alive:true,x:58,y:-23,
     vx:0,vy:0,hp:100000,maxHp:100000,spawnShieldT:0,shieldT:0,
     bulwarkT:0,tauntT:0,cloakT:0,r:16});
    window.__novaTempestHpTarget=target;
+   window.__novaTempestHp.targetReady=true;
+   window.__novaTempestHp.targetAt={x:target.x,y:target.y,at:performance.now()};
    g.tanks=[p,target];g.tankById=new Map([[p.id,p],[target.id,target]]);
    g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];g.orbs=[];
    g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
@@ -117,8 +109,11 @@ const {chromium}=require('playwright');
   const deflect=report.events.find(e=>e.type==='pointermove');
   assert.ok(press&&deflect&&press.at<=deflect.at,
    'trusted touch press must precede the firing deflection');
-  assert.ok(report.targetReady&&report.targetAt,'real bullet must place reachable target');
-  assert.ok(report.births.some(b=>b.ownerId===report.playerId));
+  assert.ok(report.targetReady&&report.targetAt,'target must be preplaced before any projectile');
+  assert.ok(report.births.some(b=>b.ownerId===report.playerId),
+   'trusted deflection must create a real player-owned projectile');
+  assert.ok(report.targetAt.at<report.births[0].at,
+   'target geometry must precede the measured projectile, not follow its trajectory');
   assert.ok(report.hits.some(h=>h.sourceId===report.playerId&&h.damage>0),
    'real composed Tempest projectile must reduce aligned target HP');
   assert.ok(report.births.every(b=>b.at>=deflect.at),
