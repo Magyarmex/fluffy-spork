@@ -99,6 +99,9 @@ const {chromium}=require('playwright');
   // still take damage from an already-existing projectile, not held autofire.
   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
   await page.waitForFunction(()=>window.__novaTempestHp.hits.length>0,null,{timeout:12000});
+  // A valid projectile can hit after release; a *new* player volley cannot.
+  // Observe beyond Tempest's base reload so a stuck firing flag is exposed.
+  await page.waitForTimeout(180);
   await page.waitForFunction(()=>{const i=window.__novaTempestHpGame?.input;
    return i&&!i.aim.active&&!i.firing&&i.stickId.aim===-1;},null,{timeout:5000});
   const report=await page.evaluate(()=>({
@@ -116,6 +119,10 @@ const {chromium}=require('playwright');
    'real composed Tempest projectile must reduce aligned target HP');
   assert.ok(report.hits[0].at>=report.births[0].at,
    'physical HP contact cannot predate projectile birth');
+  const release=report.events.find(e=>e.type==='pointerup'||e.type==='pointercancel');
+  assert.ok(release&&release.trusted,'release must be a trusted browser event');
+  assert.ok(report.births.every(b=>b.at<=release.at),
+   'no new Tempest projectile may be born after touch release');
   assert.equal(report.aimActive,false);
   assert.equal(report.firing,false);
   assert.equal(errors.length,0,'no browser page errors: '+JSON.stringify(errors));
