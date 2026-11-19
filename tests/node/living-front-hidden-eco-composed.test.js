@@ -1,13 +1,12 @@
 'use strict';
-// Research-only #1029: exercise the *materialized 49-overlay Game* and its
-// installed Living Front strategy export. A controlled public signal and
-// spatial arrangement isolate hidden private AI ecology commitments.
+// Regression #1029: the materialized 49-overlay Game must not use offscreen
+// private ecology assignments to veto an otherwise identical public signal.
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL = '1';
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { bootGame, withSeed } = require('../research/audio-rng-causal-pilot.cjs');
 
-test('composed Living Front strategy changes a public BLOOM decision on hidden intent alone', () => {
+test('composed Living Front strategy ignores hidden private intent for public BLOOM', () => {
   withSeed(1517800, () => {
     const g = bootGame();
     try {
@@ -54,10 +53,10 @@ test('composed Living Front strategy changes a public BLOOM decision on hidden i
       });
       for (const q of hidden) q.ai.__lfEcoKey = 'BLOOM:' + sector;
       const counterfactual = sample();
-      assert.notEqual(counterfactual.mode, 'signal',
-        'offscreen private commitments alone vetoed the same public opportunity');
-      assert.notEqual(counterfactual.key, 'BLOOM:' + sector,
-        'public BLOOM must no longer own the strategic decision');
+      assert.equal(counterfactual.mode, baseline.mode,
+        'offscreen private commitments must not veto the same public opportunity');
+      assert.equal(counterfactual.key, baseline.key);
+      assert.equal(counterfactual.weight, baseline.weight);
       assert.equal(JSON.stringify({
         positions: g.tanks.map(t => [t.id, t.x, t.y, t.hp]),
         signal: g.__lfState.signal
