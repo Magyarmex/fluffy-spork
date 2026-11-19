@@ -1,6 +1,6 @@
 'use strict';
 /* #799 research only. Exercise the ACTUAL composed Game and Canvas renderer
- * with the equal-total-backlog 3+3 and 4+2 fixed60 policies. This is Node
+ * with the equal-total-backlog 2+4, 3+3 and 4+2 fixed60 policies. This is Node
  * JavaScript CPU evidence, not Chromium paint or physical Android approval.
  * No production scheduler, input, weapons, or materializer changes. */
 const test=require('node:test');
@@ -34,27 +34,40 @@ function witness(cls,seed,cadence,maxSteps,backlogExtraTicks){
  }
  return result;
 }
-test('equal-backlog 3+3 and 4+2 expose real Gunner/Carrier/Hivemind CPU burst costs',()=>{
+test('equal-backlog 2+4, 3+3 and 4+2 expose real Gunner/Carrier/Hivemind CPU burst costs',()=>{
  const rows=[];
  for(const cadence of ['30Hz-adversarial','30Hz-adversarial95',
-  '30Hz-seeded-contrast','30Hz-display-quantized']){
+  '30Hz-seeded-contrast','30Hz-display-quantized','30Hz-triple-long-falsifier']){
   const gaps=frameTimes(cadence);
   assert.equal(gaps.length,60,'matched 30Hz presentation callback count');
   assert.ok(gaps.every(x=>x>0&&x<100),'only active non-stall frames');
   assert.ok(Math.abs(gaps.reduce((a,b)=>a+b,0)-DURATION_MS)<1e-6,
    'matched two-second presentation trace');
  }
- for(const cadence of ['30Hz-adversarial','30Hz-adversarial95','30Hz-seeded-contrast','30Hz-display-quantized'])
+ for(const cadence of ['30Hz-adversarial','30Hz-adversarial95','30Hz-seeded-contrast','30Hz-display-quantized','30Hz-triple-long-falsifier'])
  for(const cls of ['minigun','carrier','hivemind'])for(const seed of [1517800,1517802]){
-  const three=witness(cls,seed,cadence,3,3);
-  const four=witness(cls,seed,cadence,4,2);
+  // Counterbalance benchmark order across classes, seeds and schedules.
+  // A fixed 2+4 -> 3+3 -> 4+2 order could confound CPU P95 with JIT warmup.
+  const policies=[['two',2,4],['three',3,3],['four',4,2]];
+  const shift=(['minigun','carrier','hivemind'].indexOf(cls)+
+   ['30Hz-adversarial','30Hz-adversarial95','30Hz-seeded-contrast',
+    '30Hz-display-quantized','30Hz-triple-long-falsifier'].indexOf(cadence)+(seed===1517800?0:1))%3;
+  const measured={};
+  for(let i=0;i<policies.length;i++){
+   const [name,maxSteps,extraTicks]=policies[(i+shift)%policies.length];
+   measured[name]=witness(cls,seed,cadence,maxSteps,extraTicks);
+  }
+  const {two,three,four}=measured;
   // The alternatives share six ticks of total capacity, not identical
   // per-frame chronology. Do not falsely require matching damage or hashes.
+  assert.equal(two.maxSteps+two.backlogExtraTicks,6);
   assert.equal(three.maxSteps+three.backlogExtraTicks,6);
   assert.equal(four.maxSteps+four.backlogExtraTicks,6);
   assert.ok(four.peakSteps>=three.peakSteps,
    'four-step candidate must not have less observed peak work on this trace');
-  assert.ok(four.updates<=120 && three.updates<=120);
+  assert.ok(two.updates<=120 && four.updates<=120 && three.updates<=120);
+  assert.equal(two.threeStepFrameSamples,0,'2+4 must never execute three updates');
+  assert.equal(two.fourStepFrameSamples,0,'2+4 must never execute four updates');
   assert.equal(three.fourStepFrameSamples,0,'3+3 must never execute four updates');
   assert.equal(four.fourStepFrameSamples>0,four.peakSteps===4,
    'four-update CPU samples must correspond to actual four-update callbacks');
@@ -64,7 +77,15 @@ test('equal-backlog 3+3 and 4+2 expose real Gunner/Carrier/Hivemind CPU burst co
   rows.push({cls,seed,cadence,
    world:{playerDrones:four.playerDroneCount,hostileTanks:four.hostileTankCount,
     neutralShapes:four.neutralShapeCount},
+   two:{updates:two.updates,droppedMs:two.droppedMs,
+    totalUpdateCpuMs:two.simMs,totalRenderCpuMs:two.renderMs,
+    lagMs:two.lagMs,peakSteps:two.peakSteps,
+    frameCpuP95Ms:two.frameCpuP95Ms,
+    frameCpuPeakMs:two.frameCpuPeakMs,
+    updateCpuP95Ms:two.frameUpdateCpuP95Ms,
+    renderCpuP95Ms:two.frameRenderCpuP95Ms},
    three:{updates:three.updates,droppedMs:three.droppedMs,
+    totalUpdateCpuMs:three.simMs,totalRenderCpuMs:three.renderMs,
     lagMs:three.lagMs,peakSteps:three.peakSteps,
     frameCpuP95Ms:three.frameCpuP95Ms,
     frameCpuPeakMs:three.frameCpuPeakMs,
@@ -72,6 +93,7 @@ test('equal-backlog 3+3 and 4+2 expose real Gunner/Carrier/Hivemind CPU burst co
     updateCpuP95Ms:three.frameUpdateCpuP95Ms,
     renderCpuP95Ms:three.frameRenderCpuP95Ms},
    four:{updates:four.updates,droppedMs:four.droppedMs,
+    totalUpdateCpuMs:four.simMs,totalRenderCpuMs:four.renderMs,
     lagMs:four.lagMs,peakSteps:four.peakSteps,
     frameCpuP95Ms:four.frameCpuP95Ms,
     frameCpuPeakMs:four.frameCpuPeakMs,
@@ -80,7 +102,7 @@ test('equal-backlog 3+3 and 4+2 expose real Gunner/Carrier/Hivemind CPU burst co
     updateCpuP95Ms:four.frameUpdateCpuP95Ms,
     renderCpuP95Ms:four.frameRenderCpuP95Ms}});
  }
- assert.equal(rows.length,24);
+ assert.equal(rows.length,30);
  assert.ok(rows.some(r=>r.four.fourStepSamples>0),
   'research fixture must actually measure four-update CPU bursts');
  console.log('REAL_GAME_EQUAL_BACKLOG_CPU '+JSON.stringify({
