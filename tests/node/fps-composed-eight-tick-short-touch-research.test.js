@@ -183,3 +183,21 @@ test('composed Tempest 20ms touch separates mean30 dropped ticks from recovered 
   caveat:'real materialized Game and touch handlers, scripted RAF not Chromium/device'
  }));
 });
+
+
+test('composed Tempest centered touch cannot masquerade as a recovered shot',()=>{
+ const mean30=Array.from({length:15},()=>[
+  55,55,1000/15-55,1000/15-55]).flat();
+ const events=[
+  {at:170,type:'pointerdown',x:640,buttons:1},
+  {at:190,type:'pointerup',x:640,buttons:0}
+ ];
+ for(const [intervals,steps,extra] of [
+  [uniform,2,2],[mean30,2,2],[mean30,2,4],[mean30,3,2]]){
+  const result=run(intervals,steps,extra,{classId:'tempest',events});
+  assert.equal(result.volleys,0,
+   'a right-stick touch without deflection must never fire');
+  assert.deepEqual(result.births,[]);
+  assert.equal(result.sampled.length,2);
+ }
+});
