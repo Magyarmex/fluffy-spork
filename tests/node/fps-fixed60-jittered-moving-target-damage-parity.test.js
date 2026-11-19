@@ -8,12 +8,12 @@ const {bootGame,withSeed,digest,physical}=require('../research/audio-rng-causal-
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const TICKS=360,DT=1/60;
-function encounter(cls,seed,fixed30,playerMoveY=0,variable30=false){
+function encounter(cls,seed,fixed30,playerMoveY=0,variable30=false,reloadOverride=null){
  assert.ok(!(fixed30&&variable30),'scheduler arms are exclusive');
  return withSeed(seed,draws=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
-  g.setClass(p,cls);p.stats.reload=cls==='minigun'?1:3;
+  g.setClass(p,cls);p.stats.reload=reloadOverride==null?(cls==='minigun'?1:3):reloadOverride;
   const target=g.tanks.find(t=>t!==p);
   assert.ok(target,'composed Game must supply an opponent');
   Object.assign(p,{x:0,y:0,vx:0,vy:0,angle:0,spawnShieldT:0,droneRespawnT:Infinity});
@@ -168,4 +168,30 @@ test('fixed60 jittered 30Hz presentation preserves moving-target HP and projecti
     volleys:reference.volleys,travel:reference.travel});
   }
  console.log('GUNNER_FIXED60_JITTERED_MOVING_TARGET_DAMAGE_PARITY '+JSON.stringify(rows));
+});
+
+
+// #648: extend the same moving-body/real-HP chronology gate to both sides of
+// Tempest's legal reload 4->5 redline threshold. Do not freeze balance values.
+test('Tempest reload 4/5 preserves moving-target contacts under recovered 30Hz presentation',()=>{
+ const rows=[];
+ for(const reload of [4,5])for(const seed of [1517800,1517802]){
+  const reference=encounter('tempest',seed,false,0,false,reload);
+  const recovered=encounter('tempest',seed,true,0,false,reload);
+  assert.deepEqual(recovered,reference,
+   'fully recovered moving-target Tempest chronology must match native60');
+  const variable=encounter('tempest',seed,false,0,true,reload);
+  assert.ok(variable.hits>0&&variable.damage>0,
+   'native30 must exercise actual moving-target projectile contacts');
+  const movingReference=encounter('tempest',seed,false,.025,false,reload);
+  const movingRecovered=encounter('tempest',seed,true,.025,false,reload);
+  assert.deepEqual(movingRecovered,movingReference,
+   'moving-player muzzle and target contacts must match native60');
+  rows.push({reload,seed,referenceHits:reference.hits,
+   referenceDamage:reference.damage,variable30Hits:variable.hits,
+   variable30Damage:variable.damage,movingReferenceDamage:movingReference.damage,
+   fixed30Damage:recovered.damage,playerMovedY:movingReference.playerY});
+ }
+ assert.equal(rows.length,4);
+ console.log('TEMPEST_RELOAD45_MOVING_CONTACT '+JSON.stringify(rows));
 });
