@@ -108,7 +108,7 @@ test('foreground stall discards queued input rather than mislabeling it pending'
 test('skipped-time telemetry separates press and release without inventing sampled gameplay',()=>{
  const intervals=Array(8).fill(50);
  const events=[{atMs:130,kind:'keydown',key:'w'},
-   {atMs:145,kind:'keyup',key:'w'}];
+   {atMs:131,kind:'keyup',key:'w'}];
  for(const maxSteps of [2,3]){
   const result=replayInputDelivery(intervals,events,{maxSteps});
   const actual={keydown:0,keyup:0};
@@ -120,6 +120,11 @@ test('skipped-time telemetry separates press and release without inventing sampl
   assert.equal(actual.keydown+actual.keyup,result.appliedDuringSkippedTime);
   assert.equal(result.deliveredCount+result.unappliedCount,events.length);
   assert.equal(result.queuedCount+result.discardedCount,result.unappliedCount);
+  if(maxSteps===2){
+   assert.ok(result.droppedMs>0);
+   assert.deepEqual(result.skippedEdgeCounts,{keydown:1,keyup:1},
+    'both short-pulse edges must be classified as skipped, not simulated');
+  }
   if(maxSteps===3){
    assert.equal(result.droppedMs,0);
    assert.deepEqual(result.skippedEdgeCounts,{keydown:0,keyup:0});
