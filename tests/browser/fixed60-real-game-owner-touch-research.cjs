@@ -132,24 +132,35 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     // shipping bullet's white-core arc command, matched to a live player-owned
     // projectile's exact world position/radius, while the real renderer runs.
     // This records Canvas command emission, not compositor or screen photons.
-    const originalArc=ctx&&ctx.arc;
-    if(typeof originalArc==='function')ctx.arc=function(x,y,r,...rest){
-     if(profile.firstProjectileBirthAt!=null&&
-        this.globalCompositeOperation==='lighter'&&this.fillStyle==='#ffffff'){
-      const matched=(g.bullets||[]).some(b=>b&&b.ownerId===g.player?.id&&!b.beam&&
-       Math.abs(b.x-x)<1e-5&&Math.abs(b.y-y)<1e-5&&
-       Math.abs(b.r*(0.72+(b.maxHp?Math.max(0.18,Math.min(1,(b.hp??b.maxHp)/b.maxHp)):1)*0.28)*0.55-r)<1e-4);
+    const originalArc=ctx&&ctx.arc,originalFill=ctx&&ctx.fill;
+    let pendingBulletCore=false;
+    if(typeof originalArc==='function'&&typeof originalFill==='function'){
+     ctx.arc=function(x,y,r,...rest){
+      pendingBulletCore=false;
+      if(profile.firstProjectileBirthAt!=null&&
+         this.globalCompositeOperation==='lighter'&&this.fillStyle==='#ffffff'){
+       pendingBulletCore=(g.bullets||[]).some(b=>b&&b.ownerId===g.player?.id&&!b.beam&&
+        Math.abs(b.x-x)<1e-5&&Math.abs(b.y-y)<1e-5&&
+        Math.abs(b.r*(0.72+(b.maxHp?Math.max(0.18,Math.min(1,(b.hp??b.maxHp)/b.maxHp)):1)*0.28)*0.55-r)<1e-4);
+      }
+      return originalArc.call(this,x,y,r,...rest);
+     };
+     ctx.fill=function(...fillArgs){
+      const matched=pendingBulletCore;
+      pendingBulletCore=false;
+      const result=originalFill.apply(this,fillArgs);
       if(matched){
        profile.projectileDrawCommands=(profile.projectileDrawCommands||0)+1;
        if(profile.firstProjectileDrawCommandAt==null)
         profile.firstProjectileDrawCommandAt=performance.now();
       }
-     }
-     return originalArc.call(this,x,y,r,...rest);
-    };
+      return result;
+     };
+    }
     try{return baseRender.apply(this,args);}
     finally{
      if(ctx&&typeof originalArc==='function')ctx.arc=originalArc;
+     if(ctx&&typeof originalFill==='function')ctx.fill=originalFill;
      profile.renders.push(performance.now()-at);
      // Historical metric: post-birth render RETURN, not actual Canvas submission.
      if(profile.firstProjectileBirthAt!=null&&profile.firstProjectileCanvasSubmitAt==null)
