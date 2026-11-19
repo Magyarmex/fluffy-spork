@@ -15,7 +15,7 @@ const pulse=[
  {at:141,type:'pointermove',x:680,buttons:1},
  {at:152,type:'pointerup',x:680,buttons:0}
 ];
-function run(intervals,maxSteps,extra,{classId='scout',events=pulse}={}){
+function run(intervals,maxSteps,extra,{classId='scout',events=pulse,targetX=200}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
@@ -25,7 +25,7 @@ function run(intervals,maxSteps,extra,{classId='scout',events=pulse}={}){
   const target=g.tanks.find(t=>t!==p);
   assert.ok(target,'composed Game must contain target');
   Object.assign(target,{cls:'scout',isPlayer:true,alive:true,
-   x:200,y:0,vx:0,vy:0,hp:100000,maxHp:100000,
+   x:targetX,y:0,vx:0,vy:0,hp:100000,maxHp:100000,
    spawnShieldT:0,shieldT:0,bulwarkT:0,tauntT:0,cloakT:0});
   g.tanks=[p,target];g.tankById=new Map([[p.id,p],[target.id,target]]);
   g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];g.orbs=[];
@@ -52,7 +52,7 @@ function run(intervals,maxSteps,extra,{classId='scout',events=pulse}={}){
   };
   g.update=function(dt){
    const out=originalUpdate.apply(this,arguments);
-   target.x=200;target.y=0;target.vx=0;target.vy=0;return out;
+   target.x=targetX;target.y=0;target.vx=0;target.vy=0;return out;
   };
   const timeline=new ChronologicalInput(g.input);
   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
@@ -209,4 +209,34 @@ test('composed Tempest centered touch cannot masquerade as a recovered shot',()=
   assert.deepEqual(result.births,[]);
   assert.equal(result.sampled.length,2);
  }
+});
+
+// #648 diagnostic: establish an actually hittable close target before
+// promoting short-touch scheduler comparisons to an HP fairness gate.
+test('Tempest short-touch target-distance census records real HP contacts',()=>{
+ const events=[
+  {at:170,type:'pointerdown',x:640,buttons:1},
+  {at:172,type:'pointermove',x:680,buttons:1},
+  {at:190,type:'pointerup',x:680,buttons:0}
+ ];
+ const mean30=Array.from({length:15},()=>[55,55,1000/15-55,1000/15-55]).flat();
+ const rows=[];
+ for(const targetX of [80,120,160,200]){
+  const opts={classId:'tempest',events,targetX};
+  const native=run(uniform,2,2,opts);
+  const lost=run(mean30,2,2,opts);
+  const recovered=run(mean30,3,2,opts);
+  assert.equal(native.volleys,1,'native60 short pulse must fire');
+  assert.equal(recovered.volleys,1,'fully recovered pulse must fire');
+  assert.equal(recovered.droppedMs,0);
+  assert.equal(recovered.damage,native.damage,
+   'recovered input must preserve actual target HP change');
+  assert.equal(recovered.hits,native.hits);
+  assert.ok(lost.damage<=native.damage+1e-5,
+   'a dropped shot must not cause more damage than the native reference');
+  rows.push({targetX,nativeHits:native.hits,nativeDamage:native.damage,
+   lostHits:lost.hits,lostDamage:lost.damage,
+   recoveredHits:recovered.hits,recoveredDamage:recovered.damage});
+ }
+ console.log('TEMPEST_20MS_REAL_HP_DISTANCE_CENSUS '+JSON.stringify(rows));
 });
