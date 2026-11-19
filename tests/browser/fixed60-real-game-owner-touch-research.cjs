@@ -262,6 +262,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     const inputHandlers=this.input,handlerRestores=[];
     for(const [method,type] of [['pd','pointerdown'],['pm','pointermove'],['pu','pointerup']]){
      const original=inputHandlers[method];
+     const hadOwn=Object.prototype.hasOwnProperty.call(inputHandlers,method);
      const wrapped=function(event){
       if(event?.pointerType==='touch'&&Number.isFinite(event.__novaSampleAt)){
        profile.appliedTouchEvents.push({
@@ -275,16 +276,21 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
       return original.call(this,event);
      };
      inputHandlers[method]=wrapped;
-     handlerRestores.push([method,original,wrapped]);
+     handlerRestores.push([method,original,wrapped,hadOwn]);
     }
     // Restore instrumented methods on normal, fatal or lifecycle stop.
     const stopWithCapture=pilot.owner.stop.bind(pilot.owner);
     pilot.owner.stop=function(...args){
      try{return stopWithCapture(...args)}
      finally{
-      for(const [method,original,wrapped] of handlerRestores)
-       if(inputHandlers[method]===wrapped)inputHandlers[method]=original;
-      profile.inputHandlersRestored=true;
+      for(const [method,original,wrapped,hadOwn] of handlerRestores){
+       if(inputHandlers[method]!==wrapped)continue;
+       if(hadOwn)inputHandlers[method]=original;
+       else delete inputHandlers[method];
+      }
+      profile.inputHandlersRestored=handlerRestores.every(
+       ([method,original,,hadOwn])=>inputHandlers[method]===original&&
+        Object.prototype.hasOwnProperty.call(inputHandlers,method)===hadOwn);
      }
     };
     window.__novaFixedPilot=pilot;
