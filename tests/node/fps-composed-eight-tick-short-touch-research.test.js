@@ -38,16 +38,23 @@ function run(intervals,maxSteps,extra,{classId='scout',events=pulse,targetX=200}
   g.spawnAITank=()=>null;g.spawnDrone=()=>null;
   g.status='playing';g.paused=false;g.input.autofire=false;g.input.mouseActive=false;
   let now=1000,callback=null,volleys=0,hits=0,damage=0;
-  const births=[],sampled=[],rendered=[];
+  const births=[],birthVectors=[],contacts=[],sampled=[],rendered=[];
   const originalFire=g.tryFire,originalDamage=g.damageTank,originalUpdate=g.update;
   g.tryFire=function(t){
    const n=this.bullets.length,out=originalFire.apply(this,arguments);
-   if(t===p&&this.bullets.length>n){volleys++;births.push(+this.time.toFixed(6));}
+   if(t===p&&this.bullets.length>n){
+    volleys++;births.push(+this.time.toFixed(6));
+    const b=this.bullets[this.bullets.length-1];
+    birthVectors.push({time:+this.time.toFixed(6),x:+b.x.toFixed(3),
+     y:+b.y.toFixed(3),vx:+b.vx.toFixed(3),vy:+b.vy.toFixed(3)});
+   }
    return out;
   };
   g.damageTank=function(t){
    const hp=t.hp,out=originalDamage.apply(this,arguments);
-   if(t===target&&t.hp<hp){hits++;damage+=hp-t.hp;}
+   if(t===target&&t.hp<hp){hits++;damage+=hp-t.hp;
+    contacts.push({time:+this.time.toFixed(6),delta:+(hp-t.hp).toFixed(5)});
+   }
    return out;
   };
   g.update=function(dt){
@@ -96,7 +103,8 @@ function run(intervals,maxSteps,extra,{classId='scout',events=pulse,targetX=200}
    return {ticks:owner.ticks,droppedMs:+owner.droppedMs.toFixed(4),
     queuedMs:+owner.lagMs.toFixed(4),volleys,hits,damage:+damage.toFixed(5),
     heat:+(p.__v17Heat||0).toFixed(6),fireCd:+p.fireCd.toFixed(6),
-    births,firstRenderCallbackMs:rendered.find(x=>x.volleys>0)?.wall??null,
+    births,birthVectors,contacts,
+    firstRenderCallbackMs:rendered.find(x=>x.volleys>0)?.wall??null,
     sampled:sampled.map(e=>({...e}))};
   }finally{owner.stop();g.destroy();}
  });
@@ -236,7 +244,8 @@ test('Tempest short-touch target-distance census records real HP contacts',()=>{
    'a dropped shot must not cause more damage than the native reference');
   rows.push({targetX,nativeHits:native.hits,nativeDamage:native.damage,
    lostHits:lost.hits,lostDamage:lost.damage,
-   recoveredHits:recovered.hits,recoveredDamage:recovered.damage});
+   recoveredHits:recovered.hits,recoveredDamage:recovered.damage,
+   nativeBirthVectors:native.birthVectors,nativeContacts:native.contacts});
  }
  console.log('TEMPEST_20MS_REAL_HP_DISTANCE_CENSUS '+JSON.stringify(rows));
 });
