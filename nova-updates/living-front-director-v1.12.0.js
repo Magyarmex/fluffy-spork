@@ -538,7 +538,9 @@ function saturation(g,t,x,y){
   if(!q||q===t||!q.ai||!alive(q)||q.spawnShieldT>0||
      !Number.isFinite(q.x)||!Number.isFinite(q.y))continue;
   if(Math.hypot(q.x-x,q.y-y)>260||!visible(g,t,q))continue;
-  n++;
+  /* Eight observed bodies already veto every ecology score (maximum base
+   * is 0.87); cap expensive terrain visibility queries in dense brawls. */
+  if(++n>=8)break;
  }
  return n;
 }
