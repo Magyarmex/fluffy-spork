@@ -78,7 +78,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    }
    const renderMod=window.__novaMakeRequire('')('game/render');
    const baseStart=Game.prototype.start;
-   window.__novaFixedResearch={births:0,updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[],poseFrames:[]};
+   window.__novaFixedResearch={births:0,volleyBirthWallMs:[],updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[],poseFrames:[]};
    const profile=window.__novaFixedResearch;
    // For the held-three-shot gate, use a real controlled 50ms RAF gap
    // instead of repeatedly blocking the main thread and accidentally
@@ -92,7 +92,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     document.addEventListener(type,e=>{
      if(e.pointerType==='touch'){
-      profile.touchEvents.push({type,trusted:e.isTrusted,pointerId:e.pointerId});
+      profile.touchEvents.push({type,trusted:e.isTrusted,pointerId:e.pointerId,wallMs:performance.now()});
       if(type==='pointermove'&&profile.firstAimMoveAt==null&&
        profile.aimOrigin&&e.pointerId===profile.aimOrigin.id&&
        Math.hypot(e.clientX-profile.aimOrigin.x,
@@ -139,6 +139,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     const before=this.bullets.length,out=baseFire.call(this,t,...args);
     if(this===window.__novaFixedGame&&t===this.player&&this.bullets.length>before){
      profile.births+=this.bullets.length-before;
+     profile.volleyBirthWallMs.push(performance.now());
      if(profile.firstProjectileBirthAt==null)
       profile.firstProjectileBirthAt=performance.now();
     }
@@ -304,6 +305,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    g.input.autofire=false;g.input.firing=false;
    g.player.fireCd=0;g.player.spawnShieldT=10;
    window.__novaFixedResearch.births=0;
+   window.__novaFixedResearch.volleyBirthWallMs=[];
    window.__novaFixedResearch.firstAimMoveAt=null;
    window.__novaFixedResearch.firstProjectileBirthAt=null;
    window.__novaFixedResearch.firstProjectileCanvasSubmitAt=null;
@@ -498,6 +500,15 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    const values=a=>{const s=[...a].sort((x,y)=>x-y);
     return {n:s.length,p95:s.length?s[Math.ceil(.95*s.length)-1]:null};};
    const frames=window.__novaFixedResearch.frames;
+   const release=window.__novaFixedResearch.touchEvents.find(e=>e.type==='pointerup'&&e.trusted);
+   const births=window.__novaFixedResearch.volleyBirthWallMs;
+   const afterRelease=release?births.filter(at=>at>release.wallMs):[];
+   const lastBefore=release?births.filter(at=>at<=release.wallMs).at(-1):null;
+   const releaseTelemetry={releaseWallMs:release?.wallMs??null,
+    volleyEventsBeforeRelease:release?births.length-afterRelease.length:0,
+    volleyEventsAfterRelease:afterRelease.length,
+    firstLateBirthMs:afterRelease.length?afterRelease[0]-release.wallMs:null,
+    lastPreReleaseBirthAgeMs:lastBefore==null?null:release.wallMs-lastBefore};
    const frameIntervals=frames.map(f=>f.intervalMs).filter(Number.isFinite);
    const ownerStartMs=window.__novaFixedResearch.ownerStartMs;
    const observedWallMs=frames.length&&Number.isFinite(ownerStartMs)?
@@ -554,6 +565,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     updates:values(window.__novaFixedResearch.updates),
     renders:values(window.__novaFixedResearch.renders),
     births:window.__novaFixedResearch.births,
+    releaseTelemetry,
     touchToProjectileBirthMs:window.__novaFixedResearch.firstProjectileBirthAt==null||
      window.__novaFixedResearch.firstAimMoveAt==null?null:
      window.__novaFixedResearch.firstProjectileBirthAt-window.__novaFixedResearch.firstAimMoveAt,
@@ -578,6 +590,14 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    report.touchToCanvasSubmissionMs>=report.touchToProjectileBirthMs,
    'first actual projectile must reach a real Canvas render submission');
   assert.equal(report.aimActive,false,'release must clear aim');
+  assert.ok(Number.isFinite(report.releaseTelemetry.releaseWallMs),
+   'trusted touch release must have a browser wall-clock timestamp');
+  assert.ok(Number.isInteger(report.releaseTelemetry.volleyEventsAfterRelease)&&
+   report.releaseTelemetry.volleyEventsAfterRelease>=0,
+   'post-release volley-event count must be a nonnegative measured integer');
+  if(report.releaseTelemetry.volleyEventsAfterRelease>0)
+   assert.ok(report.releaseTelemetry.firstLateBirthMs>0,
+    'late-birth interval must be measured from DOM release delivery');
   const touches=await page.evaluate(()=>window.__novaFixedResearch.touchEvents.slice());
   assert.ok(touches.some(e=>e.type==='pointerdown'),'real touch down must reach DOM');
   assert.ok(touches.some(e=>e.type==='pointermove'),'real touch move must reach DOM');
