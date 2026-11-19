@@ -170,7 +170,7 @@ test('20ms touch phase sweep separates skipped-tick loss from intrinsic sampling
 });
 
 
-test('capacity-matched six-tick owners preserve a legal 20ms pulse under a triple-active burst',()=>{
+test('capacity-matched six-tick owners expose different 20ms pulse recovery under a triple-active burst',()=>{
  // A constructed 2s schedule with no >100ms foreground stall. Every arm
  // retains six ticks of total capacity, but has a different per-RAF work cap.
  // This is an exact-source owner/Input witness, NOT a device CPU ranking.
