@@ -23,7 +23,7 @@ on:
       - 'scripts/patch-render-tank-order.cjs'
   pull_request:
     paths:
-      - 'tests/node/tempest-shot-state-trace.test.js'
+      - 'tests/node/fps-tempest-shot-state-trace-research.test.js'
       - 'nova-updates/**'
       - 'index.html'
       - 'tests/browser/**'
