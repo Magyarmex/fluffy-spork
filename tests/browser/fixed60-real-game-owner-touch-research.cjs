@@ -127,10 +127,31 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    const baseRender=renderMod.render;
    renderMod.render=function(...args){
     if(args[0]!==window.__novaFixedGame)return baseRender.apply(this,args);
-    const at=performance.now();
+    const at=performance.now(),g=args[0],ctx=g.ctx;
+    // A render return is NOT proof that a projectile was drawn. Observe the
+    // shipping bullet's white-core arc command, matched to a live player-owned
+    // projectile's exact world position/radius, while the real renderer runs.
+    // This records Canvas command emission, not compositor or screen photons.
+    const originalArc=ctx&&ctx.arc;
+    if(typeof originalArc==='function')ctx.arc=function(x,y,r,...rest){
+     if(profile.firstProjectileBirthAt!=null&&
+        this.globalCompositeOperation==='lighter'&&this.fillStyle==='#ffffff'){
+      const matched=(g.bullets||[]).some(b=>b&&b.ownerId===g.player?.id&&!b.beam&&
+       Math.abs(b.x-x)<1e-5&&Math.abs(b.y-y)<1e-5&&
+       Math.abs(b.r*(0.72+(b.maxHp?Math.max(0.18,Math.min(1,(b.hp??b.maxHp)/b.maxHp)):1)*0.28)*0.55-r)<1e-4);
+      if(matched){
+       profile.projectileDrawCommands=(profile.projectileDrawCommands||0)+1;
+       if(profile.firstProjectileDrawCommandAt==null)
+        profile.firstProjectileDrawCommandAt=performance.now();
+      }
+     }
+     return originalArc.call(this,x,y,r,...rest);
+    };
     try{return baseRender.apply(this,args);}
     finally{
+     if(ctx&&typeof originalArc==='function')ctx.arc=originalArc;
      profile.renders.push(performance.now()-at);
+     // Historical metric: post-birth render RETURN, not actual Canvas submission.
      if(profile.firstProjectileBirthAt!=null&&profile.firstProjectileCanvasSubmitAt==null)
       profile.firstProjectileCanvasSubmitAt=performance.now();
     }
@@ -350,6 +371,8 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    window.__novaFixedResearch.firstAimMoveAt=null;
    window.__novaFixedResearch.firstProjectileBirthAt=null;
    window.__novaFixedResearch.firstProjectileCanvasSubmitAt=null;
+   window.__novaFixedResearch.firstProjectileDrawCommandAt=null;
+   window.__novaFixedResearch.projectileDrawCommands=0;
   });
   const box=await canvas.boundingBox();
   assert.ok(box&&box.width>200&&box.height>200);
@@ -629,6 +652,11 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     touchToCanvasSubmissionMs:window.__novaFixedResearch.firstProjectileCanvasSubmitAt==null||
      window.__novaFixedResearch.firstAimMoveAt==null?null:
      window.__novaFixedResearch.firstProjectileCanvasSubmitAt-window.__novaFixedResearch.firstAimMoveAt,
+    // First actual player bullet core Canvas arc; not input-to-photon latency.
+    projectileDrawCommands:window.__novaFixedResearch.projectileDrawCommands||0,
+    touchToProjectileDrawCommandMs:window.__novaFixedResearch.firstProjectileDrawCommandAt==null||
+     window.__novaFixedResearch.firstAimMoveAt==null?null:
+     window.__novaFixedResearch.firstProjectileDrawCommandAt-window.__novaFixedResearch.firstAimMoveAt,
     runtimeScriptNames:[...document.querySelectorAll('script[src*="nova-updates/"]')]
      .map(s=>s.src.split('/').pop().split('?')[0]),
     // Playwright addScriptTag({path}) injects inline contents, not a src URL.
@@ -676,6 +704,11 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   assert.ok(Number.isFinite(report.touchToCanvasSubmissionMs)&&
    report.touchToCanvasSubmissionMs>=report.touchToProjectileBirthMs,
    'first actual projectile must reach a real Canvas render submission');
+  assert.ok(Number.isFinite(report.touchToProjectileDrawCommandMs)&&
+   report.touchToProjectileDrawCommandMs>=report.touchToProjectileBirthMs,
+   'a player-owned projectile must emit a matching real Canvas core arc after birth');
+  assert.ok(report.projectileDrawCommands>0,
+   'post-birth render return alone is not a projectile Canvas draw witness');
   assert.equal(report.aimActive,false,'release must clear aim');
   assert.ok(Number.isFinite(report.releaseTelemetry.releaseWallMs),
    'trusted touch release must have a browser wall-clock timestamp');
