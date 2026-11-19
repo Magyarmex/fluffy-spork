@@ -157,6 +157,8 @@ test('fixed60 preserves touch press/release shot chronology across adversarial R
   assert.ok(result.shotTimes.some(at=>at>=5&&at<7.75),
    context+' must exercise the final touch interval');
  };
+ assert.throws(()=>assertReleaseSafety({shotTimes:[1.9]},'negative control'),
+  /outside held touch/, 'release gate must reject a synthetic late volley');
  assertReleaseSafety(baseline,'native60');
  assert.equal(baseline.ticks,480);assert.equal(baseline.dropped,0);
  for(const [name,pattern] of Object.entries(patterns))
