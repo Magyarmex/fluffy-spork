@@ -12,9 +12,9 @@ function fixture(steps=2){
   droppedMs:0,ticks:12,updates:{p95:1},renders:{p95:2},
   touchToProjectileBirthMs:10,touchToCanvasSubmissionMs:12,
   touchInput:{firstTouchWallMs:100,events:[
-   {type:'pointerdown',pointerId:42,relativeWallMs:0},
-   {type:'pointermove',pointerId:42,relativeWallMs:20},
-   {type:'pointerup',pointerId:42,relativeWallMs:100}
+   {type:'pointerdown',pointerId:42,x:100,y:200,relativeWallMs:0},
+   {type:'pointermove',pointerId:42,x:120,y:220,relativeWallMs:20},
+   {type:'pointerup',pointerId:42,x:120,y:220,relativeWallMs:100}
   ]},
   releaseTelemetry:{releaseWallMs:200,volleyEventsBeforeRelease:3,
    volleyEventsAfterRelease:0,lastPreReleaseBirthAgeMs:12},
@@ -31,6 +31,8 @@ test('matched seeded browser inputs remain descriptive, never causal',()=>{
  assert.equal(result.sameTouchSequence,true);
  assert.equal(result.maxAbsTouchTimingDeltaMs,0);
  assert.equal(result.matchedTouchTiming,true);
+ assert.equal(result.matchedTouchGeometry,true);
+ assert.equal(result.comparableTouchDelivery,true);
  assert.equal(result.causalClaimAllowed,false);
  assert.equal(result.control.volleyEventsAfterRelease,0);
  assert.equal(result.candidate.lastPreReleaseBirthAgeMs,12);
@@ -43,7 +45,19 @@ test('matching world alone does not imply matching touch histories',()=>{
  assert.equal(result.sameTouchSequence,true);
  assert.equal(result.maxAbsTouchTimingDeltaMs,25);
  assert.equal(result.matchedTouchTiming,false);
+ assert.equal(result.comparableTouchDelivery,false);
  assert.equal(result.causalClaimAllowed,false);
+});
+
+test('identical event identities but different aim positions are not comparable',()=>{
+ const candidate=fixture(3);
+ candidate.touchInput.events[1].x+=30;
+ const result=summarize(fixture(2),candidate);
+ assert.equal(result.sameTouchSequence,true);
+ assert.equal(result.matchedTouchTiming,true);
+ assert.equal(result.maxTouchPositionDeltaPx,30);
+ assert.equal(result.matchedTouchGeometry,false);
+ assert.equal(result.comparableTouchDelivery,false);
 });
 
 test('different pointer histories cannot be compared by index',()=>{
