@@ -38,7 +38,8 @@ function summarize(control,candidate){
    assert.ok(['pointerdown','pointermove','pointerup','pointercancel'].includes(e.type),
     `${label}: invalid touch event type`);
    assert.ok(Number.isInteger(e.pointerId)&&Number.isFinite(e.relativeWallMs)&&
-    Number.isFinite(e.x)&&Number.isFinite(e.y)&&e.relativeWallMs>=0,
+    Number.isFinite(e.x)&&Number.isFinite(e.y)&&e.relativeWallMs>=0&&
+    Number.isInteger(e.nominalOwnerTick)&&e.nominalOwnerTick>=0,
     `${label}: invalid touch event timestamp/identity/position`);
    if(i)assert.ok(e.relativeWallMs>=report.touchInput.events[i-1].relativeWallMs,
     `${label}: touch events not chronological`);
@@ -68,6 +69,11 @@ function summarize(control,candidate){
   candidate.touchInput.events[i].relativeWallMs-e.relativeWallMs):[];
  const maxAbsTouchTimingDeltaMs=sameTouchSequence?
   Math.max(0,...touchTimingDeltasMs.map(Math.abs)):null;
+ // Nominal owner ticks are a stronger diagnostic than a loose wall-time
+ // threshold. They are NOT a guarantee of equal consumed simulation ticks
+ // under backlog, pause, or long-stall recovery.
+ const sameNominalInputTicks=sameTouchSequence&&control.touchInput.events.every((e,i)=>
+  e.nominalOwnerTick===candidate.touchInput.events[i].nominalOwnerTick);
  const firstTouchOwnerPhaseDeltaMs=candidate.touchInput.firstTouchOwnerPhaseMs-
   control.touchInput.firstTouchOwnerPhaseMs;
  const maxTouchPositionDeltaPx=sameTouchSequence?Math.max(0,
@@ -100,13 +106,14 @@ function summarize(control,candidate){
  const durationRatio=Math.max(a.wallMs,b.wallMs)/Math.min(a.wallMs,b.wallMs);
  return {initialFingerprint:control.initialFingerprint,control:a,candidate:b,
   durationRatio,matchedObservationDuration:durationRatio<=1.05,
-  sameTouchSequence,maxAbsTouchTimingDeltaMs,maxTouchPositionDeltaPx,
+  sameTouchSequence,sameNominalInputTicks,maxAbsTouchTimingDeltaMs,maxTouchPositionDeltaPx,
   firstTouchOwnerPhaseDeltaMs,
   matchedTouchPhase:Math.abs(firstTouchOwnerPhaseDeltaMs)<=20,
   matchedTouchTiming:sameTouchSequence&&maxAbsTouchTimingDeltaMs<=20,
   matchedTouchGeometry:sameTouchSequence&&maxTouchPositionDeltaPx<=1,
   comparableTouchDelivery:sameTouchSequence&&maxAbsTouchTimingDeltaMs<=20&&
-   maxTouchPositionDeltaPx<=1&&Math.abs(firstTouchOwnerPhaseDeltaMs)<=20,
+   maxTouchPositionDeltaPx<=1&&Math.abs(firstTouchOwnerPhaseDeltaMs)<=20&&
+   sameNominalInputTicks,
   causalClaimAllowed:false,
   interpretation:'Descriptive browser observations only: even matched event sequences and delivery times do not establish equal combat trajectories, input-to-photon latency or device CPU safety.'};
 }
