@@ -11,7 +11,7 @@ function fixture(steps=2){
   controlledGate:true,configuredMaxSteps:steps,initialFingerprint:'1234abcd:200',
   droppedMs:0,ticks:12,updates:{p95:1},renders:{p95:2},
   touchToProjectileBirthMs:10,touchToCanvasSubmissionMs:12,
-  touchInput:{firstTouchWallMs:100,events:[
+  touchInput:{firstTouchWallMs:100,firstTouchOwnerPhaseMs:80,events:[
    {type:'pointerdown',pointerId:42,x:100,y:200,relativeWallMs:0},
    {type:'pointermove',pointerId:42,x:120,y:220,relativeWallMs:20},
    {type:'pointerup',pointerId:42,x:120,y:220,relativeWallMs:100}
@@ -33,6 +33,8 @@ test('matched seeded browser inputs remain descriptive, never causal',()=>{
  assert.equal(result.matchedTouchTiming,true);
  assert.equal(result.matchedTouchGeometry,true);
  assert.equal(result.comparableTouchDelivery,true);
+ assert.equal(result.firstTouchOwnerPhaseDeltaMs,0);
+ assert.equal(result.matchedTouchPhase,true);
  assert.equal(result.causalClaimAllowed,false);
  assert.equal(result.control.volleyEventsAfterRelease,0);
  assert.equal(result.candidate.lastPreReleaseBirthAgeMs,12);
@@ -57,6 +59,18 @@ test('identical event identities but different aim positions are not comparable'
  assert.equal(result.matchedTouchTiming,true);
  assert.equal(result.maxTouchPositionDeltaPx,30);
  assert.equal(result.matchedTouchGeometry,false);
+ assert.equal(result.comparableTouchDelivery,false);
+});
+
+test('identical gestures at different owner phases are not comparable',()=>{
+ const candidate=fixture(3);
+ candidate.touchInput.firstTouchOwnerPhaseMs+=40;
+ const result=summarize(fixture(2),candidate);
+ assert.equal(result.sameTouchSequence,true);
+ assert.equal(result.matchedTouchTiming,true);
+ assert.equal(result.matchedTouchGeometry,true);
+ assert.equal(result.firstTouchOwnerPhaseDeltaMs,40);
+ assert.equal(result.matchedTouchPhase,false);
  assert.equal(result.comparableTouchDelivery,false);
 });
 
