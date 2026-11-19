@@ -314,7 +314,7 @@ test('Tempest aligned-target HP recovery holds across neighboring 20ms touch pha
 });
 
 
-test('composed Tempest six-tick policies preserve real HP contact under a triple-active burst',()=>{
+test('composed Tempest six-tick policies expose real HP contact recovery under a triple-active burst',()=>{
  // A source-executed Game/Input counterpart to the capacity-matched stub
  // owner witness. No browser, device or production scheduler policy changes.
  const intervals=Array.from({length:5},()=>[
