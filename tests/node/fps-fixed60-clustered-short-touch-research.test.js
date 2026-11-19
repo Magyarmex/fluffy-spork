@@ -103,3 +103,25 @@ test('eight-tick active 30Hz burst can still swallow a legal short touch pulse',
  console.log('EIGHT_TICK_SHORT_TOUCH_LIMIT '+JSON.stringify({baseline,candidate,
   caveat:'research owner and stub input; not actual Chromium or player damage'}));
 });
+
+
+test('clustered 30Hz can lose a 20ms touch that native60 always samples',()=>{
+ // A 20ms held interval exceeds one 60Hz simulation tick. Unlike the
+ // existing 12ms test, native60 cannot miss it merely from tick phase.
+ const pulse=[{at:170,type:'pointerdown'},{at:190,type:'pointerup'}];
+ const native=replay(uniform60(),2,2,pulse);
+ const constrained=replay(clustered30(),2,2,pulse);
+ assert.equal(native.fireUpdates,1,'native60 must sample a 20ms press');
+ assert.equal(native.droppedMs,0);
+ assert.equal(constrained.applied,2,'both DOM edges must reach the timeline');
+ assert.equal(constrained.late+constrained.reordered+constrained.stale,0);
+ assert.ok(constrained.droppedMs>0,'this clustered schedule must skip simulation time');
+ assert.equal(constrained.fireUpdates,0,
+  'a 20ms press can disappear when the sole firing tick is skipped');
+ for(const [maxSteps,backlogExtraTicks] of [[2,4],[3,2]]){
+  const recovered=replay(clustered30(),maxSteps,backlogExtraTicks,pulse);
+  assert.equal(recovered.droppedMs,0);
+  assert.equal(recovered.fireUpdates,native.fireUpdates,
+   'recovery must preserve the legal press without inventing extra firing');
+ }
+});
