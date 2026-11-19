@@ -619,7 +619,10 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     updates:values(window.__novaFixedResearch.updates),
     renders:values(window.__novaFixedResearch.renders),
     births:window.__novaFixedResearch.births,
-    releaseTelemetry,touchInput,appliedTouchEvents:window.__novaFixedResearch.appliedTouchEvents,
+    releaseTelemetry,touchInput,
+    touchResetBeforeRelease:!!(release&&firstTouchWallMs!=null&&frames.some(f=>
+     f.dropReason==='long-stall'&&f.ts>=firstTouchWallMs&&f.ts<release.wallMs)),
+    appliedTouchEvents:window.__novaFixedResearch.appliedTouchEvents,
     touchToProjectileBirthMs:window.__novaFixedResearch.firstProjectileBirthAt==null||
      window.__novaFixedResearch.firstAimMoveAt==null?null:
      window.__novaFixedResearch.firstProjectileBirthAt-window.__novaFixedResearch.firstAimMoveAt,
@@ -631,28 +634,36 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     // Playwright addScriptTag({path}) injects inline contents, not a src URL.
     researchFactoryPresent:typeof window.__novaFixed60Research?.createFixedStepBrowserPilot==='function'};
   });
-  // This witness is about actual chronological Input application, not
-  // DOM delivery or a hypothetical nominal simulation tick.
+  // Witness real handler application. A >100ms foreground stall can
+  // legitimately quarantine the held touch before the trusted pointerup;
+  // in that case release is fail-closed rather than replayed into Input.
   const applied=report.appliedTouchEvents;
-  assert.ok(Array.isArray(applied)&&applied.length>=3,
+  assert.ok(Array.isArray(applied)&&applied.length>=2,
    'real browser touch must reach chronological Game input handlers');
   assert.equal(applied[0].type,'pointerdown');
-  assert.equal(applied.at(-1).type,'pointerup');
+  assert.ok(applied.some(e=>e.type==='pointermove'),
+   'real aim extension must reach the actual Input handler');
   assert.ok(applied.every((e,i)=>Number.isInteger(e.pointerId)&&
+   e.pointerId===applied[0].pointerId&&
    Number.isFinite(e.replayAtSec)&&Number.isFinite(e.sampleAtSec)&&
    Number.isInteger(e.ownerTicksBeforeUpdate)&&e.ownerTicksBeforeUpdate>=0&&
    Number.isFinite(e.wallMs)&&
    e.sampleAtSec+1e-8>=e.replayAtSec&&
    (!i||e.sampleAtSec+1e-8>=applied[i-1].sampleAtSec)),
-   'applied touch evidence must have monotonic simulation-consumption boundaries');
-  assert.equal(applied[0].pointerId,applied.at(-1).pointerId,
-   'actual release must reach the original input owner');
+   'applied touch evidence must have monotonic same-owner consumption boundaries');
   assert.equal(applied[0].aimOwnerAfter,applied[0].pointerId,
    'applied touch-down must actually acquire the aim owner');
   assert.equal(applied[0].aimActiveAfter,true);
-  assert.equal(applied.at(-1).aimOwnerAfter,-1,
-   'applied touch release must relinquish the aim owner');
-  assert.equal(applied.at(-1).aimActiveAfter,false);
+  if(applied.at(-1).type==='pointerup'){
+   assert.equal(applied.at(-1).aimOwnerAfter,-1,
+    'applied touch release must relinquish the aim owner');
+   assert.equal(applied.at(-1).aimActiveAfter,false);
+  }else{
+   assert.equal(report.touchResetBeforeRelease,true,
+    'missing applied release requires a witnessed held-touch foreground reset');
+   assert.equal(report.aimActive,false,
+    'quarantined touch must remain released after the trusted pointerup');
+  }
   if(process.env.NOVA_FIXED60_REPORT_FILE){
    // Save exact browser observations for a separate, explicitly non-causal
    // paired comparison. Never manufacture matched wall time from tick count.
