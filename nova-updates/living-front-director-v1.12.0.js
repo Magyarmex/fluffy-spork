@@ -528,7 +528,20 @@ function updateContest(g,st){
  st.contestSignal={sector:op.sector,until:Math.min(op.until,now+1.4),announcedAt:op.announcedAt,pilotRef:g.player};
  return true;
 }
-function saturation(g,key,id){var n=0,ts=g.tanks||[];for(var i=0;i<ts.length;i++){var q=ts[i];if(q&&q.id!==id&&q.ai&&alive(q)&&q.ai.__lfEcoKey===key&&q.ai.__lfEcoWeight>.05)n++;}return n;}
+/* Only physically witnessed occupancy can discourage a rotation. Another
+ * bot's private ecology assignment is never public intelligence. Keep this
+ * local to the observer's gameplay viewport and terrain line of sight. */
+function saturation(g,t,x,y){
+ var n=0,ts=g.tanks||[];
+ for(var i=0;i<ts.length;i++){
+  var q=ts[i];
+  if(!q||q===t||!q.ai||!alive(q)||q.spawnShieldT>0||
+     !Number.isFinite(q.x)||!Number.isFinite(q.y))continue;
+  if(Math.hypot(q.x-x,q.y-y)>260||!visible(g,t,q))continue;
+  n++;
+ }
+ return n;
+}
 /* The strategic score and its movement bearing must use the SAME terrain
  * route. Previously routeCost checked a waypoint but AI still steered along
  * the blocked straight line, undoing Battlefield routing at the final move.
@@ -596,10 +609,10 @@ function publicEcoBias(g,t,defs,out,classes){out=out||{};out.x=0;out.y=0;out.wei
 if(sig&&sig.started!=null&&now<sig.started)sig=null;
 if(hp<.30){migrationAudit(g,'health');return out;}
 if(target&&d2(t.x,t.y,target.x,target.y)<330*330){migrationAudit(g,'combat');return out;}
-var bx=0,by=0,bw=0,key='none',mode='none',judgment=a.isElite?1.08:.94;/* Once a rival physically reaches a live public BLOOM sector, stop pulling it toward the arbitrary sector center. Its ordinary visible farming/combat choices regain priority; this mirrors the stale-memory arrival handoff. */if(sig&&now<sig.until&&!(sig.type==='BLOOM'&&sectorIndex(t.x,t.y)===sig.sector)){var sx=sig.x,sy=sig.y;if(sig.type==='ROGUE STAR'&&sig.starId&&g.getShape){var star=g.getShape(sig.starId);if(star){/* Only a visible Star updates AI memory. When it escapes sight, pursue the last seen position rather than gaining remote tracking or forgetting the sighting. */if(visible(g,t,star)){sx=star.x;sy=star.y;a.__lfStarSeenId=sig.starId;a.__lfStarSeenX=sx;a.__lfStarSeenY=sy;}else if(a.__lfStarSeenId===sig.starId&&Number.isFinite(a.__lfStarSeenX)&&Number.isFinite(a.__lfStarSeenY)){sx=a.__lfStarSeenX;sy=a.__lfStarSeenY;}}else return out;}var direct=Math.hypot(sx-t.x,sy-t.y),bearing={},dist=routeCost(g,t,sx,sy,direct,bearing,classes),base=sig.type==='ROGUE STAR'?.87:sig.type==='BLOOM'?.68:.48,k=sig.type+':'+(sig.sector!=null?sig.sector:sig.to!=null?sig.to:sig.starId||0),crowd=saturation(g,k,t.id),score=base-dist/2300-crowd*.13;
+var bx=0,by=0,bw=0,key='none',mode='none',judgment=a.isElite?1.08:.94;/* Once a rival physically reaches a live public BLOOM sector, stop pulling it toward the arbitrary sector center. Its ordinary visible farming/combat choices regain priority; this mirrors the stale-memory arrival handoff. */if(sig&&now<sig.until&&!(sig.type==='BLOOM'&&sectorIndex(t.x,t.y)===sig.sector)){var sx=sig.x,sy=sig.y;if(sig.type==='ROGUE STAR'&&sig.starId&&g.getShape){var star=g.getShape(sig.starId);if(star){/* Only a visible Star updates AI memory. When it escapes sight, pursue the last seen position rather than gaining remote tracking or forgetting the sighting. */if(visible(g,t,star)){sx=star.x;sy=star.y;a.__lfStarSeenId=sig.starId;a.__lfStarSeenX=sx;a.__lfStarSeenY=sy;}else if(a.__lfStarSeenId===sig.starId&&Number.isFinite(a.__lfStarSeenX)&&Number.isFinite(a.__lfStarSeenY)){sx=a.__lfStarSeenX;sy=a.__lfStarSeenY;}}else return out;}var direct=Math.hypot(sx-t.x,sy-t.y),bearing={},dist=routeCost(g,t,sx,sy,direct,bearing,classes),base=sig.type==='ROGUE STAR'?.87:sig.type==='BLOOM'?.68:.48,k=sig.type+':'+(sig.sector!=null?sig.sector:sig.to!=null?sig.to:sig.starId||0),crowd=saturation(g,t,sx,sy),score=base-dist/2300-crowd*.13;
 if(sig.type==='MIGRATION')migrationAudit(g,!Number.isFinite(dist)?'blocked':score>.20?'steer':'score',dist,crowd);
 if(score>.20){bx=bearing.x;by=bearing.y;bw=clamp(score*(.72+.28*hp)*judgment,0,.48);key=k;mode='signal';if(sig.type==='MIGRATION')a.__lfMigrationSignalStarted=sig.started;}}
- if(bw<=.04){var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__,ext=F&&F.viewportHalfExtents?F.viewportHalfExtents(g):{x:Math.max(280,(g.w||800)/2),y:Math.max(220,(g.h||600)/2)},rad=Math.hypot(ext.x,ext.y),cand=st?LF.query(g,st,t.x,t.y,rad,0):(g.shapes||[]),vx=0,vy=0,value=0,count=0;for(var i=0;i<cand.length;i++){var s=cand[i];if(!s||s.kind!=='shape'||s.hp<=0||s.type==='crasher'||!visible(g,t,s))continue;var w=Math.max(5,xp(defs,s.type));vx+=s.x*w;vy+=s.y*w;value+=w;count++;}if(count>=4&&value>=170){vx/=value;vy/=value;var dx2=vx-t.x,dy2=vy-t.y,m2=Math.hypot(dx2,dy2)||1,k2='LOCAL:'+sectorIndex(vx,vy),bearing2={},travel=routeCost(g,t,vx,vy,m2,bearing2,classes),score2=clamp((value-160)/750,0,.36)-travel/3200-saturation(g,k2,t.id)*.10;if(score2>.08){bx=bearing2.x;by=bearing2.y;bw=clamp(score2*judgment,0,.32);key=k2;mode='local';}}}
+ if(bw<=.04){var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__,ext=F&&F.viewportHalfExtents?F.viewportHalfExtents(g):{x:Math.max(280,(g.w||800)/2),y:Math.max(220,(g.h||600)/2)},rad=Math.hypot(ext.x,ext.y),cand=st?LF.query(g,st,t.x,t.y,rad,0):(g.shapes||[]),vx=0,vy=0,value=0,count=0;for(var i=0;i<cand.length;i++){var s=cand[i];if(!s||s.kind!=='shape'||s.hp<=0||s.type==='crasher'||!visible(g,t,s))continue;var w=Math.max(5,xp(defs,s.type));vx+=s.x*w;vy+=s.y*w;value+=w;count++;}if(count>=4&&value>=170){vx/=value;vy/=value;var dx2=vx-t.x,dy2=vy-t.y,m2=Math.hypot(dx2,dy2)||1,k2='LOCAL:'+sectorIndex(vx,vy),bearing2={},travel=routeCost(g,t,vx,vy,m2,bearing2,classes),score2=clamp((value-160)/750,0,.36)-travel/3200-saturation(g,t,vx,vy)*.10;if(score2>.08){bx=bearing2.x;by=bearing2.y;bw=clamp(score2*judgment,0,.32);key=k2;mode='local';}}}
 /* AI may remember a *publicly announced* BLOOM, never hidden sector maturity.
  * The stale opportunity loses confidence with age and loses to a stronger
  * locally visible farm. Saturation reuses the live BLOOM key so bots do not
@@ -610,7 +623,7 @@ if((!sig||now>=sig.until)&&st){
   var c=sectorCenter(remembered.sector),dx3=c.x-t.x,dy3=c.y-t.y,direct3=Math.hypot(dx3,dy3),
    conf=clamp((remembered.until-now)/24,0,1),bearing3={},dist3=routeCost(g,t,c.x,c.y,direct3,bearing3,classes),
    k3='BLOOM:'+remembered.sector,
-   score3=.54*Math.sqrt(conf)-dist3/2600-saturation(g,k3,t.id)*.13,
+   score3=.54*Math.sqrt(conf)-dist3/2600-saturation(g,t,c.x,c.y)*.13,
    memoryWeight=clamp(score3*.5*judgment,0,.26);
   if(direct3>120&&score3>.20&&memoryWeight>bw+.03){
    bx=bearing3.x;by=bearing3.y;bw=memoryWeight;key=k3;mode='memory';
