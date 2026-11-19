@@ -264,16 +264,19 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
      const original=inputHandlers[method];
      const hadOwn=Object.prototype.hasOwnProperty.call(inputHandlers,method);
      const wrapped=function(event){
+      const result=original.call(this,event);
       if(event?.pointerType==='touch'&&Number.isFinite(event.__novaSampleAt)){
        profile.appliedTouchEvents.push({
         type:event.type||type,pointerId:event.pointerId,
         replayAtSec:event.__novaReplayAt,sampleAtSec:event.__novaSampleAt,
         ownerTicksBeforeUpdate:pilot.owner.ticks,
         wallMs:performance.now(),
-        appliedDuringSkip:event.__novaSampleAt<=pilot.owner.simAtSec+1e-8
+        appliedDuringSkip:event.__novaSampleAt<=pilot.owner.simAtSec+1e-8,
+        aimOwnerAfter:this.stickId?.aim??-1,
+        aimActiveAfter:!!this.aim?.active
        });
       }
-      return original.call(this,event);
+      return result;
      };
      inputHandlers[method]=wrapped;
      handlerRestores.push([method,original,wrapped,hadOwn]);
