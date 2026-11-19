@@ -132,6 +132,9 @@ function runTouch(seed,intervals,releaseKind='pointerup'){
     callback=null;next(now);
    }
    assertNoTarget(g);
+   assert.equal(g.input.firing,false,'released/cancelled touch must clear held fire');
+   assert.equal(g.input.aim.active,false,'released/cancelled touch must clear aim ownership');
+   assert.equal(g.input.stickId.aim,-1,'released/cancelled aim pointer must be unowned');
    return {volleys,shotTimes,hash:digest(physical(g)),draws:draws(),
     ticks:owner.ticks,dropped:owner.droppedFrames,applied:timeline.applied,
     weapon:{fireCd:p.fireCd,heat:p.__v17Heat,stability:p.__v17Stability,
