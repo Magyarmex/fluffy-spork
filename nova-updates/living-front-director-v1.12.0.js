@@ -529,17 +529,21 @@ function updateContest(g,st){
  return true;
 }
 /* Only physically witnessed occupancy can discourage a rotation. Another
- * bot's private ecology assignment is never public intelligence. Keep this
- * local to the observer's gameplay viewport and terrain line of sight. */
+ * bot's private ecology assignment is never public intelligence. Hulls in
+ * the gameplay viewport are known through the public minimap even behind
+ * cover (AI_DOCTRINE.md); line of fire is a separate combat restriction. */
 function saturation(g,t,x,y){
- var n=0,ts=g.tanks||[];
+ var n=0,ts=g.tanks||[],F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+ var z=(g.cam&&g.cam.zoom)||1,hx=(g.w||800)/(2*z),hy=(g.h||600)/(2*z);
  for(var i=0;i<ts.length;i++){
   var q=ts[i];
   if(!q||q===t||!q.ai||!alive(q)||q.spawnShieldT>0||
      !Number.isFinite(q.x)||!Number.isFinite(q.y))continue;
-  if(Math.hypot(q.x-x,q.y-y)>260||!visible(g,t,q))continue;
-  /* Eight observed bodies already veto every ecology score (maximum base
-   * is 0.87); cap expensive terrain visibility queries in dense brawls. */
+  if(Math.hypot(q.x-x,q.y-y)>260)continue;
+  if(F&&F.inGameplayViewport?!F.inGameplayViewport(g,t,q):
+     (Math.abs(q.x-t.x)>hx||Math.abs(q.y-t.y)>hy))continue;
+  /* Eight visible bodies already veto every ecology score (max base .87).
+   * Stop before dense matches can add unbounded per-bot scan work. */
   if(++n>=8)break;
  }
  return n;
