@@ -73,12 +73,12 @@ function run(seed,reload,hz){
 }
 test('Tempest legal reload builds expose composed per-shot heat and cooldown chronology',()=>{
  const rows=[];
- for(const reload of [0,4,8])for(const hz of [30,60,120]){
+ for(const reload of [0,4,5,8])for(const hz of [30,60,120]){
   const a=run(1517800,reload,hz),b=run(1517802,reload,hz);
   assert.deepEqual({...a,seed:0},{...b,seed:0},
    'isolated deterministic chronology must not depend on world seed');
   rows.push(a);
  }
- assert.equal(rows.length,9);
+ assert.equal(rows.length,12);
  console.log('TEMPEST_SHOT_STATE_TRACE '+JSON.stringify(rows));
 });
