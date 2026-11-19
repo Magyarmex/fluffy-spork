@@ -52,3 +52,17 @@ test('observer records are independent and the visible-identity cache is bounded
  q.x=90;
  assert.equal(w.sample(a,[q],goal,1,seen),0,'evicted record cannot certify');
 });
+
+test('omitted viewport contacts and a changed public destination reset approach evidence',()=>{
+ const w=createPublicApproachWitness(),o=body(1),q=body(2);
+ assert.equal(w.sample(o,[q],goal,0,seen),0);
+ q.x=30;assert.equal(w.sample(o,[q],goal,.25,seen),0);
+ assert.equal(w.sample(o,[],goal,.5,seen),0,'missing viewport sample');
+ q.x=60;assert.equal(w.sample(o,[q],goal,.75,seen),0,'cannot infer unseen travel');
+ q.x=90;assert.equal(w.sample(o,[q],goal,1,seen),0);
+ const movedGoal={x:600,y:0};
+ q.x=120;assert.equal(w.sample(o,[q],movedGoal,1.25,seen),0,
+  'new public destination invalidates the prior trajectory');
+ q.x=150;assert.equal(w.sample(o,[q],movedGoal,1.5,seen),0);
+ q.x=180;assert.equal(w.sample(o,[q],movedGoal,1.75,seen),1);
+});
