@@ -56,6 +56,9 @@ function run(seed,reload,hz){
    const summary={seed,reload,hz,volleys:shots.length,
     boost:shots.filter(s=>s.boost).length,
     redline:shots.filter(s=>s.redline).length,
+    cooldownAbove30HzTick:shots.filter(s=>s.cd>1/30+1e-9).length,
+    redlineAbove30HzTick:shots.filter(s=>s.redline&&s.cd>1/30+1e-9).length,
+    redlineAtOrBelow30HzTick:shots.filter(s=>s.redline&&s.cd<=1/30+1e-9).length,
     first:shots.slice(0,6).map(s=>({
      time:+s.time.toFixed(5),preHeat:+s.pre.heat.toFixed(5),
      heat:+s.heat.toFixed(5),cd:+s.cd.toFixed(5),
