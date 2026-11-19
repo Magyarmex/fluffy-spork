@@ -1,6 +1,6 @@
 'use strict';
 /* #799 research only. Exercise the ACTUAL composed Game and Canvas renderer
- * with the equal-total-backlog 3+3 and 4+2 fixed60 policies. This is Node
+ * with the equal-total-backlog 2+4, 3+3 and 4+2 fixed60 policies. This is Node
  * JavaScript CPU evidence, not Chromium paint or physical Android approval.
  * No production scheduler, input, weapons, or materializer changes. */
 const test=require('node:test');
@@ -34,7 +34,7 @@ function witness(cls,seed,cadence,maxSteps,backlogExtraTicks){
  }
  return result;
 }
-test('equal-backlog 3+3 and 4+2 expose real Gunner/Carrier/Hivemind CPU burst costs',()=>{
+test('equal-backlog 2+4, 3+3 and 4+2 expose real Gunner/Carrier/Hivemind CPU burst costs',()=>{
  const rows=[];
  for(const cadence of ['30Hz-adversarial','30Hz-adversarial95',
   '30Hz-seeded-contrast','30Hz-display-quantized']){
@@ -46,15 +46,19 @@ test('equal-backlog 3+3 and 4+2 expose real Gunner/Carrier/Hivemind CPU burst co
  }
  for(const cadence of ['30Hz-adversarial','30Hz-adversarial95','30Hz-seeded-contrast','30Hz-display-quantized'])
  for(const cls of ['minigun','carrier','hivemind'])for(const seed of [1517800,1517802]){
+  const two=witness(cls,seed,cadence,2,4);
   const three=witness(cls,seed,cadence,3,3);
   const four=witness(cls,seed,cadence,4,2);
   // The alternatives share six ticks of total capacity, not identical
   // per-frame chronology. Do not falsely require matching damage or hashes.
+  assert.equal(two.maxSteps+two.backlogExtraTicks,6);
   assert.equal(three.maxSteps+three.backlogExtraTicks,6);
   assert.equal(four.maxSteps+four.backlogExtraTicks,6);
   assert.ok(four.peakSteps>=three.peakSteps,
    'four-step candidate must not have less observed peak work on this trace');
-  assert.ok(four.updates<=120 && three.updates<=120);
+  assert.ok(two.updates<=120 && four.updates<=120 && three.updates<=120);
+  assert.equal(two.threeStepFrameSamples,0,'2+4 must never execute three updates');
+  assert.equal(two.fourStepFrameSamples,0,'2+4 must never execute four updates');
   assert.equal(three.fourStepFrameSamples,0,'3+3 must never execute four updates');
   assert.equal(four.fourStepFrameSamples>0,four.peakSteps===4,
    'four-update CPU samples must correspond to actual four-update callbacks');
@@ -64,6 +68,12 @@ test('equal-backlog 3+3 and 4+2 expose real Gunner/Carrier/Hivemind CPU burst co
   rows.push({cls,seed,cadence,
    world:{playerDrones:four.playerDroneCount,hostileTanks:four.hostileTankCount,
     neutralShapes:four.neutralShapeCount},
+   two:{updates:two.updates,droppedMs:two.droppedMs,
+    lagMs:two.lagMs,peakSteps:two.peakSteps,
+    frameCpuP95Ms:two.frameCpuP95Ms,
+    frameCpuPeakMs:two.frameCpuPeakMs,
+    updateCpuP95Ms:two.frameUpdateCpuP95Ms,
+    renderCpuP95Ms:two.frameRenderCpuP95Ms},
    three:{updates:three.updates,droppedMs:three.droppedMs,
     lagMs:three.lagMs,peakSteps:three.peakSteps,
     frameCpuP95Ms:three.frameCpuP95Ms,
