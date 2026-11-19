@@ -78,7 +78,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    }
    const renderMod=window.__novaMakeRequire('')('game/render');
    const baseStart=Game.prototype.start;
-   window.__novaFixedResearch={births:0,volleyBirthWallMs:[],updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[],poseFrames:[]};
+   window.__novaFixedResearch={births:0,volleyBirthWallMs:[],updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],appliedTouchEvents:[],frames:[],poseFrames:[]};
    const profile=window.__novaFixedResearch;
    // For the held-three-shot gate, use a real controlled 50ms RAF gap
    // instead of repeatedly blocking the main thread and accidentally
@@ -256,6 +256,24 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
       }
      },
      maxSteps:window.__novaFixedMaxSteps,backlogExtraTicks:controlledExtra});
+    // Record the real Input handler's simulation-consumption boundary.
+    // Browser delivery and nominal owner ticks alone do not prove when
+    // a queued touch actually reached Game input. Research-only witness.
+    for(const [method,type] of [['pd','pointerdown'],['pm','pointermove'],['pu','pointerup']]){
+     const original=this.input[method];
+     this.input[method]=function(event){
+      if(event?.pointerType==='touch'&&Number.isFinite(event.__novaSampleAt)){
+       profile.appliedTouchEvents.push({
+        type:event.type||type,pointerId:event.pointerId,
+        replayAtSec:event.__novaReplayAt,sampleAtSec:event.__novaSampleAt,
+        ownerTicksBeforeUpdate:pilot.owner.ticks,
+        wallMs:performance.now(),
+        appliedDuringSkip:event.__novaSampleAt<=pilot.owner.simAtSec+1e-8
+       });
+      }
+      return original.call(this,event);
+     };
+    }
     window.__novaFixedPilot=pilot;
     // Reuse PR #888's exact-source active-only policy in the real browser.
     // This is intentionally NOT installed in production or the bundle.
@@ -579,7 +597,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     updates:values(window.__novaFixedResearch.updates),
     renders:values(window.__novaFixedResearch.renders),
     births:window.__novaFixedResearch.births,
-    releaseTelemetry,touchInput,
+    releaseTelemetry,touchInput,appliedTouchEvents:window.__novaFixedResearch.appliedTouchEvents,
     touchToProjectileBirthMs:window.__novaFixedResearch.firstProjectileBirthAt==null||
      window.__novaFixedResearch.firstAimMoveAt==null?null:
      window.__novaFixedResearch.firstProjectileBirthAt-window.__novaFixedResearch.firstAimMoveAt,
