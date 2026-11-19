@@ -139,7 +139,8 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
       pendingBulletCore=false;
       if(profile.firstProjectileBirthAt!=null&&
          this.globalCompositeOperation==='lighter'&&this.fillStyle==='#ffffff'){
-       pendingBulletCore=(g.bullets||[]).some(b=>b&&b.ownerId===g.player?.id&&!b.beam&&
+       pendingBulletCore=(g.bullets||[]).some(b=>b&&
+        profile.firstProjectileIds?.includes(b.id)&&b.ownerId===g.player?.id&&!b.beam&&
         Math.abs(b.x-x)<1e-5&&Math.abs(b.y-y)<1e-5&&
         Math.abs(b.r*(0.72+(b.maxHp?Math.max(0.18,Math.min(1,(b.hp??b.maxHp)/b.maxHp)):1)*0.28)*0.55-r)<1e-4);
       }
@@ -173,8 +174,10 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     if(this===window.__novaFixedGame&&t===this.player&&this.bullets.length>before){
      profile.births+=this.bullets.length-before;
      profile.volleyBirthWallMs.push(performance.now());
-     if(profile.firstProjectileBirthAt==null)
+     if(profile.firstProjectileBirthAt==null){
       profile.firstProjectileBirthAt=performance.now();
+      profile.firstProjectileIds=this.bullets.slice(before).map(b=>b.id);
+     }
     }
     return out;
    };
@@ -381,6 +384,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    window.__novaFixedResearch.volleyBirthWallMs=[];
    window.__novaFixedResearch.firstAimMoveAt=null;
    window.__novaFixedResearch.firstProjectileBirthAt=null;
+   window.__novaFixedResearch.firstProjectileIds=[];
    window.__novaFixedResearch.firstProjectileCanvasSubmitAt=null;
    window.__novaFixedResearch.firstProjectileDrawCommandAt=null;
    window.__novaFixedResearch.projectileDrawCommands=0;
