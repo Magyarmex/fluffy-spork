@@ -117,14 +117,14 @@ const {chromium}=require('playwright');
   const deflect=report.events.find(e=>e.type==='pointermove');
   assert.ok(press&&deflect&&press.at<=deflect.at,
    'trusted touch press must precede the firing deflection');
-  assert.ok(report.births.every(b=>b.at>=deflect.at),
-   'player projectile must not predate the trusted firing deflection');
-  assert.ok(report.hits.every(h=>h.at>=report.births[0].at),
-   'target HP loss must not predate the first player projectile');
   assert.ok(report.targetReady&&report.targetAt,'real bullet must place reachable target');
   assert.ok(report.births.some(b=>b.ownerId===report.playerId));
   assert.ok(report.hits.some(h=>h.sourceId===report.playerId&&h.damage>0),
    'real composed Tempest projectile must reduce aligned target HP');
+  assert.ok(report.births.every(b=>b.at>=deflect.at),
+   'player projectile must not predate the trusted firing deflection');
+  assert.ok(report.hits.every(h=>h.at>=report.births[0].at),
+   'target HP loss must not predate the first player projectile');
   assert.ok(report.hits[0].at>=report.births[0].at,
    'physical HP contact cannot predate projectile birth');
   const release=report.events.find(e=>e.type==='pointerup'||e.type==='pointercancel');
