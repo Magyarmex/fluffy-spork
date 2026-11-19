@@ -305,6 +305,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    g.input.autofire=false;g.input.firing=false;
    g.player.fireCd=0;g.player.spawnShieldT=10;
    window.__novaFixedResearch.births=0;
+   window.__novaFixedResearch.volleyBirthWallMs=[];
    window.__novaFixedResearch.firstAimMoveAt=null;
    window.__novaFixedResearch.firstProjectileBirthAt=null;
    window.__novaFixedResearch.firstProjectileCanvasSubmitAt=null;
