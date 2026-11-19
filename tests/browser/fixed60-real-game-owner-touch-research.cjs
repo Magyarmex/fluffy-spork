@@ -652,6 +652,10 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     touchToCanvasSubmissionMs:window.__novaFixedResearch.firstProjectileCanvasSubmitAt==null||
      window.__novaFixedResearch.firstAimMoveAt==null?null:
      window.__novaFixedResearch.firstProjectileCanvasSubmitAt-window.__novaFixedResearch.firstAimMoveAt,
+    // Explicit truthful name; legacy alias retained for existing paired reports.
+    touchToPostBirthRenderReturnMs:window.__novaFixedResearch.firstProjectileCanvasSubmitAt==null||
+     window.__novaFixedResearch.firstAimMoveAt==null?null:
+     window.__novaFixedResearch.firstProjectileCanvasSubmitAt-window.__novaFixedResearch.firstAimMoveAt,
     // First actual player bullet core Canvas arc; not input-to-photon latency.
     projectileDrawCommands:window.__novaFixedResearch.projectileDrawCommands||0,
     touchToProjectileDrawCommandMs:window.__novaFixedResearch.firstProjectileDrawCommandAt==null||
@@ -703,7 +707,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    'trusted aim movement must precede first actual player projectile birth');
   assert.ok(Number.isFinite(report.touchToCanvasSubmissionMs)&&
    report.touchToCanvasSubmissionMs>=report.touchToProjectileBirthMs,
-   'first actual projectile must reach a real Canvas render submission');
+   'first projectile birth must precede a subsequent renderer return (not a draw proof)');
   assert.ok(Number.isFinite(report.touchToProjectileDrawCommandMs)&&
    report.touchToProjectileDrawCommandMs>=report.touchToProjectileBirthMs,
    'a player-owned projectile must emit a matching real Canvas core arc after birth');
