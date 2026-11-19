@@ -78,7 +78,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    }
    const renderMod=window.__novaMakeRequire('')('game/render');
    const baseStart=Game.prototype.start;
-   window.__novaFixedResearch={births:0,volleyBirthWallMs:[],updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],frames:[],poseFrames:[]};
+   window.__novaFixedResearch={births:0,volleyBirthWallMs:[],updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],appliedTouchEvents:[],frames:[],poseFrames:[]};
    const profile=window.__novaFixedResearch;
    // For the held-three-shot gate, use a real controlled 50ms RAF gap
    // instead of repeatedly blocking the main thread and accidentally
@@ -256,6 +256,46 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
       }
      },
      maxSteps:window.__novaFixedMaxSteps,backlogExtraTicks:controlledExtra});
+    // Record the real Input handler's simulation-consumption boundary.
+    // Browser delivery and nominal owner ticks alone do not prove when
+    // a queued touch actually reached Game input. Research-only witness.
+    const inputHandlers=this.input,handlerRestores=[];
+    for(const [method,type] of [['pd','pointerdown'],['pm','pointermove'],['pu','pointerup']]){
+     const original=inputHandlers[method];
+     const hadOwn=Object.prototype.hasOwnProperty.call(inputHandlers,method);
+     const wrapped=function(event){
+      const result=original.call(this,event);
+      if(event?.pointerType==='touch'&&Number.isFinite(event.__novaSampleAt)){
+       profile.appliedTouchEvents.push({
+        type:event.type||type,pointerId:event.pointerId,
+        replayAtSec:event.__novaReplayAt,sampleAtSec:event.__novaSampleAt,
+        ownerTicksBeforeUpdate:pilot.owner.ticks,
+        wallMs:performance.now(),
+        appliedDuringSkip:event.__novaSampleAt<=pilot.owner.simAtSec+1e-8,
+        aimOwnerAfter:this.stickId?.aim??-1,
+        aimActiveAfter:!!this.aim?.active
+       });
+      }
+      return result;
+     };
+     inputHandlers[method]=wrapped;
+     handlerRestores.push([method,original,wrapped,hadOwn]);
+    }
+    // Restore instrumented methods on normal, fatal or lifecycle stop.
+    const stopWithCapture=pilot.owner.stop.bind(pilot.owner);
+    pilot.owner.stop=function(...args){
+     try{return stopWithCapture(...args)}
+     finally{
+      for(const [method,original,wrapped,hadOwn] of handlerRestores){
+       if(inputHandlers[method]!==wrapped)continue;
+       if(hadOwn)inputHandlers[method]=original;
+       else delete inputHandlers[method];
+      }
+      profile.inputHandlersRestored=handlerRestores.every(
+       ([method,original,,hadOwn])=>inputHandlers[method]===original&&
+        Object.prototype.hasOwnProperty.call(inputHandlers,method)===hadOwn);
+     }
+    };
     window.__novaFixedPilot=pilot;
     // Reuse PR #888's exact-source active-only policy in the real browser.
     // This is intentionally NOT installed in production or the bundle.
@@ -580,6 +620,9 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     renders:values(window.__novaFixedResearch.renders),
     births:window.__novaFixedResearch.births,
     releaseTelemetry,touchInput,
+    touchResetBeforeRelease:!!(release&&firstTouchWallMs!=null&&frames.some(f=>
+     f.dropReason==='long-stall'&&f.ts>=firstTouchWallMs&&f.ts<release.wallMs)),
+    appliedTouchEvents:window.__novaFixedResearch.appliedTouchEvents,
     touchToProjectileBirthMs:window.__novaFixedResearch.firstProjectileBirthAt==null||
      window.__novaFixedResearch.firstAimMoveAt==null?null:
      window.__novaFixedResearch.firstProjectileBirthAt-window.__novaFixedResearch.firstAimMoveAt,
@@ -591,6 +634,36 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     // Playwright addScriptTag({path}) injects inline contents, not a src URL.
     researchFactoryPresent:typeof window.__novaFixed60Research?.createFixedStepBrowserPilot==='function'};
   });
+  // Witness real handler application. A >100ms foreground stall can
+  // legitimately quarantine the held touch before the trusted pointerup;
+  // in that case release is fail-closed rather than replayed into Input.
+  const applied=report.appliedTouchEvents;
+  assert.ok(Array.isArray(applied)&&applied.length>=2,
+   'real browser touch must reach chronological Game input handlers');
+  assert.equal(applied[0].type,'pointerdown');
+  assert.ok(applied.some(e=>e.type==='pointermove'),
+   'real aim extension must reach the actual Input handler');
+  assert.ok(applied.every((e,i)=>Number.isInteger(e.pointerId)&&
+   e.pointerId===applied[0].pointerId&&
+   Number.isFinite(e.replayAtSec)&&Number.isFinite(e.sampleAtSec)&&
+   Number.isInteger(e.ownerTicksBeforeUpdate)&&e.ownerTicksBeforeUpdate>=0&&
+   Number.isFinite(e.wallMs)&&
+   e.sampleAtSec+1e-8>=e.replayAtSec&&
+   (!i||e.sampleAtSec+1e-8>=applied[i-1].sampleAtSec)),
+   'applied touch evidence must have monotonic same-owner consumption boundaries');
+  assert.equal(applied[0].aimOwnerAfter,applied[0].pointerId,
+   'applied touch-down must actually acquire the aim owner');
+  assert.equal(applied[0].aimActiveAfter,true);
+  if(applied.at(-1).type==='pointerup'){
+   assert.equal(applied.at(-1).aimOwnerAfter,-1,
+    'applied touch release must relinquish the aim owner');
+   assert.equal(applied.at(-1).aimActiveAfter,false);
+  }else{
+   assert.equal(report.touchResetBeforeRelease,true,
+    'missing applied release requires a witnessed held-touch foreground reset');
+   assert.equal(report.aimActive,false,
+    'quarantined touch must remain released after the trusted pointerup');
+  }
   if(process.env.NOVA_FIXED60_REPORT_FILE){
    // Save exact browser observations for a separate, explicitly non-causal
    // paired comparison. Never manufacture matched wall time from tick count.
@@ -732,6 +805,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    const stopped={started:p.owner.started,captureActive:p.capture.active,
     raf:g.raf,inputRestored:g.input.canvas===g.canvas,
     startRestored:g.start===Game.prototype.start,
+    inputHandlersRestored:!!window.__novaFixedResearch.inputHandlersRestored,
     destroyRestored:g.destroy===Game.prototype.destroy,
     pauseRestored:g.setPaused===Game.prototype.setPaused};
    g.destroy();
@@ -741,7 +815,8 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   });
   assert.deepEqual(teardown,{
    started:false,captureActive:false,raf:null,inputRestored:true,
-   startRestored:true,destroyRestored:true,pauseRestored:true,
+   startRestored:true,inputHandlersRestored:true,
+   destroyRestored:true,pauseRestored:true,
    destroyed:true,musicTimer:null,pendingGateRequests:0
   },'pilot teardown must restore native controls and release Game/audio/RAF ownership');
   console.log('NOVA_FIXED60_CHROMIUM_OWNER_TOUCH '+JSON.stringify(report));
