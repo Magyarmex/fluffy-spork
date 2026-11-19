@@ -15,7 +15,7 @@ const pulse=[
  {at:141,type:'pointermove',x:680,buttons:1},
  {at:152,type:'pointerup',x:680,buttons:0}
 ];
-function run(intervals,maxSteps,extra,{classId='scout',events=pulse}={}){
+function run(intervals,maxSteps,extra,{classId='scout',events=pulse,targetX=200,targetY=0,manualAim=false}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
@@ -25,7 +25,7 @@ function run(intervals,maxSteps,extra,{classId='scout',events=pulse}={}){
   const target=g.tanks.find(t=>t!==p);
   assert.ok(target,'composed Game must contain target');
   Object.assign(target,{cls:'scout',isPlayer:true,alive:true,
-   x:200,y:0,vx:0,vy:0,hp:100000,maxHp:100000,
+   x:targetX,y:targetY,vx:0,vy:0,hp:100000,maxHp:100000,
    spawnShieldT:0,shieldT:0,bulwarkT:0,tauntT:0,cloakT:0});
   g.tanks=[p,target];g.tankById=new Map([[p.id,p],[target.id,target]]);
   g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];g.orbs=[];
@@ -37,22 +37,41 @@ function run(intervals,maxSteps,extra,{classId='scout',events=pulse}={}){
   g.spawnShape=()=>null;g.spawnPowerup=()=>null;
   g.spawnAITank=()=>null;g.spawnDrone=()=>null;
   g.status='playing';g.paused=false;g.input.autofire=false;g.input.mouseActive=false;
+  // The HP-distance experiment must not let automatic target assistance
+  // rotate the muzzle toward the very target used as its negative control.
+  if(manualAim){
+   const nearest=g.nearestTank;
+   g.nearestTank=function(x,y,radius,except){
+    if(except===p.id&&radius===480&&x===p.x&&y===p.y)return null;
+    return nearest.apply(this,arguments);
+   };
+  }
+
   let now=1000,callback=null,volleys=0,hits=0,damage=0;
-  const births=[],sampled=[],rendered=[];
+  const births=[],birthVectors=[],contacts=[],sampled=[],rendered=[];
   const originalFire=g.tryFire,originalDamage=g.damageTank,originalUpdate=g.update;
   g.tryFire=function(t){
    const n=this.bullets.length,out=originalFire.apply(this,arguments);
-   if(t===p&&this.bullets.length>n){volleys++;births.push(+this.time.toFixed(6));}
+   if(t===p&&this.bullets.length>n){
+    volleys++;births.push(+this.time.toFixed(6));
+    const b=this.bullets[this.bullets.length-1];
+    birthVectors.push({time:+this.time.toFixed(6),x:+b.x.toFixed(3),
+     y:+b.y.toFixed(3),vx:+b.vx.toFixed(3),vy:+b.vy.toFixed(3)});
+   }
    return out;
   };
   g.damageTank=function(t){
    const hp=t.hp,out=originalDamage.apply(this,arguments);
-   if(t===target&&t.hp<hp){hits++;damage+=hp-t.hp;}
+   if(t===target&&t.hp<hp){
+    assert.equal(arguments[2],p.id,'target HP must fall from a player-owned projectile');
+    hits++;damage+=hp-t.hp;
+    contacts.push({time:+this.time.toFixed(6),delta:+(hp-t.hp).toFixed(5)});
+   }
    return out;
   };
   g.update=function(dt){
    const out=originalUpdate.apply(this,arguments);
-   target.x=200;target.y=0;target.vx=0;target.vy=0;return out;
+   target.x=targetX;target.y=targetY;target.vx=0;target.vy=0;return out;
   };
   const timeline=new ChronologicalInput(g.input);
   const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
@@ -96,7 +115,8 @@ function run(intervals,maxSteps,extra,{classId='scout',events=pulse}={}){
    return {ticks:owner.ticks,droppedMs:+owner.droppedMs.toFixed(4),
     queuedMs:+owner.lagMs.toFixed(4),volleys,hits,damage:+damage.toFixed(5),
     heat:+(p.__v17Heat||0).toFixed(6),fireCd:+p.fireCd.toFixed(6),
-    births,firstRenderCallbackMs:rendered.find(x=>x.volleys>0)?.wall??null,
+    births,birthVectors,contacts,
+    firstRenderCallbackMs:rendered.find(x=>x.volleys>0)?.wall??null,
     sampled:sampled.map(e=>({...e}))};
   }finally{owner.stop();g.destroy();}
  });
@@ -209,4 +229,56 @@ test('composed Tempest centered touch cannot masquerade as a recovered shot',()=
   assert.deepEqual(result.births,[]);
   assert.equal(result.sampled.length,2);
  }
+});
+
+// #648 diagnostic: establish an actually hittable close target before
+// promoting short-touch scheduler comparisons to an HP fairness gate.
+test('Tempest short-touch target-distance census records real HP contacts',()=>{
+ const events=[
+  {at:170,type:'pointerdown',x:640,buttons:1},
+  {at:172,type:'pointermove',x:680,buttons:1},
+  {at:190,type:'pointerup',x:680,buttons:0}
+ ];
+ const mean30=Array.from({length:15},()=>[55,55,1000/15-55,1000/15-55]).flat();
+ const rows=[];
+ for(const [targetX,targetY] of [[80,0],[100,-25],[140,-25],[200,120]]){
+  const opts={classId:'tempest',events,targetX,targetY,manualAim:true};
+  const native=run(uniform,2,2,opts);
+  const lost=run(mean30,2,2,opts);
+  const recovered=run(mean30,3,2,opts);
+  const recoveredBacklog=run(mean30,2,4,opts);
+  assert.equal(native.volleys,1,'native60 short pulse must fire');
+  assert.equal(recovered.volleys,1,'fully recovered pulse must fire');
+  assert.equal(recovered.droppedMs,0);
+  assert.equal(recoveredBacklog.droppedMs,0);
+  assert.equal(recoveredBacklog.volleys,native.volleys);
+  assert.equal(recoveredBacklog.damage,native.damage);
+  assert.equal(recoveredBacklog.hits,native.hits);
+  assert.deepEqual(recoveredBacklog.contacts,native.contacts);
+  assert.deepEqual(recoveredBacklog.birthVectors,native.birthVectors);
+  assert.deepEqual(recovered.contacts,native.contacts);
+  assert.deepEqual(recovered.birthVectors,native.birthVectors);
+  assert.equal(recovered.damage,native.damage,
+   'recovered input must preserve actual target HP change');
+  assert.equal(recovered.hits,native.hits);
+  if(targetX===100&&targetY===-25){
+   assert.ok(native.hits>=1&&native.damage>0,
+    'aligned unshielded tank must take actual short-touch projectile damage');
+   assert.ok(lost.hits<=native.hits,
+    'a future owner fix may recover the press; never require the known bug');
+  }
+  if(targetX===200&&targetY===120){
+   assert.equal(native.hits,0,'off-lane tank is a negative contact control');
+   assert.equal(native.damage,0);
+  }
+  assert.ok(lost.damage<=native.damage+1e-5,
+   'a dropped shot must not cause more damage than the native reference');
+  rows.push({targetX,targetY,nativeHits:native.hits,nativeDamage:native.damage,
+   lostHits:lost.hits,lostDamage:lost.damage,
+   recoveredHits:recovered.hits,recoveredDamage:recovered.damage,
+   backlogRecoveredHits:recoveredBacklog.hits,
+   backlogRecoveredDamage:recoveredBacklog.damage,
+   nativeBirthVectors:native.birthVectors,nativeContacts:native.contacts});
+ }
+ console.log('TEMPEST_20MS_REAL_HP_DISTANCE_CENSUS '+JSON.stringify(rows));
 });
