@@ -37,21 +37,21 @@ function witness(cls,seed,cadence,maxSteps,backlogExtraTicks){
 test('equal-backlog 2+4, 3+3 and 4+2 expose real Gunner/Carrier/Hivemind CPU burst costs',()=>{
  const rows=[];
  for(const cadence of ['30Hz-adversarial','30Hz-adversarial95',
-  '30Hz-seeded-contrast','30Hz-display-quantized']){
+  '30Hz-seeded-contrast','30Hz-display-quantized','30Hz-triple-long-falsifier']){
   const gaps=frameTimes(cadence);
   assert.equal(gaps.length,60,'matched 30Hz presentation callback count');
   assert.ok(gaps.every(x=>x>0&&x<100),'only active non-stall frames');
   assert.ok(Math.abs(gaps.reduce((a,b)=>a+b,0)-DURATION_MS)<1e-6,
    'matched two-second presentation trace');
  }
- for(const cadence of ['30Hz-adversarial','30Hz-adversarial95','30Hz-seeded-contrast','30Hz-display-quantized'])
+ for(const cadence of ['30Hz-adversarial','30Hz-adversarial95','30Hz-seeded-contrast','30Hz-display-quantized','30Hz-triple-long-falsifier'])
  for(const cls of ['minigun','carrier','hivemind'])for(const seed of [1517800,1517802]){
   // Counterbalance benchmark order across classes, seeds and schedules.
   // A fixed 2+4 -> 3+3 -> 4+2 order could confound CPU P95 with JIT warmup.
   const policies=[['two',2,4],['three',3,3],['four',4,2]];
   const shift=(['minigun','carrier','hivemind'].indexOf(cls)+
    ['30Hz-adversarial','30Hz-adversarial95','30Hz-seeded-contrast',
-    '30Hz-display-quantized'].indexOf(cadence)+(seed===1517800?0:1))%3;
+    '30Hz-display-quantized','30Hz-triple-long-falsifier'].indexOf(cadence)+(seed===1517800?0:1))%3;
   const measured={};
   for(let i=0;i<policies.length;i++){
    const [name,maxSteps,extraTicks]=policies[(i+shift)%policies.length];
@@ -102,7 +102,7 @@ test('equal-backlog 2+4, 3+3 and 4+2 expose real Gunner/Carrier/Hivemind CPU bur
     updateCpuP95Ms:four.frameUpdateCpuP95Ms,
     renderCpuP95Ms:four.frameRenderCpuP95Ms}});
  }
- assert.equal(rows.length,24);
+ assert.equal(rows.length,30);
  assert.ok(rows.some(r=>r.four.fourStepSamples>0),
   'research fixture must actually measure four-update CPU bursts');
  console.log('REAL_GAME_EQUAL_BACKLOG_CPU '+JSON.stringify({
