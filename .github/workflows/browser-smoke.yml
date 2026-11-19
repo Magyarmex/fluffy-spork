@@ -11,6 +11,8 @@ on:
       - 'tests/node/living-front-hidden-eco-saturation-research.test.js'
       - 'tests/node/living-front-hidden-eco-composed.test.js'
       - 'tests/node/fps-fixed60-gunner-target-parity.test.js'
+      - 'tests/node/fps-fixed60-clustered-short-touch-research.test.js'
+      - 'tests/node/fps-composed-eight-tick-short-touch-research.test.js'
       - 'tests/node/fps-gunner-fixed60-touch-irregular-damage-research.test.js'
       - '.github/workflows/browser-smoke.yml'
       - 'scripts/patch-star-minimap.cjs'
