@@ -148,3 +148,38 @@ test('composed Tempest 20ms press has no ghost volley and matches when skipped t
  console.log('COMPOSED_TEMPEST_20MS_TOUCH '+JSON.stringify({baseline,rows,
   caveat:'source-executed Game/Input/Canvas fixture, not Chromium or physical device'}));
 });
+
+
+test('composed Tempest 20ms touch separates mean30 dropped ticks from recovered input',()=>{
+ const mean30=Array.from({length:15},()=>[
+  55,55,1000/15-55,1000/15-55]).flat();
+ const events=[
+  {at:170,type:'pointerdown',x:640,buttons:1},
+  {at:172,type:'pointermove',x:680,buttons:1},
+  {at:190,type:'pointerup',x:680,buttons:0}
+ ];
+ const opts={classId:'tempest',events};
+ const native=run(uniform,2,2,opts);
+ const constrained=run(mean30,2,2,opts);
+ const recovery2=run(mean30,2,4,opts);
+ const recovery3=run(mean30,3,2,opts);
+ assert.equal(native.volleys,1,'native60 must fire a real Tempest projectile');
+ assert.equal(native.droppedMs,0);
+ for(const candidate of [constrained,recovery2,recovery3]){
+  assert.equal(candidate.sampled.length,3,'all DOM edges reach real Input');
+  assert.ok(candidate.volleys<=native.volleys,'no ghost or duplicate shot');
+  assert.equal(candidate.sampled.at(-1).type,'pointerup');
+ }
+ for(const candidate of [recovery2,recovery3]){
+  assert.equal(candidate.droppedMs,0,'recovery must preserve all simulation time');
+  assert.equal(candidate.volleys,native.volleys,
+   'recovered Game must retain the legitimate short Tempest shot');
+  assert.deepEqual(candidate.births,native.births,
+   'full recovery must preserve projectile birth chronology');
+ }
+ if(constrained.droppedMs===0)assert.equal(constrained.volleys,native.volleys);
+ console.log('COMPOSED_TEMPEST_MEAN30_20MS '+JSON.stringify({
+  native,constrained,recovery2,recovery3,
+  caveat:'real materialized Game and touch handlers, scripted RAF not Chromium/device'
+ }));
+});
