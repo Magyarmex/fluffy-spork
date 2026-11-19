@@ -129,3 +129,42 @@ test('clustered 30Hz can lose a 20ms touch that native60 always samples',()=>{
    'recovery must preserve the legal press without inventing extra firing');
  }
 });
+
+
+test('20ms touch phase sweep separates skipped-tick loss from intrinsic sampling',()=>{
+ // Every interval is longer than one 60Hz tick, so the native reference
+ // must observe at least one firing sample regardless of press phase.
+ // Sweep nearby phases rather than trusting a single handpicked offset.
+ const samples=[];
+ for(let at=150;at<=230;at+=2){
+  const pulse=[{at,type:'pointerdown'},{at:at+20,type:'pointerup'}];
+  const baseline=replay(uniform60(),2,2,pulse);
+  const limited=replay(clustered30(),2,2,pulse);
+  const recovered2=replay(clustered30(),2,4,pulse);
+  const recovered3=replay(clustered30(),3,2,pulse);
+  assert.ok(baseline.fireUpdates>=1&&baseline.fireUpdates<=2,
+   'a 20ms press must cross at least one native60 firing sample');
+  for(const candidate of [limited,recovered2,recovered3]){
+   assert.equal(candidate.applied,2,'both edges must reach the input bridge');
+   assert.equal(candidate.late+candidate.reordered+candidate.stale,0,
+    'phase comparison must not be contaminated by timestamp repair');
+   assert.ok(candidate.fireUpdates<=baseline.fireUpdates,
+    'the replay must never invent additional pressed ticks');
+  }
+  for(const candidate of [recovered2,recovered3]){
+   assert.equal(candidate.droppedMs,0,'recovery arm must not discard time');
+   assert.equal(candidate.fireUpdates,baseline.fireUpdates,
+    'complete simulation recovery must match native60 input samples');
+  }
+  samples.push({at,baseline:baseline.fireUpdates,limited:limited.fireUpdates,
+   droppedMs:limited.droppedMs});
+ }
+ const lost=samples.filter(x=>x.limited<x.baseline);
+ // Diagnostic, not an acceptance assertion about the exact number of
+ // phase-sensitive losses: a future owner fix should be allowed to cure them.
+ console.log('FIXED60_20MS_PHASE_SWEEP '+JSON.stringify({
+  phases:samples.length,lostPhases:lost.length,
+  lostOffsetsMs:lost.map(x=>x.at),
+  caveat:'stub input owner; not composed Game projectiles or device latency'
+ }));
+});
