@@ -264,8 +264,8 @@ test('Tempest short-touch target-distance census records real HP contacts',()=>{
   if(targetX===100&&targetY===-25){
    assert.ok(native.hits>=1&&native.damage>0,
     'aligned unshielded tank must take actual short-touch projectile damage');
-   assert.equal(lost.hits,0,'dropped short press must not hit the target');
-   assert.equal(lost.damage,0);
+   assert.ok(lost.hits<=native.hits,
+    'a future owner fix may recover the press; never require the known bug');
   }
   if(targetX===200&&targetY===120){
    assert.equal(native.hits,0,'off-lane tank is a negative contact control');
