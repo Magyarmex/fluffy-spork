@@ -197,3 +197,22 @@ test('visible physical crowding, not private assignment, can deter a public rota
   assert.equal(choose(T, w).mode, crowded.mode,
     'private assignment must not change a witnessed crowding decision');
 });
+
+test('ecology planner never reads another bot private assignment, even if visible', () => {
+  const T = boot(), w = encounter(T, 'BLOOM', 0);
+  w.g.w = 2400;
+  w.g.h = 1600;
+  const c = T.sectorCenter(6);
+  for (const bot of w.hidden) {
+    bot.x = c.x;
+    bot.y = c.y;
+    Object.defineProperty(bot.ai, '__lfEcoKey', {
+      configurable: true, get() { throw new Error('private key read'); }
+    });
+    Object.defineProperty(bot.ai, '__lfEcoWeight', {
+      configurable: true, get() { throw new Error('private weight read'); }
+    });
+  }
+  assert.equal(choose(T, w).mode, 'none',
+    'visible occupancy is sufficient without reading hidden strategy');
+});
