@@ -15,7 +15,7 @@ const pulse=[
  {at:141,type:'pointermove',x:680,buttons:1},
  {at:152,type:'pointerup',x:680,buttons:0}
 ];
-function run(intervals,maxSteps,extra,{classId='scout',events=pulse,targetX=200,targetY=0}={}){
+function run(intervals,maxSteps,extra,{classId='scout',events=pulse,targetX=200,targetY=0,manualAim=false}={}){
  return withSeed(1517800,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.sfx.startMusic=()=>{};
@@ -37,6 +37,16 @@ function run(intervals,maxSteps,extra,{classId='scout',events=pulse,targetX=200,
   g.spawnShape=()=>null;g.spawnPowerup=()=>null;
   g.spawnAITank=()=>null;g.spawnDrone=()=>null;
   g.status='playing';g.paused=false;g.input.autofire=false;g.input.mouseActive=false;
+  // The HP-distance experiment must not let automatic target assistance
+  // rotate the muzzle toward the very target used as its negative control.
+  if(manualAim){
+   const nearest=g.nearestTank;
+   g.nearestTank=function(x,y,radius,except){
+    if(except===p.id&&radius===480&&x===p.x&&y===p.y)return null;
+    return nearest.apply(this,arguments);
+   };
+  }
+
   let now=1000,callback=null,volleys=0,hits=0,damage=0;
   const births=[],birthVectors=[],contacts=[],sampled=[],rendered=[];
   const originalFire=g.tryFire,originalDamage=g.damageTank,originalUpdate=g.update;
@@ -229,8 +239,8 @@ test('Tempest short-touch target-distance census records real HP contacts',()=>{
  ];
  const mean30=Array.from({length:15},()=>[55,55,1000/15-55,1000/15-55]).flat();
  const rows=[];
- for(const [targetX,targetY] of [[80,0],[100,-20],[140,-25],[200,0]]){
-  const opts={classId:'tempest',events,targetX,targetY};
+ for(const [targetX,targetY] of [[80,0],[100,-25],[140,-25],[200,120]]){
+  const opts={classId:'tempest',events,targetX,targetY,manualAim:true};
   const native=run(uniform,2,2,opts);
   const lost=run(mean30,2,2,opts);
   const recovered=run(mean30,3,2,opts);
