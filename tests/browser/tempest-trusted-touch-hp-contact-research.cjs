@@ -57,7 +57,7 @@ const {chromium}=require('playwright');
    g.cam.x=0;g.cam.y=0;g.cam.zoom=1;g.zoom=1;
    const target=g.tanks.find(t=>t!==p&&t.ai);
    if(!target)throw Error('no real AI target available');
-   Object.assign(target,{cls:'scout',isPlayer:true,alive:true,x:75,y:-43,
+   Object.assign(target,{cls:'scout',isPlayer:true,alive:true,x:58,y:-23,
     vx:0,vy:0,hp:100000,maxHp:100000,spawnShieldT:0,shieldT:0,
     bulwarkT:0,tauntT:0,cloakT:0,r:16});
    window.__novaTempestHpTarget=target;
