@@ -609,6 +609,22 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     // Playwright addScriptTag({path}) injects inline contents, not a src URL.
     researchFactoryPresent:typeof window.__novaFixed60Research?.createFixedStepBrowserPilot==='function'};
   });
+  // This witness is about actual chronological Input application, not
+  // DOM delivery or a hypothetical nominal simulation tick.
+  const applied=report.appliedTouchEvents;
+  assert.ok(Array.isArray(applied)&&applied.length>=3,
+   'real browser touch must reach chronological Game input handlers');
+  assert.equal(applied[0].type,'pointerdown');
+  assert.equal(applied.at(-1).type,'pointerup');
+  assert.ok(applied.every((e,i)=>Number.isInteger(e.pointerId)&&
+   Number.isFinite(e.replayAtSec)&&Number.isFinite(e.sampleAtSec)&&
+   Number.isInteger(e.ownerTicksBeforeUpdate)&&e.ownerTicksBeforeUpdate>=0&&
+   Number.isFinite(e.wallMs)&&
+   e.sampleAtSec+1e-8>=e.replayAtSec&&
+   (!i||e.sampleAtSec+1e-8>=applied[i-1].sampleAtSec)),
+   'applied touch evidence must have monotonic simulation-consumption boundaries');
+  assert.equal(applied[0].pointerId,applied.at(-1).pointerId,
+   'actual release must reach the original input owner');
   if(process.env.NOVA_FIXED60_REPORT_FILE){
    // Save exact browser observations for a separate, explicitly non-causal
    // paired comparison. Never manufacture matched wall time from tick count.
