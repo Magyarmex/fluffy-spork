@@ -49,9 +49,11 @@ test('low-health AI and a nearby legitimate combat target never chase remembered
  g.tanks.push(enemy);g.getTank=id=>id===7?enemy:null;t.ai.__v1112TargetId=7;
  assert.equal(T.publicEcoBias(g,t,{},{}).weight,0);
 });
-test('already committed rivals saturate remembered opportunity rather than dogpiling',()=>{
- const {T,t,g}=scene();for(let i=0;i<3;i++)g.tanks.push({
-  id:10+i,x:-900,y:-900,hp:100,alive:true,ai:{__lfEcoKey:'BLOOM:5',__lfEcoWeight:.3}
+test('physically witnessed rivals crowd remembered opportunity without reading their private plan',()=>{
+ const {T,t,g}=scene(),c=T.sectorCenter(5);
+ g.w=2400;g.h=1600;g.hasLineOfSight=()=>true;
+ for(let i=0;i<3;i++)g.tanks.push({
+  id:10+i,x:c.x,y:c.y,hp:100,alive:true,ai:{__lfEcoKey:'none',__lfEcoWeight:0}
  });
  const b=T.publicEcoBias(g,t,{},{});
  assert.equal(b.mode,'none');
