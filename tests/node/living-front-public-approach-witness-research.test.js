@@ -66,3 +66,17 @@ test('omitted viewport contacts and a changed public destination reset approach 
  q.x=150;assert.equal(w.sample(o,[q],movedGoal,1.5,seen),0);
  q.x=180;assert.equal(w.sample(o,[q],movedGoal,1.75,seen),1);
 });
+
+test('canonical sector-edge approach can be witnessed before entering a public BLOOM',()=>{
+ const w=createPublicApproachWitness(),o=body(1,-400,-562.5),
+   q=body(2,-100,-562.5),publicCenter={x:562.5,y:-562.5};
+ const viewport=(a,b)=>Math.abs(a.x-b.x)<=400&&Math.abs(a.y-b.y)<=300;
+ const rows=[];
+ for(const [time,x] of [[0,-100],[.25,-70],[.5,-40]]){
+  q.x=x;rows.push(w.sample(o,[q],publicCenter,time,viewport));
+ }
+ assert.deepEqual(rows,[0,0,1]);
+ assert.ok(q.x<0,'the rival is still outside sector 6 (left boundary x=0)');
+ assert.ok(publicCenter.x-q.x>260,
+  'central 260-unit physical occupancy would not count this approaching rival');
+});
