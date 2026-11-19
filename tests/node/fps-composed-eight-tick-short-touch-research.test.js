@@ -93,6 +93,7 @@ function run(intervals,maxSteps,extra,{classId='scout',events=pulse}={}){
    assert.ok(volleys<=1,'single 12ms press must not generate multiple volleys');
    return {ticks:owner.ticks,droppedMs:+owner.droppedMs.toFixed(4),
     queuedMs:+owner.lagMs.toFixed(4),volleys,hits,damage:+damage.toFixed(5),
+    heat:+(p.__v17Heat||0).toFixed(6),fireCd:+p.fireCd.toFixed(6),
     births,firstRenderCallbackMs:rendered.find(x=>x.volleys>0)?.wall??null,
     sampled:sampled.map(e=>({type:e.type,at:e.at,sample:e.sample}))};
   }finally{owner.stop();g.destroy();}
@@ -176,6 +177,9 @@ test('composed Tempest 20ms touch separates mean30 dropped ticks from recovered 
    'recovered Game must retain the legitimate short Tempest shot');
   assert.deepEqual(candidate.births,native.births,
    'full recovery must preserve projectile birth chronology');
+  assert.equal(candidate.heat,native.heat,'recovered Tempest heat must match');
+  assert.equal(candidate.fireCd,native.fireCd,'recovered cooldown must match');
+  assert.equal(candidate.damage,native.damage,'recovered target damage must match');
  }
  if(constrained.droppedMs===0)assert.equal(constrained.volleys,native.volleys);
  console.log('COMPOSED_TEMPEST_MEAN30_20MS '+JSON.stringify({
