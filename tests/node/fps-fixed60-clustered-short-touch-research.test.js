@@ -115,9 +115,13 @@ test('clustered 30Hz can lose a 20ms touch that native60 always samples',()=>{
  assert.equal(native.droppedMs,0);
  assert.equal(constrained.applied,2,'both DOM edges must reach the timeline');
  assert.equal(constrained.late+constrained.reordered+constrained.stale,0);
- assert.ok(constrained.droppedMs>0,'this clustered schedule must skip simulation time');
- assert.equal(constrained.fireUpdates,0,
-  'a 20ms press can disappear when the sole firing tick is skipped');
+ if(constrained.droppedMs>0){
+  assert.equal(constrained.fireUpdates,0,
+   'the current skipped tick swallows the only legal firing sample');
+ }else{
+  // A future scheduler fix must recover the press, not preserve the defect.
+  assert.equal(constrained.fireUpdates,native.fireUpdates);
+ }
  for(const [maxSteps,backlogExtraTicks] of [[2,4],[3,2]]){
   const recovered=replay(clustered30(),maxSteps,backlogExtraTicks,pulse);
   assert.equal(recovered.droppedMs,0);
