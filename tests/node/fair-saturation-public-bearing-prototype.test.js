@@ -1433,3 +1433,31 @@ test('composed AI nuke pickup uses Battle Sense collection without gunfire',()=>
   }finally{g.destroy();}
  });
 });
+
+
+// Predator Doctrine currently credits an attacker before the core damage
+// method can reject a shielded hit. This is a provenance characterization,
+// not a request to suppress legitimate visible blocked-shot retaliation.
+test('composed shielded zero-HP-loss callback still updates attacker memory',()=>{
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  const attacker=g.player,victim=g.tanks.find(t=>t&&t.ai&&!t.isPlayer);
+  assert.ok(attacker&&victim);
+  try{
+   g.sfx.muted=true;
+   g.setClass(victim,'scout');
+   Object.assign(victim,{hp:1000,maxHp:1000,alive:true,
+    spawnShieldT:0,shieldT:5,bulwarkT:0,invulnT:0});
+   victim.ai.__v180LastAttacker=-1;
+   victim.ai.__v180HitAt=-99;
+   g.time=10;
+   const before=victim.hp;
+   g.damageTank(victim,20,attacker.id);
+   assert.equal(victim.hp,before,'real shield must prevent HP loss');
+   assert.equal(victim.ai.__v180LastAttacker,attacker.id,
+    'Predator currently remembers credited owner before HP is checked');
+   assert.equal(victim.ai.__v180HitAt,g.time);
+  }finally{g.destroy();}
+ });
+});
