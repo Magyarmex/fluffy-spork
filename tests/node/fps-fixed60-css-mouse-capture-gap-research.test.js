@@ -1,7 +1,6 @@
 'use strict';
-// #641 RESEARCH ONLY. Negative control for the opt-in fixed60 browser
+// #641 RESEARCH ONLY. Positive regression for the opt-in fixed60 browser
 // factory's DOM-time mouse projection on a CSS-scaled canvas.
-// This records the current limitation, not desired acceptance behavior.
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 process.env.NOVA_EXPLICIT_SHOT_INTENT_RESEARCH='1';
 const test=require('node:test'),assert=require('node:assert/strict');
@@ -9,7 +8,7 @@ const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
 const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
 const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
 
-test('opt-in fixed60 factory still misprojects a centered pointer on CSS-scaled canvas',()=>{
+test('opt-in fixed60 factory preserves CSS-scaled canvas center world target',()=>{
  const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
  g.sfx.muted=true;i.autofire=false;g.status='playing';g.paused=false;
  Object.assign(g.cam,{x:20,y:-10,zoom:1});
@@ -36,12 +35,10 @@ test('opt-in fixed60 factory still misprojects a centered pointer on CSS-scaled 
   const captured=pilot.pulse.pending&&pilot.pulse.pending.world;
   assert.ok(captured,'actual factory must deliver a captured mouse target');
   const expected={x:20,y:-10}; // physical CSS-rect center
-  assert.ok(Math.abs(captured.x-expected.x)>100&&
-    Math.abs(captured.y-expected.y)>100,
-   'negative control must still expose the unnormalized CSS projection');
-  assert.ok(Math.abs(captured.x+180)<1e-8);
-  assert.ok(Math.abs(captured.y+160)<1e-8);
-  console.log('FIXED60_CSS_MOUSE_CAPTURE_GAP '+JSON.stringify({
+  assert.ok(Math.abs(captured.x-expected.x)<1e-8&&
+    Math.abs(captured.y-expected.y)<1e-8,
+   'CSS-scaled pointer center must remain the camera world center');
+  console.log('FIXED60_CSS_MOUSE_CAPTURE_PARITY '+JSON.stringify({
    expected,captured,canvasInternal:{w:800,h:600},
    canvasPresented:{w:400,h:300},
    caveat:'research-only CSS-scale fixture; no measured production player error'
