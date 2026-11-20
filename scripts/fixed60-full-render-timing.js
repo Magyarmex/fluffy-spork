@@ -60,10 +60,11 @@ function create({maxSamples=7200}={}){
    var eligible=active&&g&&g.status==='playing'&&!g.paused&&
     !g.__novaDecorativeWorld&&!(root.document&&root.document.hidden);
    if(!eligible)return original.apply(this,arguments);
-   var t0=clock(),out;
+   var t0,out,ms;
+   try{t0=clock();}catch(error){stop('clock-error');throw error;}
    try{out=original.apply(this,arguments);}
    catch(error){stop('render-error');throw error;}
-   var ms=clock()-t0;
+   try{ms=clock()-t0;}catch(error){stop('clock-error');throw error;}
    if(Number.isFinite(ms)&&ms>=0){
     samples[count++]=ms;sum+=ms;if(ms>peak)peak=ms;
    }else{stop('invalid-duration');return out;}
