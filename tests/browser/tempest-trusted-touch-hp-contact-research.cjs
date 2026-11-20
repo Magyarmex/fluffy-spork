@@ -168,10 +168,17 @@ const {chromium}=require('playwright');
     {type:'touchStart',touchPoints:[touch]});
    const moveDelivery=cdp.send('Input.dispatchTouchEvent',{type:'touchMove',
     touchPoints:[{...touch,x:touch.x+35,y:touch.y-20}]});
-   await Promise.all([startDelivery,moveDelivery]);
-   // Node's timer is independent of the page's throttled RAF clock.
-   await new Promise(resolve=>setTimeout(resolve,20));
-   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+   // Start the 20ms hold clock immediately after queueing the ordered CDP
+   // commands. Awaiting both delivery acknowledgements first previously added
+   // ~30ms of protocol round-trip time *before* this timer even began, making
+   // every nominal 20ms trial an approximately 50ms press. CDP commands are
+   // serialized on this session; the end remains queued after start and move.
+   // Real browser pointer-event timestamps below remain the authority.
+   const holdTimer=new Promise(resolve=>setTimeout(resolve,20));
+   await holdTimer;
+   const endDelivery=cdp.send('Input.dispatchTouchEvent',
+    {type:'touchEnd',touchPoints:[]});
+   await Promise.all([startDelivery,moveDelivery,endDelivery]);
    await page.waitForTimeout(140);
    const trial=await page.evaluate(before=>{
     const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
@@ -194,6 +201,11 @@ const {chromium}=require('playwright');
    },before);
    assert.ok(trial.trusted&&trial.down&&trial.up,
     'short trial must deliver trusted down/release');
+   assert.ok(Number.isFinite(trial.durationMs)&&trial.durationMs>=0,
+    'CDP overlap must not invert the trusted press/release chronology');
+   if(trial.move)assert.ok(Number.isFinite(trial.moveToReleaseMs)&&
+    trial.moveToReleaseMs>=0&&trial.moveToReleaseMs<=trial.durationMs,
+    'a delivered deflection must occur within the measured touch lifetime');
    // A short move may be coalesced before release. Record that as an input
    // delivery outcome rather than falsely requiring an aim deflection.
    assert.equal(trial.postReleaseBirths,0,
