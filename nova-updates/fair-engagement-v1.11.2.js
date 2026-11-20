@@ -100,8 +100,13 @@ function saturation(g,targetId,selfId){
  * Count pressure assignments once instead of rescanning every AI tank for
  * every candidate. The observer itself is excluded exactly as before. */
 function saturationSnapshot(g,selfId){
-  var counts=new Map(),ts=g&&g.tanks||[],byId=new Map();
-  for(var j=0;j<ts.length;j++)if(ts[j])byId.set(ts[j].id,ts[j]);
+  var counts=new Map(),ts=g&&g.tanks||[],byId=g&&g.tankById;
+  /* The composed Game already maintains an O(1) tank index. Reuse it instead
+   * of allocating another full map per AI planning tick; lightweight test
+   * fixtures without that index still get an exact local snapshot. */
+  if(!byId||typeof byId.get!=='function'){
+    byId=new Map();for(var j=0;j<ts.length;j++)if(ts[j])byId.set(ts[j].id,ts[j]);
+  }
   for(var i=0;i<ts.length;i++){
     var q=ts[i];if(!q||q.id===selfId||!q.ai||!alive(q))continue;
     var a=q.ai,id=a.__v1112TargetId>=0?a.__v1112TargetId:(a.__v1105TargetId>=0?a.__v1105TargetId:(a.__v180TargetId>=0?a.__v180TargetId:a.targetId));
