@@ -193,6 +193,29 @@ test('two observers receive different public victim memories for the same shot',
    'observer B cannot inherit A\'s victim knowledge through cover');
  }finally{g.destroy();}
 });
+test('firing-time cover blocks a duel even if the lane opens later',()=>{
+ const g=bootGame(),helper=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__;
+ try{
+  const shooter=g.player,observer=g.tanks.find(t=>t!==shooter&&t.ai);
+  assert.ok(shooter&&observer);
+  const third=tank(9003,100,0,{});
+  g.time=10;g.status='playing';g.paused=false;
+  shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
+  observer.x=-100;observer.y=0;
+  g.tanks=[observer,shooter,third];g.__novaFairVisibleTanks=g.tanks;
+  g.areHostile=()=>true;g.areAllies=()=>false;
+  g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===shooter.x&&ay===shooter.y&&bx===third.x&&by===third.y);
+  g.__novaFairShotWitnesses=[observer];
+  const before=g.bullets.length;g.tryFire(shooter);
+  assert.ok(g.bullets.length>before);
+  assert.equal(observer.ai.__v181ObservedShotId,shooter.id);
+  assert.equal(observer.ai.__v181ObservedShotVictims.includes(third),false,
+   'shot could not physically travel through firing-time cover');
+  g.hasLineOfSight=()=>true;g.time=10.5;
+  assert.equal(helper.thirdPartyVector(g,observer,shooter,{}).weight,0,
+   'cover disappearing after firing cannot manufacture historical duel evidence');
+ }finally{g.destroy();}
+});
 test('research fixture uses canonical materialized 49-overlay composition',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  const scripts=[...html.matchAll(/<script[^>]+src=["']\.\/(nova-updates\/[^"']+)["']/g)];
