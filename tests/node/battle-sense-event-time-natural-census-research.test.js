@@ -33,6 +33,7 @@ test('natural composed matches bound firing-time witness scans and report incide
       for(const observer of observers){
        if(!observer||!observer.ai||observer===shooter)continue;
        if(observer.ai.__v181ObservedShotId!==shooter.id||
+          !Number.isFinite(observer.ai.__v181ObservedShotAt)||
           Math.abs(observer.ai.__v181ObservedShotAt-this.time)>1e-8)continue;
        const candidates=observer.ai.__v181ObservedShotVictims;
        assert.ok(Array.isArray(candidates),'actual witnessed shot must have an event-time candidate set');
