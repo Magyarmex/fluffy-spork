@@ -351,6 +351,25 @@ test('inbound projectile proxy is invariant to private target velocity',()=>{
   'opposite hidden velocity must not alter the public pressure decision');
 });
 
+// Adversarial characterization: the proxy still trusts the bullet's private
+// ownerId to connect it to a witnessed shooter. The projectile's visible
+// position/velocity do not reveal that identifier. This is a release blocker,
+// not a desirable invariant for production AI.
+test('inbound projectile proxy still depends on non-public bullet owner ID',()=>{
+ const T=boot(),{g,observer,a}=world();
+ const shooter=tank(22,0,90,3,0);
+ g.tanks.push(shooter);
+ observer.ai.__v181ObservedShotId=shooter.id;
+ observer.ai.__v181ObservedShotAt=g.time-.1;
+ observer.ai.__v181ObservedShotAngle=Math.atan2(-90,100);
+ a.x=100;a.y=0;a.r=15;
+ g.bullets=[{x:40,y:0,vx:200,vy:0,r:3,ttl:1,ownerId:shooter.id}];
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),1);
+ g.bullets[0].ownerId=999999;
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),0,
+  'same visible projectile produces a different answer from private owner ID');
+});
+
 test('public base score exactly matches shipping before private saturation', () => {
   const T = boot(), { g, observer, a, b, hidden } = world();
   for (const target of [a, b]) {
