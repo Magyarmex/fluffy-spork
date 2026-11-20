@@ -221,7 +221,7 @@ test('natural composed match samples public-pressure candidate incidence without
     const stats={seed,frames:0,playingFrames:0,visiblePairs:0,privateAssignments:0,
      proximityPositive:0,projectilePositive:0,witnessPositive:0,
      bodyChecks:0,bulletChecks:0,eligiblePairs:0,nearestPairDistance:null,
-     fairCrossfireEligible:0,crossfirePositive:0,
+     observedCrossfireModeSamples:0,
      originWitnessSamples:0,relocatedWitnessSamples:0,maxWitnessShooterTravel:0};
     for(let frame=0;frame<720;frame++){
      g.update(1/60);stats.frames++;
@@ -257,14 +257,10 @@ test('natural composed match samples public-pressure candidate incidence without
       if(publicPressure(g,observer,target,{metrics:stats})>0)stats.proximityPositive++;
       if(publicProjectileThreat(g,observer,target,{metrics:stats})>0)stats.projectilePositive++;
       if(existingShotWitnessPressure(g,observer,target)>0)stats.witnessPositive++;
-      // Characterize actual crossfire activation, not merely available shot memory.
-      // Exclude the legacy fallback that consults private target slots.
-      if(g.__novaFairVisibleTanks){
-       const battle=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__;
-       stats.fairCrossfireEligible++;
-       if(battle.thirdPartyVector(g,observer,target,{}).weight>0)
-        stats.crossfirePositive++;
-      }
+      // Observe the composed AI's chosen tactical mode without replaying
+      // private planning or manufacturing an artificial visibility snapshot.
+      if(observer.ai&&observer.ai.__v181Mode==='crossfire')
+       stats.observedCrossfireModeSamples++;
      }
     }
     assert.equal(stats.frames,720,'natural game must execute the full sample');
