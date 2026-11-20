@@ -201,6 +201,11 @@ const {chromium}=require('playwright');
    },before);
    assert.ok(trial.trusted&&trial.down&&trial.up,
     'short trial must deliver trusted down/release');
+   assert.ok(Number.isFinite(trial.durationMs)&&trial.durationMs>=0,
+    'CDP overlap must not invert the trusted press/release chronology');
+   if(trial.move)assert.ok(Number.isFinite(trial.moveToReleaseMs)&&
+    trial.moveToReleaseMs>=0&&trial.moveToReleaseMs<=trial.durationMs,
+    'a delivered deflection must occur within the measured touch lifetime');
    // A short move may be coalesced before release. Record that as an input
    // delivery outcome rather than falsely requiring an aim deflection.
    assert.equal(trial.postReleaseBirths,0,
