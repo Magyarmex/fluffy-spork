@@ -37,11 +37,14 @@ test('natural composed matches bound firing-time witness scans and report incide
           !Number.isFinite(observer.ai.__v181ObservedShotAt)||
           Math.abs(observer.ai.__v181ObservedShotAt-this.time)>1e-8)continue;
        const candidates=observer.ai.__v181ObservedShotVictims;
-       assert.ok(Array.isArray(candidates),'actual witnessed shot must have an event-time candidate set');
-       assert.ok(candidates.length<=observers.length,'witness memory must be roster-bounded');
+       assert.ok(candidates===null||typeof candidates.has==='function',
+        'actual witnessed shot must have a weak event-time candidate set');
+       const count=observer.ai.__v181ObservedShotVictimCount;
+       assert.ok(Number.isInteger(count)&&count>=0&&count<=observers.length,
+        'witness count must be roster-bounded');
        stats.observedShotRecords++;
-       stats.eligibleVictimMemberships+=candidates.length;
-       if(candidates.length)witnessed=true;
+       stats.eligibleVictimMemberships+=count;
+       if(count)witnessed=true;
       }
       if(witnessed)stats.shotsWithAnyVictimWitness++;
      }
@@ -59,7 +62,7 @@ test('natural composed matches bound firing-time witness scans and report incide
           !Number.isFinite(a.__v181ObservedShotAngle)||
           !Number.isFinite(a.__v181ObservedShotX)||
           !Number.isFinite(a.__v181ObservedShotY)||
-          !Array.isArray(a.__v181ObservedShotVictims))continue;
+          !(a.__v181ObservedShotVictims===null||typeof a.__v181ObservedShotVictims?.has==='function'))continue;
        const shooter=g.getTank(a.__v181ObservedShotId);
        if(!shooter||shooter.alive===false)continue;
        for(const victim of g.tanks){
@@ -67,7 +70,7 @@ test('natural composed matches bound firing-time witness scans and report incide
         const bearing=Math.atan2(victim.y-a.__v181ObservedShotY,
           victim.x-a.__v181ObservedShotX);
         const legacy=Math.cos(a.__v181ObservedShotAngle-bearing)>.75;
-        const eventTime=a.__v181ObservedShotVictims.includes(victim);
+        const eventTime=a.__v181ObservedShotVictims?.has(victim)===true;
         stats.geometricComparisons++;
         if(legacy&&!eventTime)stats.oldOnlyGeometry++;
         if(eventTime&&!legacy)stats.newOnlyGeometry++;
