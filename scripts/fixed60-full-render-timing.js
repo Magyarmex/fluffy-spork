@@ -23,15 +23,15 @@ function create({maxSamples=7200}={}){
   if(!Number.isFinite(at))throw Error('invalid monotonic clock');
   return at;
  }
- function onVisibility(){if(root.document&&root.document.hidden)stop('hidden');}
- function stop(why){
-  if(!active)return snapshot();
+ function onVisibility(){if(root.document&&root.document.hidden)stop('hidden',false);}
+ function stop(why,summarize=true){
+  if(!active)return summarize?snapshot():null;
   active=false;reason=why||'manual';
   restored=!!(mod&&mod.render===wrapper);
   if(restored)mod.render=original;
   if(root.document&&typeof root.document.removeEventListener==='function')
    root.document.removeEventListener('visibilitychange',onVisibility);
-  return snapshot();
+  return summarize?snapshot():null;
  }
  function percentile(sorted,p){
   if(!sorted.length)return null;
@@ -61,14 +61,14 @@ function create({maxSamples=7200}={}){
     !g.__novaDecorativeWorld&&!(root.document&&root.document.hidden);
    if(!eligible)return original.apply(this,arguments);
    var t0,out,ms;
-   try{t0=clock();}catch(error){stop('clock-error');throw error;}
+   try{t0=clock();}catch(error){stop('clock-error',false);throw error;}
    try{out=original.apply(this,arguments);}
-   catch(error){stop('render-error');throw error;}
-   try{ms=clock()-t0;}catch(error){stop('clock-error');throw error;}
+   catch(error){stop('render-error',false);throw error;}
+   try{ms=clock()-t0;}catch(error){stop('clock-error',false);throw error;}
    if(Number.isFinite(ms)&&ms>=0){
     samples[count++]=ms;sum+=ms;if(ms>peak)peak=ms;
-   }else{stop('invalid-duration');return out;}
-   if(count>=maxSamples)stop('limit');
+   }else{stop('invalid-duration',false);return out;}
+   if(count>=maxSamples)stop('limit',false);
    return out;
   };
   try{
