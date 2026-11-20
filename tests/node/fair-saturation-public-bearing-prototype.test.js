@@ -112,8 +112,11 @@ function visibleInboundProjectileCount(T,g,observer,target,C=classes){
      !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
      Math.abs(b.x-observer.x)>ext.x||Math.abs(b.y-observer.y)>ext.y)continue;
   const dx=target.x-b.x,dy=target.y-b.y;
-  const vx=b.vx-(Number.isFinite(target.vx)?target.vx:0);
-  const vy=b.vy-(Number.isFinite(target.vy)?target.vy:0);
+  // Do not read the victim's exact velocity: it is not guaranteed to be
+  // observable at this instant. This deliberately estimates a static public
+  // intercept lane, not an omniscient future collision prediction.
+  const vx=b.vx;
+  const vy=b.vy;
   const v2=vx*vx+vy*vy;
   if(!(v2>1))continue;
   const t=(dx*vx+dy*vy)/v2;
@@ -327,6 +330,27 @@ test('visible projectile choice ignores offscreen private intent and offscreen b
  assert.equal(visibleInboundProjectileCount(T,g,observer,a),1,
   'offscreen projectile cannot add pressure to a visible candidate');
 });
+// Hidden exact velocity must not flip an observer's public projectile-pressure
+// decision. The visible current position and projectile path are unchanged.
+test('inbound projectile proxy is invariant to private target velocity',()=>{
+ const T=boot(),{g,observer,a}=world();
+ const shooter=tank(22,0,90,3,0);
+ g.tanks.push(shooter);
+ observer.ai.__v181ObservedShotId=shooter.id;
+ observer.ai.__v181ObservedShotAt=g.time-.1;
+ observer.ai.__v181ObservedShotAngle=Math.atan2(-90,100);
+ a.x=100;a.y=0;a.r=15;
+ g.bullets=[{x:40,y:0,vx:200,vy:0,r:3,ttl:1,ownerId:shooter.id}];
+ const baseline=visibleInboundProjectileCount(T,g,observer,a);
+ assert.equal(baseline,1,'stationary public lane must be recognized');
+ a.vx=-800;a.vy=1200;
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),baseline,
+  'private target velocity must not affect an otherwise identical public view');
+ a.vx=800;a.vy=-1200;
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),baseline,
+  'opposite hidden velocity must not alter the public pressure decision');
+});
+
 test('public base score exactly matches shipping before private saturation', () => {
   const T = boot(), { g, observer, a, b, hidden } = world();
   for (const target of [a, b]) {
