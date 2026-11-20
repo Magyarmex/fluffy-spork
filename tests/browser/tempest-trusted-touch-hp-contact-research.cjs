@@ -5,6 +5,9 @@
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 const halfRate=process.env.NOVA_TEMPEST_HALF_RATE==='1';
+const trialCount=Number(process.env.NOVA_TEMPEST_TRIALS||8);
+assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
+ 'short-touch research trials must stay bounded');
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
  const context=await browser.newContext({viewport:{width:390,height:780},deviceScaleFactor:2,isMobile:true,hasTouch:true});
@@ -160,7 +163,7 @@ const halfRate=process.env.NOVA_TEMPEST_HALF_RATE==='1';
   // presentation cadence and OS scheduling vary. Record real event timing,
   // physical HP contact and any post-release births without forcing a frame.
   const shortTrials=[];
-  for(let i=0;i<8;i++){
+  for(let i=0;i<trialCount;i++){
    const before=await page.evaluate(()=>{
     const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
     g.player.fireCd=0;g.player.__v17Heat=.56;
