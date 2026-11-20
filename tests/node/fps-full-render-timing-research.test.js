@@ -91,3 +91,15 @@ test('probe remains outside shipping HTML and targets the live final render expo
  assert.doesNotMatch(html,/fixed60-full-render-timing\.js/,
   'DevTools probe must not ship or run on player devices by default');
 });
+
+test('a second probe cannot nest a timing wrapper around the first',()=>{
+ const h=harness(),first=h.api.create({maxSamples:60}),second=h.api.create({maxSamples:60});
+ first.start();
+ assert.throws(()=>second.start(),/another render timing probe/);
+ h.mod.render(game);
+ assert.equal(first.stop().frames,1);
+ assert.equal(h.mod.render,h.original);
+ second.start();h.mod.render(game);
+ assert.equal(second.stop().frames,1);
+ assert.equal(h.mod.render,h.original);
+});
