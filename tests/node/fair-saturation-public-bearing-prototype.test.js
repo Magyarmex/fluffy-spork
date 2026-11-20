@@ -1427,6 +1427,8 @@ test('composed AI nuke pickup uses Battle Sense collection without gunfire',()=>
     ttl:20,born:g.time}];
    g.updatePowerups(1/60);
    assert.ok(contacts>0,'AI pickup must cause real tank HP damage');
+   assert.equal(victim.ai.__v180LastAttacker,owner.id,
+    'nuke collector ID also enters Predator retaliation memory');
    assert.equal(g.powerups.length,0,'AI collector must consume pickup');
    assert.equal(g.bullets.length,0,'AI collector fired no projectile');
    assert.equal(player.hp,1000,'distant player must not collect or take damage');
