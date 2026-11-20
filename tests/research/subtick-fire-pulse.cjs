@@ -1,6 +1,20 @@
 'use strict';
 // RESEARCH ONLY. Preserve one deliberate, aimed press/release pair that occurs
 // entirely between simulation ticks. Not installed in the playable runtime.
+// A trusted native PointerEvent timestamp is measured on the same monotonic
+// performance clock as the queued release. An event delivered late must not
+// become a fresh shot merely because its handler ran recently. Unknown event
+// clocks remain unverified research input, never certified physical latency.
+function physicalReleaseAt(e) {
+  return e && e.isTrusted === true && Number.isFinite(e.timeStamp)
+    ? e.timeStamp : null;
+}
+function releaseIsFresh(p, now) {
+  const queuedAge = now - p.queuedAt;
+  const physicalAge = p.physicalAt === null ? null : now - p.physicalAt;
+  return queuedAge >= 0 && queuedAge <= 50 &&
+    (physicalAge === null || (physicalAge >= 0 && physicalAge <= 50));
+}
 class SubtickFirePulse {
   constructor(game, timeline) {
     if (!game || !game.input || !timeline || timeline.input !== game.input ||
@@ -52,7 +66,8 @@ class SubtickFirePulse {
         self.pending = {event:{type:'pointerup',pointerType:'mouse',button:0,buttons:0,
           pointerId:self.down.id,__novaOriginalAt:e.__novaOriginalAt,
           __novaTimestampTrusted:e.__novaTimestampTrusted},type:'mouse',id:self.down.id,
-          player:self.down.player,queuedAt:performance.now()};
+          player:self.down.player,queuedAt:performance.now(),
+          physicalAt:physicalReleaseAt(e)};
         self.down = null;
         return; // The later native mouseup/pointerup is also suppressed.
       }
@@ -78,7 +93,8 @@ class SubtickFirePulse {
         input.aim.active && Math.hypot(input.aim.dx,input.aim.dy) >= 9);
       if (same && !down.sampled && aimValid && self.game.status === 'playing' && !self.game.paused &&
           !input.__novaInputPaused && !(self.game.__testWindow && self.game.__testWindow.document.hidden)) {
-        self.pending = {event:e, type:down.type, id:down.id, player:down.player,queuedAt:performance.now()}; self.down = null;
+        self.pending = {event:e, type:down.type, id:down.id, player:down.player,queuedAt:performance.now(),
+          physicalAt:physicalReleaseAt(e)}; self.down = null;
         return; // Hold only through the immediately following Game.update.
       }
       if (same) self.down = null;
@@ -88,11 +104,10 @@ class SubtickFirePulse {
       // A queued shot belongs to the life that began the press. Redeploying
       // before the next simulation tick must never fire the replacement tank.
       if (self.pending) {
-        const p=self.pending,age=Number.isFinite(p.queuedAt)
-          ? performance.now()-p.queuedAt : Infinity;
+        const p=self.pending,now=performance.now();
         // The raw pulse helper must be safe on its own, not only when
         // wrapped by ExplicitShotIntent. Never replay a stale/dead release.
-        if(p.player!==game.player||p.player?.alive!==true||age<0||age>50)
+        if(p.player!==game.player||p.player?.alive!==true||!releaseIsFresh(p,now))
           self.release();
       }
       if (self.down && self.down.player !== game.player) {
