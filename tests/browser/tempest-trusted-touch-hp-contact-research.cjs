@@ -20,7 +20,8 @@ const {chromium}=require('playwright');
    Game.prototype.update=function(...args){
     if(this===window.__novaTempestHpGame)
      window.__novaTempestHp.updates.push({at:performance.now(),gameTime:this.time,
-      aimActive:!!this.input?.aim?.active,firing:!!this.input?.firing});
+      aimActive:!!this.input?.aim?.active,firing:!!this.input?.firing,
+      aimMagnitude:Math.hypot(this.input?.aim?.dx||0,this.input?.aim?.dy||0)});
     return update.apply(this,args);
    };
    Game.prototype.start=function(...args){
@@ -176,6 +177,7 @@ const {chromium}=require('playwright');
      updatesDuringTouch:down&&up?updates.filter(u=>u.at>=down.at&&u.at<=up.at).length:null,
      activeAimSamples:down&&up?updates.filter(u=>u.at>=down.at&&u.at<=up.at&&u.aimActive).length:null,
      firingSamples:down&&up?updates.filter(u=>u.at>=down.at&&u.at<=up.at&&u.firing).length:null,
+     aimedFiringSamples:down&&up?updates.filter(u=>u.at>=down.at&&u.at<=up.at&&u.firing&&u.aimMagnitude>=9).length:null,
      moveToReleaseMs:move&&up?up.at-move.at:null,
      births:births.length,hits:hits.length,
      postReleaseBirths:up?births.filter(b=>b.at>up.at).length:null,
