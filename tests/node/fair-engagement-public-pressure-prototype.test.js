@@ -131,3 +131,18 @@ test('public projectile trajectory distinguishes an actual short-horizon threat 
   }finally{s.g.destroy();}
  });
 });
+
+test('negative control: trajectory-only pressure overcounts an occluded bullet',()=>{
+ withSeed(1517814,()=>{
+  const s=scene();
+  try{
+   const {g,observer,left}=s;
+   g.bullets=[{x:-200,y:0,vx:400,vy:0,ttl:1,dead:false}];
+   g.hasLineOfSight=()=>false;
+   assert.equal(publicProjectileThreat(g,observer,left),1,
+    'naive trajectory projection ignores an intervening permanent wall');
+   // Explicitly a falsifying witness: before promotion, require the actual
+   // Battlefield swept collision/occlusion owner, not a cheap geometry guess.
+  }finally{s.g.destroy();}
+ });
+});
