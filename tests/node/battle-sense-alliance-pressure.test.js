@@ -168,7 +168,7 @@ test('Battle Sense reload-punish window rejects untrusted shot times but accepts
  const observer={...tank(1,undefined,0,0),ai:{__v181ObservedShotId:target.id}};
  const classes={CLASSES:{cannon:{bullet:{reload:1.2}}}};
  const g={hasLineOfSight:()=>true};
- for(const bad of [undefined,null,'0',-1,NaN,Infinity]){
+ for(const bad of [undefined,null,'0',-0.1,-1,NaN,Infinity]){
   observer.ai.__v181ObservedShotAt=bad;
   assert.equal(helper.witnessedOpening(g,classes,observer,target,.2),0,
    'untrusted shot time must not grant reload-punish knowledge: '+String(bad));
