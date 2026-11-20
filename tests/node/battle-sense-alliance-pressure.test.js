@@ -118,8 +118,12 @@ test('actual Battle Sense tryFire witness stores firing origin only on real proj
  assert.equal(observer.ai.__v181ObservedShotY,40);
  const noShot=loadBattleSense(),empty=new noShot.Game();
  const other={...tank(3,undefined,10,10),ai:{}};
- Object.assign(empty,{bullets:[],tanks:[shooter,other],time:10,hasLineOfSight:()=>true});
+ let rejectedHostilityReads=0;
+ Object.assign(empty,{bullets:[],tanks:[shooter,other],time:10,hasLineOfSight:()=>true,
+  areHostile:()=>{rejectedHostilityReads++;return true;}});
  empty.tryFire(shooter);
+ assert.equal(rejectedHostilityReads,0,
+  'cooldown/no-projectile attempt must not trigger new tactical roster scans');
  assert.equal(other.ai.__v181ObservedShotX,undefined,
   'failed/no-projectile fire attempt cannot create an observed origin');
  const blocked=new helper.Game(),hidden={...tank(4,undefined,80,40),ai:{}};
