@@ -39,7 +39,7 @@ class SubtickFirePulse {
         self.pending = {event:{type:'pointerup',pointerType:'mouse',button:0,buttons:0,
           pointerId:self.down.id,__novaOriginalAt:e.__novaOriginalAt,
           __novaTimestampTrusted:e.__novaTimestampTrusted},type:'mouse',id:self.down.id,
-          player:self.down.player};
+          player:self.down.player,queuedAt:performance.now()};
         self.down = null;
         return; // The later native mouseup/pointerup is also suppressed.
       }
@@ -65,7 +65,7 @@ class SubtickFirePulse {
         input.aim.active && Math.hypot(input.aim.dx,input.aim.dy) >= 9);
       if (same && !down.sampled && aimValid && self.game.status === 'playing' && !self.game.paused &&
           !input.__novaInputPaused && !(self.game.__testWindow && self.game.__testWindow.document.hidden)) {
-        self.pending = {event:e, type:down.type, id:down.id, player:down.player}; self.down = null;
+        self.pending = {event:e, type:down.type, id:down.id, player:down.player,queuedAt:performance.now()}; self.down = null;
         return; // Hold only through the immediately following Game.update.
       }
       if (same) self.down = null;
