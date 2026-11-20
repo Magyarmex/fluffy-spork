@@ -605,7 +605,8 @@ test('natural composed worlds report public-bearing sensitivity without changing
         publicChoiceLOSCalls: 0, publicDiagnosticLOSCalls: 0,
         physicalDamageEvents: 0, potentialHitWitnessPairs: 0,
         droneDamageEvents: 0, reflectionDamageEvents: 0,
-        splashDamageEvents: 0, knownNonProjectileWitnessPairs: 0,
+        splashDamageEvents: 0, bodyDamageEvents: 0,
+        knownNonProjectileWitnessPairs: 0,
         maxPotentialHitWitnessPairs: 0,
         acceptedHitWitnessPairs: 0, hitWitnessLOSCalls: 0,
         hitChangedSelections: 0, hitHumanSelections: 0,
@@ -614,10 +615,16 @@ test('natural composed worlds report public-bearing sensitivity without changing
       const hadOwnDamage=Object.prototype.hasOwnProperty.call(g,'damageTank');
       const originalDrones=g.updateDrones;
       const hadOwnDrones=Object.prototype.hasOwnProperty.call(g,'updateDrones');
-      let droneScope=0;
+      const originalBodies=g.bodyCollisions;
+      const hadOwnBodies=Object.prototype.hasOwnProperty.call(g,'bodyCollisions');
+      let droneScope=0,bodyScope=0;
       if(observe)g.updateDrones=function(...args){
         droneScope++;
         try{return originalDrones.apply(this,args);}finally{droneScope--;}
+      };
+      if(observe)g.bodyCollisions=function(...args){
+        bodyScope++;
+        try{return originalBodies.apply(this,args);}finally{bodyScope--;}
       };
       if(observe)g.damageTank=function(victim,amount,srcId,...rest){
         const hp=Number(victim&&victim.hp);
@@ -628,10 +635,12 @@ test('natural composed worlds report public-bearing sensitivity without changing
           // actual shooter. Reflection outranks its nested caller; splash
           // outranks the generic owner ID. Unclassified is NOT projectile.
           const nonProjectile=this.__v17ReflectingIronWill?'reflection':
-            this.__v172HardBlast?.active?'splash':droneScope?'drone':null;
+            this.__v172HardBlast?.active?'splash':
+            droneScope?'drone':bodyScope?'body':null;
           if(nonProjectile==='drone')result.droneDamageEvents++;
           if(nonProjectile==='reflection')result.reflectionDamageEvents++;
           if(nonProjectile==='splash')result.splashDamageEvents++;
+          if(nonProjectile==='body')result.bodyDamageEvents++;
           const shooter=(this.tanks||[]).find(t=>t&&t.id===srcId);
           if(shooter&&shooter!==victim){
             let possible=0,accepted=0;
@@ -736,7 +745,10 @@ test('natural composed worlds report public-bearing sensitivity without changing
           else delete g.damageTank;
           if(hadOwnDrones)g.updateDrones=originalDrones;
           else delete g.updateDrones;
+          if(hadOwnBodies)g.bodyCollisions=originalBodies;
+          else delete g.bodyCollisions;
           assert.equal(droneScope,0,'research drone scope must not leak');
+          assert.equal(bodyScope,0,'research body scope must not leak');
         }
         g.destroy();
       }
@@ -777,6 +789,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
       droneDamageEvents: observed.droneDamageEvents,
       reflectionDamageEvents: observed.reflectionDamageEvents,
       splashDamageEvents: observed.splashDamageEvents,
+      bodyDamageEvents: observed.bodyDamageEvents,
       knownNonProjectileWitnessPairs: observed.knownNonProjectileWitnessPairs,
       potentialHitWitnessPairs: observed.potentialHitWitnessPairs,
       acceptedHitWitnessPairs: observed.acceptedHitWitnessPairs,
@@ -1043,6 +1056,59 @@ test('composed splash marks physical blast cause before owner-credit witness',()
    assert.equal(g.bullets.length,0,'blast fixture emitted no projectile');
    assert.ok(naiveWitnesses>0,'owner-ID witness wrongly implies direct fire');
    assert.equal(g.__v172HardBlast.active,false,'blast scope must restore');
+  }finally{g.destroy();}
+ });
+});
+
+
+// A tank-to-tank body collision credits the other hull's ID, yet neither
+// hull fires a projectile. The actual composed bodyCollisions callsite is a
+// fourth non-projectile physical cause for event-time public-hit attribution.
+test('composed tank collision credits non-firing hull as damage owner',()=>{
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  const owner=g.player;
+  const [victim,observer]=g.tanks.filter(t=>t&&t.ai&&!t.isPlayer);
+  assert.ok(owner&&victim&&observer);
+  try{
+   g.sfx.muted=true;
+   g.setClass(owner,'scout');g.setClass(victim,'scout');
+   for(const [t,x,y] of [[owner,0,0],[victim,10,0],[observer,0,90]])
+    Object.assign(t,{x,y,vx:0,vy:0,hp:1000,maxHp:1000,alive:true,
+     spawnShieldT:0,shieldT:0,bulwarkT:0,invulnT:0,tauntT:0,
+     stampedeT:0,perk:null,gene:null});
+   g.tanks=[owner,victim,observer];
+   g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
+   g.shapes=[];g.drones=[];g.bullets=[];g.__novaTerrain=[];
+   g.__novaBattlefieldIndex=null;g.tmp=[];g.bodyCd=new Map();
+   if(g.hash&&g.hash.clear)g.hash.clear();
+   for(const t of g.tanks)g.hash.insert(t);
+   g.w=800;g.h=600;g.cam.zoom=1;g.time=10;
+   const T=g.__testFair,C=g.__testWindow.__novaMakeRequire('')('game/classes');
+   const original=g.damageTank;
+   let contacts=0,naiveWitnesses=0,inBody=false;
+   g.damageTank=function(target,amount,srcId,...rest){
+    const before=target.hp;
+    const out=original.call(this,target,amount,srcId,...rest);
+    if(target===victim&&target.hp<before){
+     contacts++;
+     assert.ok(inBody,'damage must originate inside body collision');
+     assert.equal(srcId,owner.id,'body hit credits colliding owner');
+     if(recordVisibleHit(T,this,observer,owner,target,C))naiveWitnesses++;
+    }
+    return out;
+   };
+   const originalBodies=g.bodyCollisions;
+   g.bodyCollisions=function(...args){
+    inBody=true;try{return originalBodies.apply(this,args);}
+    finally{inBody=false;}
+   };
+   g.bodyCollisions(1/60);
+   assert.ok(contacts>0,'actual body collision must lower victim HP');
+   assert.equal(g.bullets.length,0,'colliding hull fired no projectile');
+   assert.ok(naiveWitnesses>0,'owner-ID witness confuses collision with fire');
+   assert.equal(inBody,false,'body provenance scope must clear');
   }finally{g.destroy();}
  });
 });
