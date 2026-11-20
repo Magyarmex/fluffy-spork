@@ -10,6 +10,7 @@
 (function(root){
 'use strict';
 if(root.__novaFullRenderTiming)return;
+var currentOwner=null;
 function create({maxSamples=7200}={}){
  if(!Number.isInteger(maxSamples)||maxSamples<60||maxSamples>20000)
   throw Error('invalid render sample bound');
@@ -28,6 +29,7 @@ function create({maxSamples=7200}={}){
  function stop(why,summarize=true){
   if(!active)return summarize?snapshot():null;
   active=false;reason=why||'manual';
+  if(currentOwner===api)currentOwner=null;
   restored=!!(mod&&mod.render===wrapper);
   if(restored)mod.render=original;
   if(root.document&&typeof root.document.removeEventListener==='function')
@@ -51,6 +53,7 @@ function create({maxSamples=7200}={}){
  }
  function start(){
   if(active)throw Error('render timing already active');
+  if(currentOwner)throw Error('another render timing probe is active');
   if(root.document&&root.document.hidden)throw Error('foreground game required');
   if(typeof root.__novaMakeRequire!=='function')throw Error('production module loader unavailable');
   var candidate=root.__novaMakeRequire('')('game/render');
@@ -78,18 +81,20 @@ function create({maxSamples=7200}={}){
   try{
    mod.render=wrapper;
    if(mod.render!==wrapper)throw Error('renderer export is not writable');
-   active=true;
+   active=true;currentOwner=api;
    if(root.document&&typeof root.document.addEventListener==='function')
     root.document.addEventListener('visibilitychange',onVisibility);
   }catch(error){
    active=false;
+   if(currentOwner===api)currentOwner=null;
    if(mod&&mod.render===wrapper)mod.render=original;
    restored=mod&&mod.render===original;
    reason='start-error';
    throw error;
   }
  }
- return {start,stop,snapshot,get active(){return active;}};
+ var api={start,stop,snapshot,get active(){return active;}};
+ return api;
 }
 root.__novaFullRenderTiming={create};
 })(typeof window!=='undefined'?window:globalThis);
