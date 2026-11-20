@@ -91,7 +91,7 @@ function saturation(g,targetId,selfId){
   for(var i=0;i<ts.length;i++){
     var q=ts[i];if(!q||q.id===selfId||!q.ai||!alive(q))continue;
     var a=q.ai,id=a.__v1112TargetId>=0?a.__v1112TargetId:(a.__v1105TargetId>=0?a.__v1105TargetId:(a.__v180TargetId>=0?a.__v180TargetId:a.targetId));
-    if(id===targetId&&(a.state==='hunt'||a.__v180Posture==='pressure'||a.__v180Posture==='flank'||a.__v180Posture==='route'))n++;
+    if(id===targetId&&hostile(g,q,(g.tanks||[]).find(function(t){return t&&t.id===targetId;}))&&(a.state==='hunt'||a.__v180Posture==='pressure'||a.__v180Posture==='flank'||a.__v180Posture==='route'))n++;
   }
   return n;
 }
@@ -99,11 +99,12 @@ function saturation(g,targetId,selfId){
  * Count pressure assignments once instead of rescanning every AI tank for
  * every candidate. The observer itself is excluded exactly as before. */
 function saturationSnapshot(g,selfId){
-  var counts=new Map(),ts=g&&g.tanks||[];
+  var counts=new Map(),ts=g&&g.tanks||[],byId=new Map();
+  for(var j=0;j<ts.length;j++)if(ts[j])byId.set(ts[j].id,ts[j]);
   for(var i=0;i<ts.length;i++){
     var q=ts[i];if(!q||q.id===selfId||!q.ai||!alive(q))continue;
     var a=q.ai,id=a.__v1112TargetId>=0?a.__v1112TargetId:(a.__v1105TargetId>=0?a.__v1105TargetId:(a.__v180TargetId>=0?a.__v180TargetId:a.targetId));
-    if(a.state==='hunt'||a.__v180Posture==='pressure'||a.__v180Posture==='flank'||a.__v180Posture==='route')
+    if((a.state==='hunt'||a.__v180Posture==='pressure'||a.__v180Posture==='flank'||a.__v180Posture==='route')&&hostile(g,q,byId.get(id)))
       counts.set(id,(counts.get(id)||0)+1);
   }
   return counts;
