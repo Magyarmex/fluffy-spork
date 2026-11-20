@@ -941,19 +941,27 @@ test('composed drone damage would forge a naive visible-owner hit witness',()=>{
    Object.assign(g.drones[0],{x:65,y:0,speed:0,attackCd:0,
     targetRef:victim,targetId:victim.id,retargetT:1,hitFlash:0});
    const T=g.__testFair,C=g.__testWindow.__novaMakeRequire('')('game/classes');
-   const original=g.damageTank;
-   let contact=0,forged=0;
+   const original=g.damageTank,originalDrones=g.updateDrones;
+   let causeScope=null,contact=0,forged=0;
+   // Scope is owned by the physical update path, not the credited owner ID.
+   // try/finally prevents a thrown drone update from contaminating later hits.
+   g.updateDrones=function(...args){
+    const previous=causeScope;causeScope='drone';
+    try{return originalDrones.apply(this,args);}finally{causeScope=previous;}
+   };
    g.damageTank=function(target,amount,srcId,...rest){
     const before=target.hp;
     const out=original.call(this,target,amount,srcId,...rest);
     if(target===victim&&target.hp<before){
      contact++;
      assert.equal(srcId,owner.id,'drone hit credits its owner');
+     assert.equal(causeScope,'drone','event-time physical update owns cause');
      if(recordVisibleHit(T,this,observer,owner,target,C))forged++;
     }
     return out;
    };
    g.updateDrones(1/60);
+   assert.equal(causeScope,null,'physical cause scope must clear after update');
    assert.ok(contact>0,'real gene drone must damage victim');
    assert.equal(g.bullets.length,0,'credited owner fired no projectile');
    assert.ok(forged>0,'naive srcId witness falsely treats drone owner as shooter');
