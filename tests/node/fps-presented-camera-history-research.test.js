@@ -23,6 +23,8 @@ test('old, unknown, future and untrusted camera samples fail closed',()=>{
  assert.equal(h.project(event(),{...meta,timestampTrusted:false}),null);
  assert.equal(h.project(event(),{...meta,timestampExact:false}),null);
  assert.equal(h.project(event(1300),{...meta,physicalAtMs:1300}),null);
+ assert.equal(h.project(event(1010),{...meta,physicalAtMs:1010}),null,
+   'old event cannot be revived by a matching old camera frame');
  assert.equal(h.project(null,meta),null);
  h.reset();assert.equal(h.frames.length,0);
  assert.equal(h.project(event(),meta),null);
@@ -35,8 +37,8 @@ test('bounded history never returns future frames or nonmonotonic snapshots',()=
  assert.equal(h.record(1020,geometry(20)),true);
  assert.equal(h.frames.length,2);
  assert.equal(h.project(event(1005),{...meta,physicalAtMs:1005}),null);
- assert.equal(h.project(event(1015),{...meta,physicalAtMs:1015}).x,210);
- assert.equal(h.project(event(1025),{...meta,physicalAtMs:1025}).x,220);
+ assert.equal(h.project(event(1015),{...meta,physicalAtMs:1015,deliveryMs:1030}).x,210);
+ assert.equal(h.project(event(1025),{...meta,physicalAtMs:1025,deliveryMs:1030}).x,220);
 });
 test('resize and hidden lifecycle require explicit reset',()=>{
  const h=new PresentedCameraHistory();h.record(1100,geometry(0));
