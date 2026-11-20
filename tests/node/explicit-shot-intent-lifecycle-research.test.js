@@ -186,3 +186,17 @@ test('raw pulse also refuses a physically stale trusted release',()=>{
  assert.equal(pulse.pulses,0);
  pulse.detach();
 });
+
+test('stalled long trusted hold is not mistaken for a short unsampled press',()=>{
+ const f=setup();
+ f.input.pd({...event('pointerdown',7),isTrusted:true,
+  timeStamp:performance.now()-250});
+ f.input.pm({...event('pointermove',7),dx:30,dy:0});
+ f.input.pu({...event('pointerup',7),isTrusted:true,
+  timeStamp:performance.now()});
+ f.game.update(1/30);
+ assert.equal(f.seen[0].intent,undefined);
+ assert.equal(f.owner.intents,0);
+ assert.equal(f.owner.pulse.pulses,0);
+ f.owner.detach();
+});
