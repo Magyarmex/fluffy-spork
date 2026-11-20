@@ -212,3 +212,14 @@ test('short physical hold may recover late within its independent release budget
  assert.equal(f.owner.intents,1);
  f.owner.detach();
 });
+
+test('mixed trusted and unverified timestamp provenance cannot certify a pulse',()=>{
+ const f=setup();
+ f.input.pd(event('pointerdown',7));
+ f.input.pm({...event('pointermove',7),dx:30,dy:0});
+ f.input.pu({...event('pointerup',7),isTrusted:true,timeStamp:performance.now()});
+ f.game.update(1/30);
+ assert.equal(f.seen[0].intent,undefined);
+ assert.equal(f.owner.intents,0);
+ f.owner.detach();
+});
