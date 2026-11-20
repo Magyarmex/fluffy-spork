@@ -1161,3 +1161,55 @@ test('composed core taunt reflection credits non-firing defender via nested dama
   }finally{g.destroy();}
  });
 });
+
+
+// A collectible nuke deals area damage and credits its collector's tank ID.
+// It creates no direct projectile and must never certify visible gunfire.
+test('composed nuke pickup credits a non-firing collector on real HP damage',()=>{
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  const owner=g.player;
+  const [victim,observer]=g.tanks.filter(t=>t&&t.ai&&!t.isPlayer);
+  assert.ok(owner&&victim&&observer);
+  try{
+   g.sfx.muted=true;
+   g.setClass(owner,'scout');g.setClass(victim,'scout');
+   for(const [t,x,y] of [[owner,0,0],[victim,70,0],[observer,0,90]])
+    Object.assign(t,{x,y,vx:0,vy:0,hp:1000,maxHp:1000,alive:true,
+     spawnShieldT:0,shieldT:0,bulwarkT:0,invulnT:0,tauntT:0});
+   g.tanks=[owner,victim,observer];
+   g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
+   g.shapes=[];g.drones=[];g.bullets=[];g.__novaTerrain=[];
+   g.__novaBattlefieldIndex=null;g.tmp=[];
+   if(g.hash&&g.hash.clear)g.hash.clear();
+   for(const t of g.tanks)g.hash.insert(t);
+   g.w=800;g.h=600;g.cam.zoom=1;g.time=10;
+   const T=g.__testFair,C=g.__testWindow.__novaMakeRequire('')('game/classes');
+   const original=g.damageTank,originalPowerup=g.applyPowerup;
+   let contacts=0,naiveWitnesses=0,causeScope=null;
+   g.applyPowerup=function(t,type){
+    const previous=causeScope;
+    if(type==='nuke')causeScope='nuke';
+    try{return originalPowerup.call(this,t,type);}
+    finally{causeScope=previous;}
+   };
+   g.damageTank=function(target,amount,srcId,...rest){
+    const before=target.hp;
+    const out=original.call(this,target,amount,srcId,...rest);
+    if(target===victim&&target.hp<before){
+     contacts++;
+     assert.equal(causeScope,'nuke','pickup must own physical cause');
+     assert.equal(srcId,owner.id,'nuke credits collector ID');
+     if(recordVisibleHit(T,this,observer,owner,target,C))naiveWitnesses++;
+    }
+    return out;
+   };
+   g.applyPowerup(owner,'nuke');
+   assert.ok(contacts>0,'actual nuke must reduce target HP');
+   assert.equal(g.bullets.length,0,'collector fired no projectile');
+   assert.ok(naiveWitnesses>0,'naive owner-ID hit witness mistakes nuke for fire');
+   assert.equal(causeScope,null,'nuke scope must unwind after pickup');
+  }finally{g.destroy();}
+ });
+});
