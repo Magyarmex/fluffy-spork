@@ -5,7 +5,7 @@
 (function(){
 'use strict';
 var mods=window.__novaModules;if(!mods){console.error('[NOVA v1.8.1] module registry unavailable');return;}
-var VERSION='1.8.1',CODENAME='Battle Sense',EMPTY_SHOT_VICTIMS=Object.freeze([]);
+var VERSION='1.8.1',CODENAME='Battle Sense';
 window.__NOVA_VERSION=VERSION;
 window.__NOVA_BATTLE_SENSE_RELEASE__={version:VERSION,codename:CODENAME,date:'2026-08-08',headline:'Rivals read the whole fight, not just the tank in their crosshair.',groups:{
  'Situational Awareness':['AI now evaluates local hostile pressure, crossfire exposure, wounded combatants, nearby neutral resources and observed weapon commitments before deciding how hard to enter a fight.','Allied tanks no longer inflate combat pressure or trigger decompression movement; classic free-for-all behavior is preserved when no relationship metadata exists.','Rivals can recognize a dangerous multi-tank brawl and skirt it, or identify a vulnerable duel and attack from a useful third angle instead of joining the same firing line.','Observed long-reload shots create short punish windows; the AI infers the opening only from shots that specific rival legitimately witnessed.'],
@@ -45,6 +45,8 @@ function witnessedDuel(g,observer,target,third){
  if(!Number.isFinite(sx)||!Number.isFinite(sy))return false;
  /* Event-time public witness set: later movement cannot rewrite a shot's intent.
   * Trusted origin and bearing remain mandatory even for cached candidates. */
+ if(a.__v181ObservedShotVictims===null)return false;
+ if(a.__v181ObservedShotVictims&&typeof a.__v181ObservedShotVictims.has==='function')return a.__v181ObservedShotVictims.has(victim);
  if(Array.isArray(a.__v181ObservedShotVictims))return a.__v181ObservedShotVictims.indexOf(victim)!==-1;
  var toward=Math.atan2(victim.y-sy,victim.x-sx);
  return Math.cos(bearing-toward)>.75;
@@ -67,15 +69,16 @@ wrap('game/engine',function(engine){var Game=engine.Game;if(!Game||Game.prototyp
   }
  }
  var ts=this.__novaFairShotWitnesses||this.tanks||[];for(var i=0;i<ts.length;i++){var o=ts[i];if(!o||o.id===t.id||!o.ai||o.alive===false)continue;var fair=window.__NOVA_FAIR_ENGAGEMENT__;if(fair&&typeof fair.inGameplayViewport==='function'&&!fair.inGameplayViewport(this,o,t))continue;if(!visible(this,o,t))continue;o.ai.__v181ObservedShotId=t.id;o.ai.__v181ObservedShotAt=this.time||0;o.ai.__v181ObservedShotAngle=shotAngle;o.ai.__v181ObservedShotX=shotX;o.ai.__v181ObservedShotY=shotY;
- var observedVictims=null;
+ var observedVictims=null,observedCount=0;
  for(var ci=0;ci<candidateVictims.length;ci++){
   var victim=candidateVictims[ci];if(victim===o)continue;
   if(fair&&typeof fair.inGameplayViewport==='function'&&!fair.inGameplayViewport(this,o,victim))continue;
   if(!visible(this,o,victim))continue;
-  if(!observedVictims)observedVictims=[];
-  observedVictims.push(victim);
+  if(!observedVictims)observedVictims=new WeakSet();
+  observedVictims.add(victim);observedCount++;
  }
- o.ai.__v181ObservedShotVictims=observedVictims||EMPTY_SHOT_VICTIMS;
+ o.ai.__v181ObservedShotVictims=observedVictims;
+ o.ai.__v181ObservedShotVictimCount=observedCount;
  }return out;};var oldPower=Game.prototype.updatePowerups;if(oldPower)Game.prototype.updatePowerups=function(dt){if(this.status==='playing'&&this.powerups&&this.tanks){for(var i=this.powerups.length-1;i>=0;i--){var p=this.powerups[i],winner=null,bd=46*46;for(var j=0;j<this.tanks.length;j++){var t=this.tanks[j];if(!t||t.alive===false)continue;var q=d2(t.x,t.y,p.x,p.y);if(q<bd||(q===bd&&t.isPlayer)){bd=q;winner=t;}}if(winner&&!winner.isPlayer){this.applyPowerup(winner,p.type);this.powerups.splice(i,1);if(window.__NOVA_BATTLE_SENSE__)window.__NOVA_BATTLE_SENSE__.aiPowerups++;}}}return oldPower.apply(this,arguments);};});
 wrap('game/ai',function(ai,require){var old=ai.updateAI;if(!old||old.__novaBattleSense)return;var classes=require('./classes');function patched(t,g,dt){if(!t||!t.ai)return old(t,g,dt);var a=t.ai,now=g.time||0;a.__v181Think=(a.__v181Think||0)-dt;if(a.__v181Think<=0){/* Preserve fractional overshoot so strategic planning cadence is independent of frame quantization. A long frame still plans only once. */var interval=.16+((t.id||0)%5)*.018;a.__v181Think=((a.__v181Think%interval)+interval)%interval;if(a.__v181Think<1e-9)a.__v181Think=interval;var b=strategicBias(g,classes,t,a,now,a.__v181Bias||(a.__v181Bias={}));a.__v181BiasX=b.x||0;a.__v181BiasY=b.y||0;a.__v181BiasW=b.weight||0;a.__v181Mode=b.mode||'none';if(window.__NOVA_BATTLE_SENSE__)window.__NOVA_BATTLE_SENSE__.plans++;}var move=g.moveTank,own=Object.prototype.hasOwnProperty.call(g,'moveTank');if(move&&a.__v181BiasW>0)g.moveTank=function(tt,vx,vy,dd){if(tt!==t)return move.apply(g,arguments);var sp=Math.hypot(vx||0,vy||0)||((g.tankSpeed&&g.tankSpeed(tt))||1),bx=vx/sp,by=vy/sp,w=clamp(a.__v181BiasW,0,1.15),x=bx*(1-w*.72)+a.__v181BiasX*w,y=by*(1-w*.72)+a.__v181BiasY*w,side=saferSide(g,t,x,y);if(side){var mm=Math.hypot(x,y)||1,px=-y/mm,py=x/mm;x+=px*side*.28;y+=py*side*.28;}var m=Math.hypot(x,y)||1;return move.call(g,tt,x/m*sp,y/m*sp,dd);};try{return old(t,g,dt);}finally{if(move){if(own)g.moveTank=move;else delete g.moveTank;}}}patched.__novaBattleSense=true;ai.updateAI=patched;});
 window.__NOVA_BATTLE_SENSE__={version:VERSION,plans:0,aiPowerups:0,prunedRoutes:0,fairPlay:{hiddenCooldownReads:false,teamHiveMind:false,hiddenTracking:false,statBuffs:false,perObserverShotMemory:true}};
