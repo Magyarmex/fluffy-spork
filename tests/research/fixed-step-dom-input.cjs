@@ -103,6 +103,8 @@ class ChronologicalInput {
       const evt = {type:e.kind, __novaOriginalAt:d.__novaOriginalAt,
         __novaTimestampTrusted:d.__novaTimestampTrusted,
         __novaPhysicalTimestampExact:d.__novaPhysicalTimestampExact,
+        // Preserve physical DOM-time mouse target across delayed replay.
+        __novaCaptureWorld:d.__novaCaptureWorld,
         __novaReplayAt:e.at, __novaSampleAt:end,
         pointerId:d.pointerId, pointerType:d.pointerType,
         clientX, clientY, buttons:d.buttons,
