@@ -96,7 +96,9 @@ function saturation(g,targetId,selfId){
   }
   return n;
 }
-/* An ally's target slot is not evidence of hostile pressure. This narrows\n * phantom saturation but does not make other bots' private slots public.\n * During one target choice the other tanks' target slots cannot change.
+/* An ally's target slot is not evidence of hostile pressure. This narrows
+ * phantom saturation but does not make other bots' private slots public.
+ * During one target choice the other tanks' target slots cannot change.
  * Count pressure assignments once instead of rescanning every AI tank for
  * every candidate. The observer itself is excluded exactly as before. */
 function saturationSnapshot(g,selfId){
