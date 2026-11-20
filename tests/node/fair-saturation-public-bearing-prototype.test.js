@@ -604,17 +604,34 @@ test('natural composed worlds report public-bearing sensitivity without changing
         publicBearingContacts: 0, publicShotContacts: 0, selected: 0,
         publicChoiceLOSCalls: 0, publicDiagnosticLOSCalls: 0,
         physicalDamageEvents: 0, potentialHitWitnessPairs: 0,
+        droneDamageEvents: 0, reflectionDamageEvents: 0,
+        splashDamageEvents: 0, knownNonProjectileWitnessPairs: 0,
         maxPotentialHitWitnessPairs: 0,
         acceptedHitWitnessPairs: 0, hitWitnessLOSCalls: 0,
         hitChangedSelections: 0, hitHumanSelections: 0,
         shippingHumanSelections: 0, publicHitContacts: 0 };
       const originalDamage=g.damageTank;
       const hadOwnDamage=Object.prototype.hasOwnProperty.call(g,'damageTank');
+      const originalDrones=g.updateDrones;
+      const hadOwnDrones=Object.prototype.hasOwnProperty.call(g,'updateDrones');
+      let droneScope=0;
+      if(observe)g.updateDrones=function(...args){
+        droneScope++;
+        try{return originalDrones.apply(this,args);}finally{droneScope--;}
+      };
       if(observe)g.damageTank=function(victim,amount,srcId,...rest){
         const hp=Number(victim&&victim.hp);
         const out=originalDamage.call(this,victim,amount,srcId,...rest);
         if(Number.isFinite(hp)&&victim&&victim.hp<hp){
           result.physicalDamageEvents++;
+          // A physical call-site scope can disprove a credited owner as the
+          // actual shooter. Reflection outranks its nested caller; splash
+          // outranks the generic owner ID. Unclassified is NOT projectile.
+          const nonProjectile=this.__v17ReflectingIronWill?'reflection':
+            droneScope?'drone':this.__v172HardBlast?.active?'splash':null;
+          if(nonProjectile==='drone')result.droneDamageEvents++;
+          if(nonProjectile==='reflection')result.reflectionDamageEvents++;
+          if(nonProjectile==='splash')result.splashDamageEvents++;
           const shooter=(this.tanks||[]).find(t=>t&&t.id===srcId);
           if(shooter&&shooter!==victim){
             let possible=0,accepted=0;
@@ -643,6 +660,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
             }
             result.potentialHitWitnessPairs+=possible;
             result.acceptedHitWitnessPairs+=accepted;
+            if(nonProjectile)result.knownNonProjectileWitnessPairs+=accepted;
             result.maxPotentialHitWitnessPairs=Math.max(
              result.maxPotentialHitWitnessPairs,possible);
           }
@@ -713,8 +731,13 @@ test('natural composed worlds report public-bearing sensitivity without changing
              t.ai.__v181ObservedShotAt] : null)),
           draws: draws() };
       } finally {
-        if(observe){if(hadOwnDamage)g.damageTank=originalDamage;
-          else delete g.damageTank;}
+        if(observe){
+          if(hadOwnDamage)g.damageTank=originalDamage;
+          else delete g.damageTank;
+          if(hadOwnDrones)g.updateDrones=originalDrones;
+          else delete g.updateDrones;
+          assert.equal(droneScope,0,'research drone scope must not leak');
+        }
         g.destroy();
       }
     });
@@ -730,6 +753,8 @@ test('natural composed worlds report public-bearing sensitivity without changing
     assert.ok(observed.observerSamples > 0, 'must inspect live AI observers');
     assert.ok(observed.acceptedHitWitnessPairs <= observed.potentialHitWitnessPairs,
       'physical evidence cannot exceed eligible public observer pairs');
+    assert.ok(observed.knownNonProjectileWitnessPairs <= observed.acceptedHitWitnessPairs,
+      'known non-projectile witness subset cannot exceed all witnesses');
     assert.ok(observed.hitWitnessLOSCalls <= 2 * observed.potentialHitWitnessPairs,
       'bounded event-time witness must use at most two LOS checks per pair');
     if (observed.publicBearingContacts > 0 || observed.publicShotContacts > 0)
@@ -749,6 +774,10 @@ test('natural composed worlds report public-bearing sensitivity without changing
       publicDiagnosticLOSCalls: observed.publicDiagnosticLOSCalls,
       extraTerrainQueries: observed.terrainQueries - control.terrainQueries,
       physicalDamageEvents: observed.physicalDamageEvents,
+      droneDamageEvents: observed.droneDamageEvents,
+      reflectionDamageEvents: observed.reflectionDamageEvents,
+      splashDamageEvents: observed.splashDamageEvents,
+      knownNonProjectileWitnessPairs: observed.knownNonProjectileWitnessPairs,
       potentialHitWitnessPairs: observed.potentialHitWitnessPairs,
       acceptedHitWitnessPairs: observed.acceptedHitWitnessPairs,
       hitWitnessLOSCalls: observed.hitWitnessLOSCalls,
