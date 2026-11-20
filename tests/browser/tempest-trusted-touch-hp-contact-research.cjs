@@ -102,6 +102,10 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
       if(candidate&&activeTouch!==candidate){activeTouch=candidate;pendingShot=null;}
      }
      if(type==='pointerup'||type==='pointercancel'){
+      // A newer right-stick press without a delivered move still supersedes
+      // any older queued release; a left-stick release must not do so.
+      if(g?.input?.stickId?.aim===e.pointerId&&activeTouch?.id!==e.pointerId)
+       pendingShot=null;
       if(activeTouch?.id===e.pointerId){
        const a=g?.input?.aim,len=Math.hypot(a?.dx||0,a?.dy||0);
        if(type==='pointerup'&&!activeTouch.sampled&&g?.input?.firing&&
@@ -320,29 +324,34 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
    assert.equal(afterCancel.firing,false,'cancel releases firing ownership');
    // Real twin-stick players hold movement while aiming. A second pointerdown
    // must not overwrite the first right-stick shot owner.
-   const right={...origin,id:1501};
-   const left={...origin,x:box.x+box.width*.28,id:1502};
-   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[right]});
-   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
-    {...right,x:right.x+35,y:right.y-20}]});
-   await page.waitForFunction(()=>{
-    const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
-    return g?.input?.stickId?.aim>=0&&r.aimOwnerId===g.input.stickId.aim;
-   },null,{timeout:5000});
-   const rightOwner=await page.evaluate(()=>window.__novaTempestHp.aimOwnerId);
-   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
-    {...right,x:right.x+35,y:right.y-20},left]});
-   const twoFinger=await page.evaluate(()=>({
-    tracked:window.__novaTempestHp.aimOwnerId,
-    physical:window.__novaTempestHpGame.input.stickId.aim
-   }));
-   assert.equal(twoFinger.tracked,rightOwner,
-    'movement-stick second thumb must not steal the pending aim owner');
-   assert.equal(twoFinger.physical,rightOwner,
-    'physical aim owner must remain unchanged by movement touch');
-   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-   await page.waitForFunction(()=>window.__novaTempestHpGame.input.stickId.aim===-1,
-    null,{timeout:5000});
+   for(const aimFirst of [true,false]){
+    const right={...origin,id:1501+(aimFirst?0:10)};
+    const left={...origin,x:box.x+box.width*.28,id:1502+(aimFirst?0:10)};
+    if(aimFirst)
+     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[right]});
+    else
+     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[left]});
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+     right,left]});
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+     {...right,x:right.x+35,y:right.y-20},left]});
+    await page.waitForFunction(()=>{
+     const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
+     return g?.input?.stickId?.aim>=0&&r.aimOwnerId===g.input.stickId.aim;
+    },null,{timeout:5000});
+    const rightOwner=await page.evaluate(()=>window.__novaTempestHp.aimOwnerId);
+    const twoFinger=await page.evaluate(()=>({
+     tracked:window.__novaTempestHp.aimOwnerId,
+     physical:window.__novaTempestHpGame.input.stickId.aim
+    }));
+    assert.equal(twoFinger.tracked,rightOwner,
+     'second thumb must not steal the actual aim owner');
+    assert.equal(twoFinger.physical,rightOwner,
+     'physical aim owner must match tracked right stick');
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    await page.waitForFunction(()=>window.__novaTempestHpGame.input.stickId.aim===-1,
+     null,{timeout:5000});
+   }
   }
   assert.equal(errors.length,0,
    'no browser page errors during short-touch trials: '+JSON.stringify(errors));
