@@ -49,8 +49,9 @@ class ExplicitShotIntent {
   const self=this;
   game.update=function(...args){
    const p=self.pulse&&self.pulse.pending,input=self.input;
-   const canPlay=!!p&&p.player===game.player&&game.player?.alive!==false&&
-     Number.isFinite(p.queuedAt)&&performance.now()-p.queuedAt>=0&&performance.now()-p.queuedAt<=50&&
+   const age=p&&Number.isFinite(p.queuedAt)?performance.now()-p.queuedAt:Infinity;
+   const canPlay=!!p&&p.player===game.player&&game.player?.alive===true&&
+     age>=0&&age<=50&&
      game.status==='playing'&&!game.paused&&!input.__novaInputPaused&&
      !(game.__testWindow&&game.__testWindow.document.hidden);
    if(!canPlay){
