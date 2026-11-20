@@ -234,3 +234,16 @@ test('dead owner cannot retain an unreleased physical aim stick across update',(
  assert.equal(f.input.stickId.aim,-1);
  f.owner.detach();
 });
+
+test('trusted events with unusable timestamps cannot be laundered as unverified',()=>{
+ for(const stamp of [NaN,0,Infinity]){
+  const f=setup();
+  f.input.pd({...event('pointerdown',7),isTrusted:true,timeStamp:stamp});
+  f.input.pm({...event('pointermove',7),dx:30,dy:0});
+  f.input.pu({...event('pointerup',7),isTrusted:true,timeStamp:stamp});
+  f.game.update(1/30);
+  assert.equal(f.seen[0].intent,undefined,String(stamp));
+  assert.equal(f.owner.intents,0);
+  f.owner.detach();
+ }
+});
