@@ -105,3 +105,11 @@ test('invalid camera geometry and event coordinates never produce a projected ta
  assert.equal(h.project(event(),{...meta,deliveryMs:NaN}),null);
  assert.equal(h.project(event(),{...meta,physicalAtMs:1201}),null);
 });
+
+test('normalized physical clock overrides raw epoch-style event timestamp',()=>{
+ const h=new PresentedCameraHistory();h.record(1100,geometry(0));
+ const raw=event(1793560001130);
+ const result=h.project(raw,{...meta,physicalAtMs:1130});
+ assert.equal(result.x,200);
+ assert.equal(result.frameAt,1100);
+});
