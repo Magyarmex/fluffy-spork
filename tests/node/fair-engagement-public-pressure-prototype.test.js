@@ -124,7 +124,9 @@ test('public projectile trajectory distinguishes an actual short-horizon threat 
    assert.equal(publicProjectileThreat(g,observer,right),0,
     'farther candidate is beyond the explicit short prediction horizon');
    // A visually hidden projectile must not grant privileged pressure data.
-   g.bullets[0].x=-1200;
+   g.bullets[0].x=450;g.bullets[0].vx=-2000;
+   assert.ok((left.x-450)/-2000<=.35,
+    'offscreen shot would geometrically reach target within horizon');
    assert.equal(publicProjectileThreat(g,observer,left),0);
   }finally{s.g.destroy();}
  });
