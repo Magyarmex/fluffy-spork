@@ -148,6 +148,9 @@ test('missing witnessed shot timestamp cannot become a time-zero crossfire',()=>
  observer.ai.__v181ObservedShotAt='0';
  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
   'a string-coerced timestamp is not an authenticated numeric witness');
+ observer.ai.__v181ObservedShotAt=-1;
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
+  'a negative pre-match time cannot masquerade as a fresh shot');
  observer.ai.__v181ObservedShotAt=0;
  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
   'a genuine time-zero shot remains a valid crossfire witness');
