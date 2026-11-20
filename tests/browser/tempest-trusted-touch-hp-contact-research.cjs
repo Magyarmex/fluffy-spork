@@ -24,6 +24,7 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
     update=Game.prototype.update;
    window.__novaTempestHp={births:[],hits:[],events:[],updates:[],latches:[],targetReady:false};
    let activeTouch=null,pendingShot=null;
+   const touchOwners=new Map();
    // Research-only: keep the actual Game.update/combat chain, but sample it
    // at roughly half the host RAF cadence. This is NOT a native 30Hz display
    // or a shipping scheduler: real callback timestamps remain the authority.
@@ -44,7 +45,7 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
      }
      if(activeTouch&&this.input?.firing&&this.input?.aim?.active&&
         Math.hypot(this.input.aim.dx,this.input.aim.dy)>=9)activeTouch.sampled=true;
-     const p=pendingShot;pendingShot=null,now=performance.now();
+     const p=pendingShot,now=performance.now();pendingShot=null;
      const valid=latchMode&&p&&p.player===this.player&&this.player?.alive&&
       this.status==='playing'&&!this.paused&&!this.input?.__novaInputPaused&&
       !document.hidden&&this.input?.stickId?.aim===-1&&
@@ -91,19 +92,29 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
       at:performance.now(),pointerId:e.pointerId});
      if(!latchMode||!e.isTrusted)return;
      const g=window.__novaTempestHpGame;
-     if(type==='pointerdown'){pendingShot=null;
-       activeTouch={id:e.pointerId,player:g?.player,sampled:false};}
-     if((type==='pointerup'||type==='pointercancel')&&activeTouch?.id===e.pointerId){
-      const a=g?.input?.aim,len=Math.hypot(a?.dx||0,a?.dy||0);
-      if(type==='pointerup'&&!activeTouch.sampled&&g?.input?.firing&&
-         g?.input?.stickId?.aim===e.pointerId&&a?.active&&len>=9)
-       pendingShot={player:activeTouch.player,dx:a.dx,dy:a.dy,at:performance.now()};
-      activeTouch=null;
+     // A second thumb may press the movement stick while the first aims.
+     // Track each physical pointer independently; only the actual Input aim
+     // owner may replace/cancel an aim-shot candidate.
+     if(type==='pointerdown')
+      touchOwners.set(e.pointerId,{id:e.pointerId,player:g?.player,sampled:false});
+     if(type==='pointermove'&&g?.input?.stickId?.aim===e.pointerId){
+      const candidate=touchOwners.get(e.pointerId);
+      if(candidate&&activeTouch!==candidate){activeTouch=candidate;pendingShot=null;}
+     }
+     if(type==='pointerup'||type==='pointercancel'){
+      if(activeTouch?.id===e.pointerId){
+       const a=g?.input?.aim,len=Math.hypot(a?.dx||0,a?.dy||0);
+       if(type==='pointerup'&&!activeTouch.sampled&&g?.input?.firing&&
+          g?.input?.stickId?.aim===e.pointerId&&a?.active&&len>=9)
+        pendingShot={player:activeTouch.player,dx:a.dx,dy:a.dy,at:performance.now()};
+       activeTouch=null;
+      }
+      touchOwners.delete(e.pointerId);
      }
     },{capture:true,passive:true});
-   window.addEventListener('blur',()=>{pendingShot=null;activeTouch=null;});
+   window.addEventListener('blur',()=>{pendingShot=null;activeTouch=null;touchOwners.clear();});
    document.addEventListener('visibilitychange',()=>{
-    if(document.hidden){pendingShot=null;activeTouch=null;}
+    if(document.hidden){pendingShot=null;activeTouch=null;touchOwners.clear();}
    });
   },{halfRate,latchMode});
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
