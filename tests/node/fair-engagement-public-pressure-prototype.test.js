@@ -199,3 +199,38 @@ test('natural composed match samples public-pressure candidate incidence without
   });
  }
 });
+
+function movingProjectileThreat(g,observer,target,{horizon=.35,margin=28}={}){
+ const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
+ for(const b of g.bullets||[]){
+  if(!b||b.dead||!(b.ttl>0)||!Number.isFinite(b.x)||
+     !Number.isFinite(b.y)||!Number.isFinite(b.vx)||
+     !Number.isFinite(b.vy)||!fair.inGameplayWorldPoint(g,observer,b.x,b.y))continue;
+  const tvx=Number.isFinite(target.vx)?target.vx:0;
+  const tvy=Number.isFinite(target.vy)?target.vy:0;
+  const vx=b.vx-tvx,vy=b.vy-tvy,v2=vx*vx+vy*vy;
+  if(v2<1)continue;
+  const dx=target.x-b.x,dy=target.y-b.y;
+  const t=(dx*vx+dy*vy)/v2;
+  if(!(t>=0&&t<=Math.min(horizon,b.ttl)))continue;
+  if(Math.hypot(dx-vx*t,dy-vy*t)<=margin+(Number(target.r)||0))return 1;
+ }
+ return 0;
+}
+test('moving public target can cross a shot lane that static trajectory misses',()=>{
+ withSeed(1517818,()=>{
+  const s=scene();
+  try{
+   const {g,observer,left}=s;
+   Object.assign(left,{x:-100,y:70,vx:0,vy:-280,r:0});
+   g.bullets=[{x:-200,y:0,vx:400,vy:0,ttl:1,dead:false}];
+   assert.equal(publicProjectileThreat(g,observer,left),0,
+    'stationary proxy misses a target crossing the lane');
+   assert.equal(movingProjectileThreat(g,observer,left),1,
+    'relative public velocity predicts the crossing within 250ms');
+   left.vy=280;
+   assert.equal(movingProjectileThreat(g,observer,left),0,
+    'moving away from the lane is not the same threat');
+  }finally{s.g.destroy();}
+ });
+});
