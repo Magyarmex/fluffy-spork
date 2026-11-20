@@ -368,7 +368,21 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
   const {BrowserEventTimeline}=require('./fixed-step-browser-events.cjs');
   const {BrowserInputCapture}=require('./fixed-step-browser-capture.cjs');
   const timeline=new ChronologicalInput(game.input);
-  const bridge=new BrowserEventTimeline(timeline,clock);
+  const bridge=new BrowserEventTimeline(timeline,clock,{
+    // Only the research weapon-intent pilot needs DOM-time mouse projection.
+    // A camera shift between event capture and chronological replay must not
+    // change the player's chosen world point. Fail closed on bad geometry.
+    captureMouseWorld:shotOnlyPulseFactory?e=>{
+      const cam=game.cam,rect=canvas.getBoundingClientRect();
+      const z=Number(cam?.zoom)||Number(game.zoom);
+      if(!cam||!Number.isFinite(z)||z<=0||!Number.isFinite(cam.x)||
+         !Number.isFinite(cam.y)||!Number.isFinite(rect.left)||
+         !Number.isFinite(rect.top)||!Number.isFinite(game.w)||
+         !Number.isFinite(game.h))return null;
+      return {x:cam.x+(e.clientX-rect.left-game.w*.5)/z,
+        y:cam.y+(e.clientY-rect.top-game.h*.5)/z};
+    }:null
+  });
   const capture=new BrowserInputCapture(game.input,canvas,timeline,bridge,
     {window:win,document:doc,game});
   let owner,pulse=null;
