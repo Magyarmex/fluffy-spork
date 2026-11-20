@@ -14,7 +14,8 @@ test('natural composed matches bound firing-time witness scans and report incide
     g.status='playing';g.paused=false;
     const stats={seed,frames:0,playingFrames:0,successfulFireCalls:0,observedShotRecords:0,
      eligibleVictimMemberships:0,shotsWithAnyVictimWitness:0,
-     fireLOSCalls:0,maxFireLOSCalls:0,crossfireSamples:0};
+     fireLOSCalls:0,maxFireLOSCalls:0,crossfireSamples:0,
+     geometricComparisons:0,oldOnlyGeometry:0,newOnlyGeometry:0};
     const originalLOS=g.hasLineOfSight,originalFire=g.tryFire;
     let insideFire=false,shotRays=0;
     g.hasLineOfSight=function(){if(insideFire)shotRays++;
@@ -49,9 +50,30 @@ test('natural composed matches bound firing-time witness scans and report incide
     for(let frame=0;frame<720;frame++){
      g.update(1/60);stats.frames++;
      if(g.status==='playing')stats.playingFrames++;
-     if(frame%30===0)for(const t of g.tanks)
-      if(t&&t.ai&&t.alive!==false&&t.ai.__v181Mode==='crossfire')
-       stats.crossfireSamples++;
+     if(frame%30===0){
+      for(const t of g.tanks){
+       if(!t||!t.ai||t.alive===false)continue;
+       if(t.ai.__v181Mode==='crossfire')stats.crossfireSamples++;
+       const a=t.ai,at=a.__v181ObservedShotAt;
+       if(!Number.isFinite(at)||g.time-at<0||g.time-at>1.25||
+          !Number.isFinite(a.__v181ObservedShotAngle)||
+          !Number.isFinite(a.__v181ObservedShotX)||
+          !Number.isFinite(a.__v181ObservedShotY)||
+          !Array.isArray(a.__v181ObservedShotVictims))continue;
+       const shooter=g.getTank(a.__v181ObservedShotId);
+       if(!shooter||shooter.alive===false)continue;
+       for(const victim of g.tanks){
+        if(!victim||victim===shooter||victim===t||victim.alive===false)continue;
+        const bearing=Math.atan2(victim.y-a.__v181ObservedShotY,
+          victim.x-a.__v181ObservedShotX);
+        const legacy=Math.cos(a.__v181ObservedShotAngle-bearing)>.75;
+        const eventTime=a.__v181ObservedShotVictims.includes(victim);
+        stats.geometricComparisons++;
+        if(legacy&&!eventTime)stats.oldOnlyGeometry++;
+        if(eventTime&&!legacy)stats.newOnlyGeometry++;
+       }
+      }
+     }
     }
     assert.equal(stats.frames,720);
     assert.ok(stats.successfulFireCalls>=0);
