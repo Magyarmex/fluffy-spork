@@ -71,3 +71,26 @@ test('Battle Sense team-field fallback excludes same-side tanks when helpers are
   const game = { tanks: [self, ally, enemy], hasLineOfSight: () => true };
   assert.equal(helper.localCount(game, self, 560), 1);
 });
+
+
+test('Battle Sense witnessed crossfire keeps its event-time firing origin after shooter relocation',()=>{
+ const helper=loadBattleSense();
+ const observer=tank(1,undefined,0,0);
+ const target=tank(2,undefined,-100,0);
+ const shooter=tank(3,undefined,0,0);
+ observer.ai={__v181ObservedShotId:shooter.id,__v181ObservedShotAt:9.9,
+  __v181ObservedShotAngle:0,__v181ObservedShotX:0,__v181ObservedShotY:0};
+ const g={tanks:[observer,target,shooter],__novaFairVisibleTanks:[observer,target,shooter],
+  time:10,areHostile:()=>true,hasLineOfSight:()=>true};
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
+  'an eastbound shot does not establish a duel with a target to the west');
+ shooter.x=-200;
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
+  'moving the shooter west must not retroactively redirect the witnessed shot');
+ observer.ai.__v181ObservedShotX=-200;
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
+  'a genuinely west-origin eastbound witnessed shot can establish crossfire');
+ observer.ai.__v181ObservedShotX=NaN;
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
+  'missing trusted origin fails closed instead of reading current hull location');
+});
