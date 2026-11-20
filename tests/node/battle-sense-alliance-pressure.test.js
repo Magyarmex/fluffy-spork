@@ -155,3 +155,19 @@ test('missing witnessed shot timestamp cannot become a time-zero crossfire',()=>
  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
   'a genuine time-zero shot remains a valid crossfire witness');
 });
+
+test('Battle Sense reload-punish window rejects untrusted shot times but accepts real time zero',()=>{
+ const helper=loadBattleSense();
+ const target={...tank(2,undefined,100,0),cls:'cannon'};
+ const observer={...tank(1,undefined,0,0),ai:{__v181ObservedShotId:target.id}};
+ const classes={CLASSES:{cannon:{bullet:{reload:1.2}}}};
+ const g={hasLineOfSight:()=>true};
+ for(const bad of [undefined,null,'0',-1,NaN,Infinity]){
+  observer.ai.__v181ObservedShotAt=bad;
+  assert.equal(helper.witnessedOpening(g,classes,observer,target,.2),0,
+   'untrusted shot time must not grant reload-punish knowledge: '+String(bad));
+ }
+ observer.ai.__v181ObservedShotAt=0;
+ assert.ok(helper.witnessedOpening(g,classes,observer,target,.2)>0,
+  'real game-time-zero shot must retain its legitimate punish window');
+});
