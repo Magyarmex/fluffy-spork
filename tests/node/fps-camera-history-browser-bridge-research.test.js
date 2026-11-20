@@ -2,6 +2,8 @@
 // Research-only composition gate: an event-time camera sample must survive
 // BrowserEventTimeline capture even when DOM delivery sees a newer camera.
 // This is not a production input or Android-device validation.
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+process.env.NOVA_EXPLICIT_SHOT_INTENT_RESEARCH='1';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {PresentedCameraHistory}=require('../research/presented-camera-history.cjs');
 const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
