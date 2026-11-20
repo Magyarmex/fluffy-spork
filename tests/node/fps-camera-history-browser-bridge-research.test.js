@@ -112,3 +112,15 @@ test('historical mouse projection survives chronological replay into real Game p
   assert.equal(owner.intents,1);
  }finally{owner.detach();g.destroy();}
 });
+
+test('future-skewed and future-clamped releases cannot borrow a historical camera',()=>{
+ for(const physical of [1210,1300]){
+  const s=setup();s.setNow(1200);
+  assert.equal(s.bridge.capture(s.release(physical)),true);
+  assert.equal(s.accepted[0].data.__novaCaptureWorld,null,
+   'a non-exact physical clock must not authorize a camera projection');
+  assert.equal(s.bridge.mouseProjectionFailures,1);
+  assert.equal(s.accepted[0].data.__novaPhysicalTimestampExact,false);
+  if(physical>1232)assert.equal(s.accepted[0].data.__novaTimestampTrusted,false);
+ }
+});
