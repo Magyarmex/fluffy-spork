@@ -111,22 +111,22 @@ class SubtickFirePulse {
           if (down.type === 'mouse') input.mouseActive = false;
         }
       }
+      // Capture the actual physical firing state entering the Game tick,
+      // before any update owner can change input or replace the player.
+      // A centered touch is not an aimed-firing sample.
+      const sampledOwner=canPlay?self.down:null,aim=input.aim;
+      const sampledAim=!!sampledOwner&&(sampledOwner.type==='mouse'
+        ? !!input.mouseActive&&!!input.firing
+        : input.stickId?.aim===sampledOwner.id&&!!aim?.active&&!!input.firing&&
+          Math.hypot(aim.dx||0,aim.dy||0)>=9);
       try { return self.old.update.apply(this,arguments); }
       finally {
         if (canPlay && self.pending) self.pulses++;
         self.release();
-        // Keep the press's original player identity across multiple ticks.
-        // Mark it sampled so a later release cannot manufacture a second shot.
-        // A centered touch can span a tick before the thumb deflects.
-        // Sampling that centered press is NOT sampling a firing bearing.
-        // Mark consumed only after a tick saw an actual aimed shot.
+        // Do not mark a different press sampled if a lifecycle callback
+        // replaced the owner while Game.update was executing.
         if (canPlay && self.down) {
-          const d=self.down,aim=input.aim;
-          const sampled=d.type==='mouse'
-            ? !!input.mouseActive&&!!input.firing
-            : input.stickId?.aim===d.id&&!!aim?.active&&!!input.firing&&
-              Math.hypot(aim.dx||0,aim.dy||0)>=9;
-          if(sampled)d.sampled=true;
+          if(self.down===sampledOwner&&sampledAim)self.down.sampled=true;
         } else self.down = null;
       }
     };
