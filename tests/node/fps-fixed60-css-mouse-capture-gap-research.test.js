@@ -14,7 +14,6 @@ test('opt-in fixed60 factory preserves CSS-scaled canvas center world target',()
  Object.assign(g.cam,{x:20,y:-10,zoom:1});
  g.w=800;g.h=600;
  const oldRect=i.canvas.getBoundingClientRect;
- i.canvas.getBoundingClientRect=()=>({left:0,top:0,width:400,height:300});
  let now=1000;
  const pilot=createFixedStepBrowserPilot(g,{
   window:win,document:doc,canvas:i.canvas,
@@ -25,6 +24,9 @@ test('opt-in fixed60 factory preserves CSS-scaled canvas center world target',()
    requireTrustedDuration:true,eventOriginMs:1000,
    maxIntentAgeMs:100,nowMs:()=>1180})
  });
+ // Input detach/reattach may replace fixture canvas geometry during pilot setup.
+ // Install the presented-rect override at the actual DOM capture boundary.
+ i.canvas.getBoundingClientRect=()=>({left:0,top:0,width:400,height:300});
  const event=(type,stamp,buttons)=>({type,timeStamp:stamp,
   pointerType:'mouse',pointerId:1,button:0,buttons,
   clientX:200,clientY:150,target:{closest:()=>null}});
