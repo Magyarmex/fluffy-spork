@@ -61,3 +61,34 @@ test('DOM-time world target resists late camera movement; legacy replay still dr
   caveat:'research-only injected capture-time projection; constructed camera mutation, not physical Android validation'
  }));
 });
+
+
+test('actual fixed-step browser factory freezes the DOM-time mouse world point',()=>{
+ const {createFixedStepBrowserPilot}=require('../research/fixed-step-raf-owner.cjs');
+ const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
+ g.sfx.muted=true;i.autofire=false;g.status='playing';g.paused=false;
+ Object.assign(g.cam,{x:0,y:0,zoom:1});
+ let now=1000;
+ const pilot=createFixedStepBrowserPilot(g,{
+  window:win,document:doc,canvas:i.canvas,
+  clock:{now:()=>now,timeOrigin:1793560000000},
+  request:()=>1,cancel:()=>{},render:()=>{},
+  shotOnlyPulseFactory:(game)=>new DirectShotIntent(game,{
+   window:win,document:doc,rebindDomListeners:false,
+   requireTrustedDuration:true,eventOriginMs:1000,
+   maxIntentAgeMs:100,nowMs:()=>1180})
+ });
+ const e=(type,stamp,buttons)=>({type,timeStamp:stamp,pointerType:'mouse',
+  pointerId:1,button:0,buttons,clientX:600,clientY:300,
+  target:{closest:()=>null}});
+ try{
+  now=1100;assert.equal(pilot.bridge.capture(e('pointerdown',1100,1)),true);
+  now=1130;assert.equal(pilot.bridge.capture(e('pointerup',1130,0)),true);
+  g.cam.x=100;
+  pilot.timeline.consumeThrough(.2);
+  assert.ok(pilot.pulse.pending?.world,'factory must pass a physical world target');
+  assert.ok(Math.abs(pilot.pulse.pending.world.x-200)<1e-8,
+   'camera movement after DOM capture cannot move the physical mouse target');
+  assert.ok(Math.abs(pilot.pulse.pending.durationMs-30)<1e-7);
+ }finally{pilot.stop();g.destroy();}
+});
