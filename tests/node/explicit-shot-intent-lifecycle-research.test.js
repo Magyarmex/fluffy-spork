@@ -51,7 +51,9 @@ test('pause, hidden tab, input lock and player replacement revoke pending pulse'
   if(mode==='replacement')f.game.player={id:2,alive:true};
   f.game.update(1/30);
   assert.equal(f.seen.at(-1).intent,undefined,mode);
-  assert.equal(f.input.__novaShotIntent,undefined,mode);f.owner.detach();
+  assert.equal(f.input.__novaShotIntent,undefined,mode);
+  assert.equal(f.owner.pulse.pulses,0,'revoked pulse must not count as recovered');
+  f.owner.detach();
  }
 });
 test('second thumb cannot steal right-stick ownership',()=>{
