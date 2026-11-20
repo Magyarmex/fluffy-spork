@@ -7,9 +7,9 @@ function setup(){
  const input={aim:{active:false,dx:0,dy:0},stickId:{aim:-1},firing:false,
   mouseActive:false,touchSeen:true,__novaInputPaused:false};
  const timeline={input,reset(){},releaseAll(){}},seen=[];
- input.pd=function(e){if(this.stickId.aim===-1){this.stickId.aim=e.pointerId;this.aim.active=true;}};
+ input.pd=function(e){if(this.stickId.aim===-1){this.stickId.aim=e.pointerId;this.aim.active=true;this.firing=true;}};
  input.pm=function(e){if(this.stickId.aim===e.pointerId){
-  this.aim.dx=e.dx||0;this.aim.dy=e.dy||0;this.firing=Math.hypot(this.aim.dx,this.aim.dy)>=9;}};
+  this.aim.dx=e.dx||0;this.aim.dy=e.dy||0;}};
  input.pu=function(e){if(this.stickId.aim===e.pointerId){
   this.stickId.aim=-1;this.aim.active=false;this.firing=false;}};
  const game={input,player:{id:1,alive:true},status:'playing',paused:false,
