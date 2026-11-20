@@ -66,22 +66,35 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
       p.physicalAt-p.physicalDownAt<=50;
      const input=this.input,aim=input.aim;
      const prior={firing:input.firing,active:aim.active,dx:aim.dx,dy:aim.dy};
+     const birthsBefore=window.__novaTempestHp.births.length;
+     let latchRecord=null;
      if(valid){
       if(explicitMode){
        const len=Math.hypot(p.dx,p.dy);
        input.__novaShotIntent=Object.freeze({fire:true,
         aim:Object.freeze({x:p.dx/len,y:p.dy/len})});
       }else{input.firing=true;aim.active=true;aim.dx=p.dx;aim.dy=p.dy;}
-      window.__novaTempestHp.latches.push({at:now,releaseAt:p.at,
+      latchRecord={at:now,releaseAt:p.at,
        mode:explicitMode?'weapon-only':'whole-update',
        physicalReleaseAgeMs:now-p.physicalAt,
-       physicalHoldMs:p.physicalAt-p.physicalDownAt});
+       physicalHoldMs:p.physicalAt-p.physicalDownAt,
+       requestedAngle:Math.atan2(p.dy,p.dx),
+       hullAngleBefore:this.player?.angle};
+      window.__novaTempestHp.latches.push(latchRecord);
      }
      window.__novaTempestHp.updates.push({at:performance.now(),gameTime:this.time,
       aimActive:!!input?.aim?.active,firing:!!input?.firing,
       aimMagnitude:Math.hypot(input?.aim?.dx||0,input?.aim?.dy||0)});
      try{return update.apply(this,args);}
      finally{if(valid){
+      const newBirths=window.__novaTempestHp.births.slice(birthsBefore);
+      latchRecord.hullAngleAfter=this.player?.angle;
+      latchRecord.projectileCount=newBirths.length;
+      latchRecord.firstProjectileBearing=newBirths.length?
+       Math.atan2(newBirths[0].vy,newBirths[0].vx):null;
+      const angularError=(a,b)=>Math.atan2(Math.sin(a-b),Math.cos(a-b));
+      latchRecord.hullAimErrorRad=Math.abs(angularError(
+       latchRecord.hullAngleAfter,latchRecord.requestedAngle));
       if(explicitMode)delete input.__novaShotIntent;
       else{input.firing=prior.firing;aim.active=prior.active;
        aim.dx=prior.dx;aim.dy=prior.dy;}
