@@ -40,7 +40,8 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
         Math.hypot(this.input.aim.dx,this.input.aim.dy)>=9)activeTouch.sampled=true;
      const p=pendingShot;pendingShot=null;
      const valid=latchMode&&p&&p.player===this.player&&this.status==='playing'&&
-      !this.paused&&!document.hidden&&performance.now()-p.at<=50;
+      !this.paused&&!document.hidden&&this.input?.stickId?.aim===-1&&
+      performance.now()-p.at>=0&&performance.now()-p.at<=50;
      const input=this.input,aim=input.aim;
      const prior={firing:input.firing,active:aim.active,dx:aim.dx,dy:aim.dy};
      if(valid){input.firing=true;aim.active=true;aim.dx=p.dx;aim.dy=p.dy;
@@ -83,14 +84,20 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
       at:performance.now(),pointerId:e.pointerId});
      if(!latchMode||!e.isTrusted)return;
      const g=window.__novaTempestHpGame;
-     if(type==='pointerdown')activeTouch={id:e.pointerId,player:g?.player,sampled:false};
+     if(type==='pointerdown'){pendingShot=null;
+       activeTouch={id:e.pointerId,player:g?.player,sampled:false};}
      if((type==='pointerup'||type==='pointercancel')&&activeTouch?.id===e.pointerId){
       const a=g?.input?.aim,len=Math.hypot(a?.dx||0,a?.dy||0);
-      if(type==='pointerup'&&!activeTouch.sampled&&g?.input?.firing&&a?.active&&len>=9)
+      if(type==='pointerup'&&!activeTouch.sampled&&g?.input?.firing&&
+         g?.input?.stickId?.aim===e.pointerId&&a?.active&&len>=9)
        pendingShot={player:activeTouch.player,dx:a.dx,dy:a.dy,at:performance.now()};
       activeTouch=null;
      }
     },{capture:true,passive:true});
+   window.addEventListener('blur',()=>{pendingShot=null;activeTouch=null;});
+   document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){pendingShot=null;activeTouch=null;}
+   });
   },{halfRate,latchMode});
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   const canvas=page.locator('canvas.absolute.inset-0');
