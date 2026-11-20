@@ -38,7 +38,7 @@ function witnessedDuel(g,observer,target,third){
    a.__v181ObservedShotId===third.id?third:null;
  if(!shooter)return false;
  var victim=shooter===target?third:target;
- var bearing=Number(a.__v181ObservedShotAngle);
+ var bearing=a.__v181ObservedShotAngle;
  if(!Number.isFinite(bearing))return false;
  /* A witnessed bearing belongs to the firing origin, not the shooter's later hull. */
  var sx=a.__v181ObservedShotX,sy=a.__v181ObservedShotY;
