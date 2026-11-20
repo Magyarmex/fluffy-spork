@@ -85,7 +85,7 @@ test('historical mouse projection survives chronological replay into real Game p
  });
  const owner=new DirectShotIntent(g,{window:win,document:doc,
   rebindDomListeners:false,requireTrustedDuration:true,eventOriginMs:1000,
-  maxIntentAgeMs:100,nowMs:()=>1200});
+  maxIntentAgeMs:50,nowMs:()=>1175});
  const pointer=(type,timeStamp,buttons)=>({type,timeStamp,pointerType:'mouse',
   pointerId:1,button:0,buttons,clientX:600,clientY:300,
   target:{closest:()=>null}});
@@ -93,7 +93,7 @@ test('historical mouse projection survives chronological replay into real Game p
   now=1100;assert.equal(bridge.capture(pointer('pointerdown',1100,1)),true);
   // Physical release happened before camera moved, but DOM delivery was late.
   g.cam.x=100;
-  now=1180;assert.equal(bridge.capture(pointer('pointerup',1130,0)),true);
+  now=1170;assert.equal(bridge.capture(pointer('pointerup',1130,0)),true);
   timeline.consumeThrough(.2);
   assert.ok(owner.pending&&owner.pending.world);
   assert.ok(Math.abs(owner.pending.world.x-200)<1e-8,
