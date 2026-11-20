@@ -217,6 +217,9 @@ test('real AI firing witness drives another observer crossfire without target-pl
  assert.equal(self.ai.__v181ObservedShotAngle,0);
  assert.equal(self.ai.__v181ObservedShotX,target.x);
  assert.equal(self.ai.__v181ObservedShotY,target.y);
+ assert.ok(Array.isArray(self.ai.__v181ObservedShotVictims));
+ assert.ok(self.ai.__v181ObservedShotVictims.includes(duelist),
+  'fair full witness roster must preserve a visible non-primary duelist during narrowed AI fire');
  g.__fireDuringAI=false;
  ai.updateAI(self,g,1/60);
  assert.equal(self.ai.__v1112TargetId,target.id);
