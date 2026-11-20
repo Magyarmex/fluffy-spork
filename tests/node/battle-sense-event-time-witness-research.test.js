@@ -135,6 +135,28 @@ test('a victim hidden at firing time cannot become a retroactive witness',()=>{
    'later cover removal cannot reveal historical firing-time victim knowledge');
  }finally{g.destroy();}
 });
+test('a victim outside observer viewport at shot time cannot appear retroactively',()=>{
+ const g=bootGame(),helper=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__;
+ try{
+  const shooter=g.player,observer=g.tanks.find(t=>t!==shooter&&t.ai);
+  assert.ok(shooter&&observer);
+  const third=tank(9003,600,0,{});
+  g.time=10;g.status='playing';g.paused=false;g.w=800;g.h=600;
+  shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
+  observer.x=-100;observer.y=0;
+  g.tanks=[observer,shooter,third];g.__novaFairVisibleTanks=g.tanks;
+  g.areHostile=()=>true;g.areAllies=()=>false;g.hasLineOfSight=()=>true;
+  g.__novaFairShotWitnesses=[observer];
+  const before=g.bullets.length;g.tryFire(shooter);
+  assert.ok(g.bullets.length>before);
+  assert.equal(observer.ai.__v181ObservedShotId,shooter.id);
+  assert.equal(observer.ai.__v181ObservedShotVictims.includes(third),false,
+   'off-viewport victim must not enter event-time public witness memory');
+  third.x=100;g.time=10.5;
+  assert.equal(helper.thirdPartyVector(g,observer,shooter,{}).weight,0,
+   'entering the viewport later cannot reveal a historical duel');
+ }finally{g.destroy();}
+});
 test('research fixture uses canonical materialized 49-overlay composition',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  const scripts=[...html.matchAll(/<script[^>]+src=["']\.\/(nova-updates\/[^"']+)["']/g)];
