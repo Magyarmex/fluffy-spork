@@ -58,7 +58,9 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
       this.status==='playing'&&!this.paused&&!this.input?.__novaInputPaused&&
       !document.hidden&&this.input?.stickId?.aim===-1&&
       !this.input?.firing&&!this.input?.aim?.active&&
-      now-p.at>=0&&now-p.at<=50;
+      now-p.at>=0&&now-p.at<=50&&
+      Number.isFinite(p.physicalAt)&&now-p.physicalAt>=0&&
+      now-p.physicalAt<=50;
      const input=this.input,aim=input.aim;
      const prior={firing:input.firing,active:aim.active,dx:aim.dx,dy:aim.dy};
      if(valid){
@@ -68,7 +70,8 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
         aim:Object.freeze({x:p.dx/len,y:p.dy/len})});
       }else{input.firing=true;aim.active=true;aim.dx=p.dx;aim.dy=p.dy;}
       window.__novaTempestHp.latches.push({at:now,releaseAt:p.at,
-       mode:explicitMode?'weapon-only':'whole-update'});
+       mode:explicitMode?'weapon-only':'whole-update',
+       physicalReleaseAgeMs:now-p.physicalAt});
      }
      window.__novaTempestHp.updates.push({at:performance.now(),gameTime:this.time,
       aimActive:!!input?.aim?.active,firing:!!input?.firing,
@@ -137,7 +140,8 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
        const a=g?.input?.aim,len=Math.hypot(a?.dx||0,a?.dy||0);
        if(type==='pointerup'&&!activeTouch.sampled&&g?.input?.firing&&
           g?.input?.stickId?.aim===e.pointerId&&a?.active&&len>=9)
-        pendingShot={player:activeTouch.player,dx:a.dx,dy:a.dy,at:performance.now()};
+        pendingShot={player:activeTouch.player,dx:a.dx,dy:a.dy,
+         at:performance.now(),physicalAt:e.timeStamp};
        activeTouch=null;
       }
       touchOwners.delete(e.pointerId);
@@ -290,6 +294,7 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
     const nextUpdate=move?r.updates.find(u=>u.at>move.at):null;
     return {recoveredIntents:latches.length,
      recoveredLatencyMs:latches.map(l=>l.at-l.releaseAt),
+     physicalReleaseAgeMs:latches.map(l=>l.physicalReleaseAgeMs),
      postReleaseProjectileLatencyMs:up?births.filter(b=>b.at>up.at).map(b=>b.at-up.at):[],
      phaseSincePreviousUpdateMs:previousUpdate?move.at-previousUpdate.at:null,
      phaseUntilNextUpdateMs:nextUpdate?nextUpdate.at-move.at:null,
@@ -319,6 +324,8 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
      'only a bounded deliberate intent may fire after release');
     assert.ok(trial.recoveredLatencyMs.every(ms=>ms>=0&&ms<=50),
      'a recovered shot intent must expire after 50ms');
+    assert.ok(trial.physicalReleaseAgeMs.every(ms=>ms>=0&&ms<=50),
+     'a trusted physically stale release cannot be recovered');
    }
    else assert.equal(trial.postReleaseBirths,0,
     'baseline short touch must not create projectiles after release');
