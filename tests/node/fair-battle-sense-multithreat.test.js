@@ -354,3 +354,37 @@ test('no-target contest uses public class speed without private rival stats',()=
  assert.ok(fast>slow,'publicly faster classes should contest more strongly');
  assert.equal(slow,0,'slow public class cannot win this distant race');
 });
+
+
+test('49-overlay Game records real player projectile firing origin for a legitimate AI witness',()=>{
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ withSeed(1517832,()=>{
+  const g=bootGame();
+  if(!g.player)g.redeploy();
+  try{
+   g.sfx.muted=true;
+   const shooter=g.player,observer=g.tanks.find(t=>t&&t.ai&&!t.isPlayer);
+   assert.ok(shooter&&observer,'real game must supply player and AI observer');
+   g.setClass(shooter,'twin');
+   Object.assign(shooter,{x:0,y:0,angle:0,alive:true,fireCd:0,
+    spawnShieldT:0,overheatT:0});
+   Object.assign(observer,{x:110,y:0,alive:true,hp:100,maxHp:100,
+    spawnShieldT:0});
+   g.tanks=[shooter,observer];
+   g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
+   g.__novaFairShotWitnesses=g.tanks;
+   g.w=800;g.h=600;g.cam.zoom=1;g.time=10;
+   g.hasLineOfSight=()=>true;
+   const before=g.bullets.length;
+   g.tryFire(shooter);
+   assert.ok(g.bullets.length>before,'actual composed weapon must fire');
+   assert.equal(observer.ai.__v181ObservedShotId,shooter.id);
+   assert.equal(observer.ai.__v181ObservedShotX,0);
+   assert.equal(observer.ai.__v181ObservedShotY,0);
+   assert.equal(observer.ai.__v181ObservedShotAngle,0);
+   shooter.x=200;shooter.y=200;
+   assert.equal(observer.ai.__v181ObservedShotX,0,
+    'subsequent real tank relocation cannot rewrite the firing witness');
+  }finally{g.destroy();}
+ });
+});
