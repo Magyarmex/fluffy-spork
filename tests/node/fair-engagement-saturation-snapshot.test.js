@@ -167,3 +167,22 @@ test('self-targeting bots cannot create phantom pressure in free-for-all worlds'
   assert.equal(T.chooseTarget(g, classes, observer, observer.ai, 1)?.id, selfAssigned,
     'a tank assigning itself cannot represent another attacker');
 });
+
+test('composed Game tankById index is reused without changing the selected rival', () => {
+  const T = boot();
+  const observer = { id: 1, x: 0, y: 0, hp: 100, maxHp: 100,
+    alive: true, cls: 'basic', ai: { state: 'hunt', __v1112TargetId: -1 } };
+  const a = { id: 2, x: 100, y: 0, hp: 100, maxHp: 100,
+    alive: true, cls: 'basic', ai: { state: 'hunt', __v1112TargetId: 2 } };
+  const b = { id: 3, x: -100, y: 0, hp: 100, maxHp: 100,
+    alive: true, cls: 'basic', ai: { state: 'hunt', __v1112TargetId: 2 } };
+  const g = { tanks: [observer, a, b], w: 900, h: 700,
+    cam: { zoom: 1 }, time: 1 };
+  const withoutIndex = T.chooseTarget(g, classes, observer, observer.ai, 1)?.id;
+  const index = new Map(g.tanks.map(t => [t.id, t]));
+  let lookups = 0;
+  g.tankById = { get(id) { lookups++; return index.get(id); } };
+  const withIndex = T.chooseTarget(g, classes, observer, observer.ai, 1)?.id;
+  assert.equal(withIndex, withoutIndex);
+  assert.ok(lookups > 0, 'production index must serve saturation target lookups');
+});
