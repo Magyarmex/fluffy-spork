@@ -6,8 +6,10 @@
 // become a fresh shot merely because its handler ran recently. Unknown event
 // clocks remain unverified research input, never certified physical latency.
 function physicalReleaseAt(e) {
-  return e && e.isTrusted === true && Number.isFinite(e.timeStamp)
-    ? e.timeStamp : null;
+  if (!e || e.isTrusted !== true) return null;
+  // A trusted event with an unusable clock is NOT equivalent to an
+  // unverified synthetic fixture. Fail closed rather than laundering it.
+  return Number.isFinite(e.timeStamp) && e.timeStamp > 0 ? e.timeStamp : NaN;
 }
 function releaseIsFresh(p, now) {
   const queuedAge = now - p.queuedAt;
