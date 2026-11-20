@@ -10,7 +10,7 @@ const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
 
-function run(cameraAtReplay,captureAtDom=true){
+function run(cameraAtReplay,captureAtDom=true,moveAfterRelease=false){
  const g=bootGame(),i=g.input,win=g.__testWindow;
  g.sfx.muted=true;i.autofire=false;
  g.status='playing';g.paused=false;
@@ -34,6 +34,10 @@ function run(cameraAtReplay,captureAtDom=true){
  try{
   now=1100;assert.equal(bridge.capture(e('pointerdown',1100,1)),true);
   now=1130;assert.equal(bridge.capture(e('pointerup',1130,0)),true);
+  if(moveAfterRelease){
+   now=1140;assert.equal(bridge.capture({...e('pointermove',1140,0),
+    clientX:700,clientY:500}),true);
+  }
   assert.equal(owner.pending,null,'physical events are still queued');
   // Camera change between DOM capture and chronological Input replay.
   // The DOM cursor and original physical timestamp do not change.
@@ -51,6 +55,7 @@ function run(cameraAtReplay,captureAtDom=true){
 }
 test('DOM-time world target resists late camera movement; legacy replay still drifts',()=>{
  const stable=run(0),moved=run(100),zoomed=run({x:100,zoom:2}),
+  cursorMoved=run({x:100,zoom:2},true,true),
   legacy=run(100,false),failed=run(100,'throw');
  assert.equal(stable.applied,2);assert.equal(moved.applied,2);
  assert.ok(Math.abs(stable.worldX-200)<1e-8);
@@ -58,6 +63,9 @@ test('DOM-time world target resists late camera movement; legacy replay still dr
   'a captured physical world target must not drift with the replay camera');
  assert.ok(Math.abs(zoomed.worldX-stable.worldX)<1e-8,
   'camera translation plus zoom must not retarget the captured world point');
+ assert.ok(Math.abs(cursorMoved.worldX-stable.worldX)<1e-8,
+  'post-release cursor motion must not retarget the physical shot');
+ assert.equal(cursorMoved.applied,3,'cursor motion must still replay as live input');
  assert.ok(Math.abs(legacy.worldX-stable.worldX-100)<1e-8,
   'negative control must still reproduce the original 100-unit drift');
  assert.equal(stable.durationMs,moved.durationMs);
@@ -67,7 +75,7 @@ test('DOM-time world target resists late camera movement; legacy replay still dr
  assert.ok(Math.abs(failed.worldX-legacy.worldX)<1e-8,
   'projection failure preserves legacy fallback rather than inventing a world point');
  console.log('MOUSE_LATE_REPLAY_CAMERA_RESEARCH '+JSON.stringify({
-  stable,moved,zoomed,legacy,failed,projectionDrift:moved.worldX-stable.worldX,
+  stable,moved,zoomed,cursorMoved,legacy,failed,projectionDrift:moved.worldX-stable.worldX,
   caveat:'research-only injected capture-time projection; constructed camera mutation, not physical Android validation'
  }));
 });
