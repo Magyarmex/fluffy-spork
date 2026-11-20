@@ -150,3 +150,20 @@ test('friendly or same-target assignments cannot masquerade as hostile focus fir
   assert.notEqual(attackingA, attackingB,
     'genuinely hostile pressure should still affect the soft saturation score');
 });
+
+test('self-targeting bots cannot create phantom pressure in free-for-all worlds', () => {
+  const T = boot();
+  const observer = { id: 1, x: 0, y: 0, hp: 100, maxHp: 100,
+    alive: true, cls: 'basic', ai: { state: 'hunt', __v1112TargetId: -1 } };
+  const a = { id: 2, x: 100, y: 0, hp: 100, maxHp: 100,
+    alive: true, cls: 'basic', ai: { state: 'hunt', __v1112TargetId: 2 } };
+  const b = { id: 3, x: -100, y: 0, hp: 100, maxHp: 100,
+    alive: true, cls: 'basic', ai: { state: 'hunt', __v1112TargetId: 3 } };
+  const g = { tanks: [observer, a, b], w: 1000, h: 700,
+    cam: { zoom: 1 }, time: 1 };
+  const selfAssigned = T.chooseTarget(g, classes, observer, observer.ai, 1)?.id;
+  a.ai.__v1112TargetId = -1;
+  b.ai.__v1112TargetId = -1;
+  assert.equal(T.chooseTarget(g, classes, observer, observer.ai, 1)?.id, selfAssigned,
+    'a tank assigning itself cannot represent another attacker');
+});
