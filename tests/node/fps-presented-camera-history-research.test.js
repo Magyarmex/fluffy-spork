@@ -47,3 +47,14 @@ test('resize and hidden lifecycle require explicit reset',()=>{
  assert.equal(h.record(1180,geometry(100)),true);
  assert.equal(h.project(event(1190),{...meta,physicalAtMs:1190}).x,300);
 });
+
+test('default history covers 120ms at high 240Hz presentation without unbounded growth',()=>{
+ const h=new PresentedCameraHistory();
+ for(let i=0;i<48;i++)assert.equal(h.record(1000+i*1000/240,geometry(i)),true);
+ assert.equal(h.frames.length,48);
+ const at=1000+30*1000/240;
+ const result=h.project(event(at),{...meta,physicalAtMs:at,deliveryMs:at+10});
+ assert.ok(result&&result.x===230,'history must retain a 240Hz camera 75ms behind newest frame');
+ assert.equal(h.record(1200,geometry(100)),true);
+ assert.equal(h.frames.length,48);
+});
