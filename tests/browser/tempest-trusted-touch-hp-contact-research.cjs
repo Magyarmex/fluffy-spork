@@ -29,8 +29,8 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
   await page.evaluate(({halfRate,latchMode,explicitMode})=>{
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const start=Game.prototype.start,fire=Game.prototype.tryFire,damage=Game.prototype.damageTank,
-    update=Game.prototype.update;
-   window.__novaTempestHp={births:[],hits:[],events:[],updates:[],latches:[],targetReady:false};
+    update=Game.prototype.update,updateDrones=Game.prototype.updateDrones;
+   window.__novaTempestHp={births:[],hits:[],events:[],updates:[],latches:[],droneReads:[],targetReady:false};
    let activeTouch=null,pendingShot=null;
    const touchOwners=new Map();
    // Research-only: keep the actual Game.update/combat chain, but sample it
@@ -81,6 +81,14 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
      }}
     }
     return update.apply(this,args);
+   };
+   Game.prototype.updateDrones=function(...args){
+    if(this===window.__novaTempestHpGame&&this.input?.__novaShotIntent)
+     window.__novaTempestHp.droneReads.push({
+      aimActive:!!this.input.aim?.active,firing:!!this.input.firing,
+      intent:!!this.input.__novaShotIntent.fire
+     });
+    return updateDrones.apply(this,args);
    };
    Game.prototype.start=function(...args){
     if(!this.__novaDecorativeWorld)window.__novaTempestHpGame=this;
@@ -371,6 +379,12 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
     await page.waitForFunction(()=>window.__novaTempestHpGame.input.stickId.aim===-1,
      null,{timeout:5000});
    }
+  }
+  if(explicitMode){
+   const droneReads=await page.evaluate(()=>window.__novaTempestHp.droneReads);
+   assert.ok(droneReads.length>0,'weapon-only pilot must traverse real drone-update owner');
+   assert.ok(droneReads.every(x=>x.intent&&!x.aimActive&&!x.firing),
+    'weapon-only intent must never revive the physical right stick for drones');
   }
   assert.equal(errors.length,0,
    'no browser page errors during short-touch trials: '+JSON.stringify(errors));
