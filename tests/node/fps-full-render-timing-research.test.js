@@ -81,3 +81,13 @@ test('nonfinite clock during an active render releases the instrumentation owner
  assert.equal(h.mod.render,h.original);
  assert.equal(h.listeners.size,0);
 });
+
+test('probe remains outside shipping HTML and targets the live final render export',()=>{
+ const html=fs.readFileSync(path.join(__dirname,'../../index.html'),'utf8');
+ assert.match(html,/render_1\\.render\\(this, this\\.w, this\\.h\\)/,
+  'shipping RAF must dereference the module export at render time');
+ assert.match(html,/window\\.__novaMakeRequire = makeRequire/,
+  'materialized game must expose its canonical module loader');
+ assert.doesNotMatch(html,/fixed60-full-render-timing\\.js/,
+  'DevTools probe must not ship or run on player devices by default');
+});
