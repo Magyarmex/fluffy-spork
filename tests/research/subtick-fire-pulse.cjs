@@ -87,7 +87,14 @@ class SubtickFirePulse {
     game.update = function() {
       // A queued shot belongs to the life that began the press. Redeploying
       // before the next simulation tick must never fire the replacement tank.
-      if (self.pending && self.pending.player !== game.player) self.release();
+      if (self.pending) {
+        const p=self.pending,age=Number.isFinite(p.queuedAt)
+          ? performance.now()-p.queuedAt : Infinity;
+        // The raw pulse helper must be safe on its own, not only when
+        // wrapped by ExplicitShotIntent. Never replay a stale/dead release.
+        if(p.player!==game.player||p.player?.alive!==true||age<0||age>50)
+          self.release();
+      }
       if (self.down && self.down.player !== game.player) {
         // A held press from a dead/replaced life must not keep firing or
         // commanding the new life while waiting for a later physical release.
