@@ -373,7 +373,7 @@ test('49-overlay Game records real player projectile firing origin for a legitim
    g.tanks=[shooter,observer];
    g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
    g.__novaFairShotWitnesses=g.tanks;
-   g.w=800;g.h=600;g.cam.zoom=1;g.time=10;
+   g.w=800;g.h=600;g.cam.zoom=1;g.time=10;g.status='playing';
    g.hasLineOfSight=()=>true;
    const before=g.bullets.length;
    g.tryFire(shooter);
