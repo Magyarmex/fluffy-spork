@@ -196,6 +196,10 @@ const {chromium}=require('playwright');
    assert.equal(trial.aimActive,false,'short trial must release aim ownership');
    assert.equal(trial.firing,false,'short trial must release firing');
    assert.equal(trial.stickId,-1,'short trial must clear aim pointer ID');
+   trial.outcome=!trial.move?'move-not-delivered':
+    trial.aimedFiringSamples===0?'no-deflected-simulation-sample':
+    trial.births===0?'sampled-but-no-projectile':
+    trial.hits===0?'projectile-without-hp-contact':'hp-contact';
    shortTrials.push(trial);
   }
   console.log('NOVA_TEMPEST_TRUSTED_20MS_DIAGNOSTIC '+JSON.stringify({
