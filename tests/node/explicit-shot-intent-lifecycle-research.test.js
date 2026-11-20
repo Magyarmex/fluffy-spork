@@ -223,3 +223,14 @@ test('mixed trusted and unverified timestamp provenance cannot certify a pulse',
  assert.equal(f.owner.intents,0);
  f.owner.detach();
 });
+
+test('dead owner cannot retain an unreleased physical aim stick across update',()=>{
+ const f=setup();
+ f.press();f.game.player.alive=false;
+ f.game.update(1/30);
+ assert.equal(f.seen[0].firing,false);
+ assert.equal(f.seen[0].aimActive,false);
+ assert.equal(f.owner.pulse.down,null);
+ assert.equal(f.input.stickId.aim,-1);
+ f.owner.detach();
+});
