@@ -118,4 +118,11 @@ test('actual Battle Sense tryFire witness stores firing origin only on real proj
  empty.tryFire(shooter);
  assert.equal(other.ai.__v181ObservedShotX,undefined,
   'failed/no-projectile fire attempt cannot create an observed origin');
+ const blocked=new helper.Game(),hidden={...tank(4,undefined,80,40),ai:{}};
+ Object.assign(blocked,{bullets:[],tanks:[shooter,hidden],time:11,
+  hasLineOfSight:()=>false});
+ blocked.tryFire(shooter);
+ assert.equal(blocked.bullets.length,1,'shot still physically exists behind cover');
+ assert.equal(hidden.ai.__v181ObservedShotX,undefined,
+  'occluded observer must not gain the firing origin');
 });
