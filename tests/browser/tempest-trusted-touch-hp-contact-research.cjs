@@ -52,7 +52,7 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
       return update.apply(this,args);
      }
      if(activeTouch&&this.input?.firing&&this.input?.aim?.active&&
-        Math.hypot(this.input.aim.dx,this.input.aim.dy)>=9)activeTouch.sampled=true;
+        Math.hypot(this.input.aim.dx,this.input.aim.dy)>=4)activeTouch.sampled=true;
      const p=pendingShot,now=performance.now();pendingShot=null;
      const valid=latchMode&&p&&p.player===this.player&&this.player?.alive&&
       this.status==='playing'&&!this.paused&&!this.input?.__novaInputPaused&&
