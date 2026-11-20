@@ -243,7 +243,7 @@ test('moving public target can cross a shot lane that static trajectory misses',
 });
 
 test('real composed AI update wrapper is sensitive to hidden private assignment',()=>{
- function run(arm){
+ function run(arm,hiddenAlive=true){
   return withSeed(1517820,()=>{
    const s=scene();
    try{
@@ -253,6 +253,7 @@ test('real composed AI update wrapper is sensitive to hidden private assignment'
     const baseline=fair.chooseTarget(g,classes,observer,observer.ai,g.time);
     assert.ok(baseline===left||baseline===right);
     other.ai.__v1112TargetId=arm===0?baseline.id:(baseline===left?right:left).id;
+    other.alive=hiddenAlive;
     const publicBefore=JSON.stringify(g.tanks.map(t=>[t.id,t.x,t.y,t.hp,t.alive]));
     observer.ai.__v1112NextThink=-1;
     observer.ai.__v1112TargetId=-1;
@@ -270,4 +271,7 @@ test('real composed AI update wrapper is sensitive to hidden private assignment'
  assert.equal(b.chosen,b.expected);
  assert.notEqual(a.chosen,b.chosen,
   'actual shipping AI wrapper changes target from invisible private AI slot');
+ const deadA=run(0,false),deadB=run(1,false);
+ assert.equal(deadA.chosen,deadB.chosen,
+  'dead hidden AI assignments must not affect real wrapper target choice');
 });
