@@ -332,6 +332,9 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
     trial.hits===0?'projectile-without-hp-contact':'hp-contact';
    shortTrials.push(trial);
   }
+  if(explicitMode)assert.ok(shortTrials.filter(t=>t.recoveredIntents>0)
+   .every(t=>t.births===1&&t.postReleaseBirths===1),
+   'each eligible weapon-only intent must create exactly one player projectile');
   if(latchMode){
    // A browser-trusted cancellation is not a deliberate completed shot.
    const beforeCancel=await page.evaluate(()=>window.__novaTempestHp.latches.length);
