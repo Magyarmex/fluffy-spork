@@ -111,6 +111,30 @@ test('real projectile birth records event-time observer-visible third party',()=
    'moving away after firing must not erase the witnessed duel');
  }finally{g.destroy();}
 });
+test('a victim hidden at firing time cannot become a retroactive witness',()=>{
+ const g=bootGame(),helper=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__;
+ try{
+  const shooter=g.player,observer=g.tanks.find(t=>t!==shooter&&t.ai);
+  assert.ok(shooter&&observer);
+  const third=tank(9003,100,0,{});
+  g.time=10;g.status='playing';g.paused=false;
+  shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
+  observer.x=-100;observer.y=0;
+  g.tanks=[observer,shooter,third];g.__novaFairVisibleTanks=g.tanks;
+  g.areHostile=()=>true;g.areAllies=()=>false;
+  g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===observer.x&&ay===observer.y&&bx===third.x&&by===third.y);
+  g.__novaFairShotWitnesses=[observer];
+  const before=g.bullets.length;g.tryFire(shooter);
+  assert.ok(g.bullets.length>before);
+  assert.equal(observer.ai.__v181ObservedShotId,shooter.id,
+   'observer can see the shooter firing');
+  assert.equal(observer.ai.__v181ObservedShotVictims.includes(third),false,
+   'occluded victim was not visible to this observer at shot birth');
+  g.hasLineOfSight=()=>true;g.time=10.5;
+  assert.equal(helper.thirdPartyVector(g,observer,shooter,{}).weight,0,
+   'later cover removal cannot reveal historical firing-time victim knowledge');
+ }finally{g.destroy();}
+});
 test('research fixture uses canonical materialized 49-overlay composition',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  const scripts=[...html.matchAll(/<script[^>]+src=["']\.\/(nova-updates\/[^"']+)["']/g)];
