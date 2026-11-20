@@ -267,7 +267,9 @@ class BrowserEventTimeline {
        event.type==='pointerup' && Number.isFinite(event.clientX) &&
        Number.isFinite(event.clientY)){
       try{
-        const projected=this.captureMouseWorld(event);
+        const projected=this.captureMouseWorld(event,Object.freeze({
+          physicalAtMs:stamp,deliveryMs:now,timestampTrusted,timestampExact
+        }));
         if(projected && Number.isFinite(projected.x) && Number.isFinite(projected.y))
           mouseWorld=Object.freeze({x:projected.x,y:projected.y});
         else this.mouseProjectionFailures++;
