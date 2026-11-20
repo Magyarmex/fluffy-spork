@@ -97,15 +97,14 @@ function visibleInboundProjectileCount(T,g,observer,target,C=classes){
  // observer's own recently witnessed shooter and shot bearing first.
  if(!witnessedShotCount(T,g,observer,target,C))return 0;
  const witnessedId=observer.ai&&observer.ai.__v181ObservedShotId;
- const owners=new Set(),ext=T.viewportHalfExtents(g);
+ const ext=T.viewportHalfExtents(g);
  for(const b of g.bullets||[]){
   if(!b||b.dead||!(Number(b.ttl)>0)||!Number.isFinite(b.x)||
      !Number.isFinite(b.y)||!Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
      Math.abs(b.x-observer.x)>ext.x||Math.abs(b.y-observer.y)>ext.y)continue;
   const shooter=(g.tanks||[]).find(t=>t&&t.id===b.ownerId);
   if(!shooter||shooter.id!==witnessedId||shooter===observer||shooter===target||
-     !hostile(g,shooter,target)||!T.canPerceive(g,C,observer,shooter)||
-     owners.has(shooter.id))continue;
+     !hostile(g,shooter,target)||!T.canPerceive(g,C,observer,shooter))continue;
   const dx=target.x-b.x,dy=target.y-b.y;
   const vx=b.vx-(Number.isFinite(target.vx)?target.vx:0);
   const vy=b.vy-(Number.isFinite(target.vy)?target.vy:0);
@@ -121,10 +120,9 @@ function visibleInboundProjectileCount(T,g,observer,target,C=classes){
   if(!g.hasLineOfSight(observer.x,observer.y,b.x,b.y,2)||
      !g.hasLineOfSight(observer.x,observer.y,shooter.x,shooter.y,2)||
      !g.hasLineOfSight(b.x,b.y,target.x,target.y,2))continue;
-  owners.add(shooter.id);
-  if(owners.size>=4)break;
+  return 1; // Latest witnessed shooter is unique; extra bullets add no pressure.
  }
- return owners.size;
+ return 0;
 }
 // Third RESEARCH alternative: an observer-owned, event-time confirmed-hit
 // witness. Unlike a turret bearing or stale shot angle, the victim identity
