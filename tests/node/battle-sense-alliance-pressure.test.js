@@ -92,6 +92,7 @@ test('Battle Sense witnessed crossfire keeps its event-time firing origin after 
  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
   'moving the shooter west must not retroactively redirect the witnessed shot');
  observer.ai.__v181ObservedShotX=-200;
+ observer.ai.__v181ObservedShotVictims=new WeakSet([target]);
  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
   'a genuinely west-origin eastbound witnessed shot can establish crossfire');
  observer.ai.__v181ObservedShotX=NaN;
@@ -157,6 +158,7 @@ test('missing witnessed shot timestamp cannot become a time-zero crossfire',()=>
  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
   'a negative pre-match time cannot masquerade as a fresh shot');
  observer.ai.__v181ObservedShotAt=0;
+ observer.ai.__v181ObservedShotVictims=new WeakSet([third]);
  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
   'a genuine time-zero shot remains a valid crossfire witness');
  g.time=1.25;
@@ -197,6 +199,7 @@ test('missing or coerced shot bearing cannot invent an eastbound duel',()=>{
    'untrusted bearing cannot imply a shot to the east: '+String(bad));
  }
  observer.ai.__v181ObservedShotAngle=0;
+ observer.ai.__v181ObservedShotVictims=new WeakSet([third]);
  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
   'a legitimate numeric eastbound bearing remains valid');
 });
