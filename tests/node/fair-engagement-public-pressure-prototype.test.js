@@ -91,3 +91,41 @@ test('negative control: mere proximity falsely counts a passive bystander',()=>{
   }finally{s.g.destroy();}
  });
 });
+
+function publicProjectileThreat(g,observer,target,{horizon=.35,margin=28}={}){
+ const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
+ for(const b of g.bullets||[]){
+  if(!b||b.dead||!(b.ttl>0)||!Number.isFinite(b.x)||
+     !Number.isFinite(b.y)||!Number.isFinite(b.vx)||
+     !Number.isFinite(b.vy))continue;
+  // No owner target slot or hidden attacker location is consulted.
+  if(!fair.inGameplayWorldPoint(g,observer,b.x,b.y))continue;
+  const speed2=b.vx*b.vx+b.vy*b.vy;
+  if(speed2<1)continue;
+  const t=((target.x-b.x)*b.vx+(target.y-b.y)*b.vy)/speed2;
+  if(!(t>=0&&t<=Math.min(horizon,b.ttl)))continue;
+  const miss=Math.hypot(target.x-(b.x+b.vx*t),
+   target.y-(b.y+b.vy*t));
+  if(miss<=margin+(Number(target.r)||0))return 1;
+ }
+ return 0;
+}
+test('public projectile trajectory distinguishes an actual short-horizon threat from passive proximity',()=>{
+ withSeed(1517812,()=>{
+  const s=scene();
+  try{
+   const {g,observer,left,right,other}=s;
+   other.x=-330;other.y=0;other.ai.state='idle';
+   assert.equal(publicPressure(g,observer,left),2);
+   g.bullets=[];
+   assert.equal(publicProjectileThreat(g,observer,left),0);
+   g.bullets=[{x:-200,y:0,vx:400,vy:0,ttl:1,dead:false}];
+   assert.equal(publicProjectileThreat(g,observer,left),1);
+   assert.equal(publicProjectileThreat(g,observer,right),0,
+    'farther candidate is beyond the explicit short prediction horizon');
+   // A visually hidden projectile must not grant privileged pressure data.
+   g.bullets[0].x=-1200;
+   assert.equal(publicProjectileThreat(g,observer,left),0);
+  }finally{s.g.destroy();}
+ });
+});
