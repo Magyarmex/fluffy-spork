@@ -178,7 +178,8 @@ test('natural composed match samples public-pressure candidate incidence without
     g.status='playing';g.paused=false;
     const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
     const stats={seed,frames:0,visiblePairs:0,privateAssignments:0,
-     proximityPositive:0,projectilePositive:0,bodyChecks:0,bulletChecks:0};
+     proximityPositive:0,projectilePositive:0,witnessPositive:0,
+     bodyChecks:0,bulletChecks:0};
     for(let frame=0;frame<120;frame++){
      g.update(1/60);stats.frames++;
      if(frame%12!==0)continue;
@@ -191,6 +192,7 @@ test('natural composed match samples public-pressure candidate incidence without
       if(fair.saturation(g,target.id,observer.id)>0)stats.privateAssignments++;
       if(publicPressure(g,observer,target,{metrics:stats})>0)stats.proximityPositive++;
       if(publicProjectileThreat(g,observer,target,{metrics:stats})>0)stats.projectilePositive++;
+      if(existingShotWitnessPressure(g,observer,target)>0)stats.witnessPositive++;
      }
     }
     assert.equal(stats.frames,120,'natural game must execute the full sample');
