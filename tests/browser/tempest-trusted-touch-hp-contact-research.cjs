@@ -44,15 +44,15 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
      }
      if(activeTouch&&this.input?.firing&&this.input?.aim?.active&&
         Math.hypot(this.input.aim.dx,this.input.aim.dy)>=9)activeTouch.sampled=true;
-     const p=pendingShot;pendingShot=null;
+     const p=pendingShot;pendingShot=null,now=performance.now();
      const valid=latchMode&&p&&p.player===this.player&&this.player?.alive&&
       this.status==='playing'&&!this.paused&&!this.input?.__novaInputPaused&&
       !document.hidden&&this.input?.stickId?.aim===-1&&
-      performance.now()-p.at>=0&&performance.now()-p.at<=50;
+      now-p.at>=0&&now-p.at<=50;
      const input=this.input,aim=input.aim;
      const prior={firing:input.firing,active:aim.active,dx:aim.dx,dy:aim.dy};
      if(valid){input.firing=true;aim.active=true;aim.dx=p.dx;aim.dy=p.dy;
-      window.__novaTempestHp.latches.push({at:performance.now(),releaseAt:p.at});}
+      window.__novaTempestHp.latches.push({at:now,releaseAt:p.at});}
      window.__novaTempestHp.updates.push({at:performance.now(),gameTime:this.time,
       aimActive:!!input?.aim?.active,firing:!!input?.firing,
       aimMagnitude:Math.hypot(input?.aim?.dx||0,input?.aim?.dy||0)});
