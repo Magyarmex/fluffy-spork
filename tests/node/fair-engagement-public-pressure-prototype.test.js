@@ -420,6 +420,10 @@ test('event-time public shot origin prevents shooter-relocation retargeting',()=
     'a relocated shooter cannot move the witnessed firing origin');
    assert.equal(eventOriginShotPressure(g,observer,left,witness),0,
     'a relocated shooter cannot turn an old east shot into a new left attack');
+   assert.equal(eventOriginShotPressure(g,observer,right,{...witness,x:NaN}),0,
+    'missing trusted event-time origin cannot become pressure');
+   assert.equal(eventOriginShotPressure(g,observer,right,{...witness,angle:Infinity}),0,
+    'nonfinite firing bearing fails closed');
    g.time=12;
    assert.equal(eventOriginShotPressure(g,observer,right,witness),0,
     'historical origin must expire even when the shooter stays visible');
