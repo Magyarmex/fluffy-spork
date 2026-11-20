@@ -182,8 +182,10 @@ const {chromium}=require('playwright');
      aimActive:g.input.aim.active,firing:g.input.firing,
      stickId:g.input.stickId.aim};
    },before);
-   assert.ok(trial.trusted&&trial.down&&trial.move&&trial.up,
-    'short trial must deliver trusted down/move/release');
+   assert.ok(trial.trusted&&trial.down&&trial.up,
+    'short trial must deliver trusted down/release');
+   // A short move may be coalesced before release. Record that as an input
+   // delivery outcome rather than falsely requiring an aim deflection.
    assert.equal(trial.postReleaseBirths,0,
     'short touch must not create projectiles after release');
    assert.equal(trial.aimActive,false,'short trial must release aim ownership');
