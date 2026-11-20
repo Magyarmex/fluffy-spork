@@ -247,6 +247,12 @@ test('visible inbound projectile pressure requires a live public intercept lane'
  shooter.x=2000;shooter.y=2000;
  assert.equal(visibleInboundProjectileCount(T,g,observer,a),0,
   'offscreen shooter identity is not public evidence');
+ shooter.x=0;shooter.y=90;shooter.alive=false;
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),0,
+  'a dead or stale shooter hull cannot certify live public pressure');
+ shooter.alive=true;shooter.team=a.team;
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),0,
+  'friendly fire must not be counted as hostile pressure');
  assert.equal(visibleInboundProjectileCount(T,g,observer,b),0,
   'a projectile heading away from the other candidate is not pressure');
 });
