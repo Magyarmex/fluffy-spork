@@ -63,6 +63,37 @@ function command(game, a) {
   return state;
 }
 
+test('AI Controller acquisition ranks visible hostile hulls by physical distance, not player identity', () => {
+  const bestObservedTank = new Function(
+    'dist2', 'hostileOwners', 'sensorSees',
+    'return (' + extract(liveVector, 'function bestObservedTank(', 'function hostileDroneNear(') + ')'
+  )(
+    (ax, ay, bx, by) => (bx - ax) ** 2 + (by - ay) ** 2,
+    (g, a, b) => a.team !== b.team,
+    (g, a, b) => g.hasLineOfSight(a.x, a.y, b.x, b.y)
+  );
+  const controller = {id: 7, team: 1, x: 0, y: 0};
+  const bot = {id: 8, team: 2, x: 300, y: 0, alive: true, isPlayer: false};
+  const human = {id: 9, team: 2, x: 315, y: 0, alive: true, isPlayer: true};
+  const g = {tanks: [controller, human, bot], hasLineOfSight: () => true};
+  assert.equal(bestObservedTank(g, controller, null), bot,
+    'a farther player must not displace a nearer visible bot');
+  human.x = 290;
+  assert.equal(bestObservedTank(g, controller, null), human,
+    'a genuinely nearer player remains a valid target');
+  human.x = 300;
+  assert.equal(bestObservedTank(g, controller, null), human,
+    'equal distances retain stable encounter order without a player multiplier');
+  human.spawnShieldT = 1;
+  assert.equal(bestObservedTank(g, controller, null), bot,
+    'spawn protection still excludes an otherwise nearer player');
+  human.spawnShieldT = 0;
+  g.hasLineOfSight = (ax, ay, bx, by) => bx !== human.x || by !== human.y;
+  human.x = 290;
+  assert.equal(bestObservedTank(g, controller, null), bot,
+    'sensor rejection must still exclude a hidden player');
+});
+
 test('shipping composition contains canonical Controller command and later Live Vector bridge', () => {
   const a = shipping.indexOf('nova-updates/controller-v1.3.0.js');
   const b = shipping.indexOf('nova-updates/second-body-live-vector-v1.10.7.js');
