@@ -180,14 +180,23 @@ test('natural composed match samples public-pressure candidate incidence without
     const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
     const stats={seed,frames:0,visiblePairs:0,privateAssignments:0,
      proximityPositive:0,projectilePositive:0,witnessPositive:0,
-     bodyChecks:0,bulletChecks:0};
+     bodyChecks:0,bulletChecks:0,eligiblePairs:0,nearestPairDistance:null};
     for(let frame=0;frame<120;frame++){
      g.update(1/60);stats.frames++;
      if(frame%12!==0)continue;
      const observers=g.tanks.filter(t=>t&&t.ai&&t.alive!==false).slice(0,5);
      for(const observer of observers)for(const target of g.tanks){
-      if(!target||target===observer||target.alive===false||
-         !fair.inGameplayViewport(g,observer,target))continue;
+      if(!target||target===observer||target.alive===false)continue;
+      if(typeof g.areAllies==='function'&&g.areAllies(observer,target))continue;
+      // Diagnose zero-witness natural samples without pretending distant
+      // enemies are visible or changing the Fair Engagement viewport gate.
+      const distance=Math.hypot(target.x-observer.x,target.y-observer.y);
+      if(Number.isFinite(distance)){
+       stats.eligiblePairs++;
+       stats.nearestPairDistance=stats.nearestPairDistance===null?
+        distance:Math.min(stats.nearestPairDistance,distance);
+      }
+      if(!fair.inGameplayViewport(g,observer,target))continue;
       if(typeof g.areAllies==='function'&&g.areAllies(observer,target))continue;
       stats.visiblePairs++;
       if(fair.saturation(g,target.id,observer.id)>0)stats.privateAssignments++;
