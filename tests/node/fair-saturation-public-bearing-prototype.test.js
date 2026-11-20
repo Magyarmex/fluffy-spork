@@ -85,6 +85,43 @@ function witnessedShotCount(T, g, observer, target, C = classes) {
       !g.hasLineOfSight(shooter.x, shooter.y, target.x, target.y, 18)) return 0;
   return 1;
 }
+// Fourth research alternative: a projectile is public evidence only while
+// the observer can see the projectile AND its source and the candidate victim.
+// This predicts a bounded inbound lane, not a certified hit or private intent.
+// One owner contributes at most one pressure unit per target, so rapid-fire
+// classes do not manufacture arbitrary saturation merely by bullet count.
+function visibleInboundProjectileCount(T,g,observer,target,C=classes){
+ if(!observer||!target||!T.canPerceive(g,C,observer,target)||
+    typeof g.hasLineOfSight!=='function')return 0;
+ const owners=new Set();
+ for(const b of g.bullets||[]){
+  if(!b||b.dead||!(Number(b.ttl)>0)||!Number.isFinite(b.x)||
+     !Number.isFinite(b.y)||!Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
+     !T.inGameplayWorldPoint(g,observer,b.x,b.y))continue;
+  const shooter=(g.tanks||[]).find(t=>t&&t.id===b.ownerId);
+  if(!shooter||shooter===observer||shooter===target||
+     !hostile(g,shooter,target)||!T.canPerceive(g,C,observer,shooter)||
+     owners.has(shooter.id))continue;
+  const dx=target.x-b.x,dy=target.y-b.y;
+  const vx=b.vx-(Number.isFinite(target.vx)?target.vx:0);
+  const vy=b.vy-(Number.isFinite(target.vy)?target.vy:0);
+  const v2=vx*vx+vy*vy;
+  if(!(v2>1))continue;
+  const t=(dx*vx+dy*vy)/v2;
+  if(!(t>0))continue;
+  const horizon=Math.min(.38,Number(b.ttl));
+  const at=Math.min(t,horizon);
+  const missX=dx-vx*at,missY=dy-vy*at;
+  const radius=Math.max(1,Number(target.r)||15)+Math.max(0,Number(b.r)||0)+5;
+  if(missX*missX+missY*missY>radius*radius)continue;
+  if(!g.hasLineOfSight(observer.x,observer.y,b.x,b.y,2)||
+     !g.hasLineOfSight(observer.x,observer.y,shooter.x,shooter.y,2)||
+     !g.hasLineOfSight(b.x,b.y,target.x,target.y,2))continue;
+  owners.add(shooter.id);
+  if(owners.size>=4)break;
+ }
+ return owners.size;
+}
 // Third RESEARCH alternative: an observer-owned, event-time confirmed-hit
 // witness. Unlike a turret bearing or stale shot angle, the victim identity
 // is fixed when physical damage occurs. No private target slot is consulted.
@@ -165,7 +202,8 @@ function publicChoice(T, g, observer, C = classes, mode = 'bearing') {
     const base = basePublicScore(T, g, C, observer, target);
     if (!Number.isFinite(base)) continue;
     const score = base - (mode === 'hit' ?
-      confirmedHitCount(g, observer, target) : mode === 'shot' ?
+      confirmedHitCount(g, observer, target) : mode === 'projectile' ?
+      visibleInboundProjectileCount(T, g, observer, target, C) : mode === 'shot' ?
       witnessedShotCount(T, g, observer, target, C) :
       bearingCount(T, g, observer, target, C)) * T.saturationPenalty;
     if (score > bestScore) { bestScore = score; best = target; }
