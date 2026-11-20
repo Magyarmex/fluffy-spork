@@ -194,7 +194,8 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
    const endDelivery=cdp.send('Input.dispatchTouchEvent',
     {type:'touchEnd',touchPoints:[]});
    await Promise.all([startDelivery,moveDelivery,endDelivery]);
-   await page.waitForTimeout(140);
+   // Deterministic jitter reduces repeated host-frame phase alignment.
+   await page.waitForTimeout(140+(i*37)%97);
    const trial=await page.evaluate(before=>{
     const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
     const events=r.events.slice(before.events),births=r.births.slice(before.births),
@@ -202,7 +203,11 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
     const down=events.find(e=>e.type==='pointerdown');
     const move=events.find(e=>e.type==='pointermove');
     const up=events.find(e=>e.type==='pointerup'||e.type==='pointercancel');
-    return {trusted:events.every(e=>e.trusted),down:!!down,move:!!move,
+    const previousUpdate=move?[...r.updates].reverse().find(u=>u.at<=move.at):null;
+    const nextUpdate=move?r.updates.find(u=>u.at>move.at):null;
+    return {phaseSincePreviousUpdateMs:previousUpdate?move.at-previousUpdate.at:null,
+     phaseUntilNextUpdateMs:nextUpdate?nextUpdate.at-move.at:null,
+     trusted:events.every(e=>e.trusted),down:!!down,move:!!move,
      up:!!up,durationMs:down&&up?up.at-down.at:null,
      updatesDuringTouch:down&&up?updates.filter(u=>u.at>=down.at&&u.at<=up.at).length:null,
      activeAimSamples:down&&up?updates.filter(u=>u.at>=down.at&&u.at<=up.at&&u.aimActive).length:null,
