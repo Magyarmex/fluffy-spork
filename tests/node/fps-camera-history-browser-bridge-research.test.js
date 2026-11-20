@@ -149,3 +149,24 @@ test('camera history must sample inside interpolated render before pose restorat
    'post-render simulation camera is not the displayed camera');
  }finally{pose.stop();}
 });
+
+test('browser event-time bridge preserves center aim on CSS-scaled presented canvas',()=>{
+ const history=new PresentedCameraHistory({maxAgeMs:120});
+ assert.equal(history.record(1090,{x:20,y:-10,zoom:2,width:800,height:600,
+  rect:{left:100,top:50,width:400,height:300}}),true);
+ let now=1000;
+ const accepted=[];
+ const timeline={sampled:0,last:0,input:{},push(at,kind,data){
+  accepted.push({at,kind,data});this.last=at;return true;
+ }};
+ const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000},{
+  captureMouseWorld:(e,physicalMeta)=>history.project(e,physicalMeta)
+ });
+ now=1200;
+ assert.equal(bridge.capture({type:'pointerup',pointerType:'mouse',
+  pointerId:1,button:0,buttons:0,clientX:300,clientY:200,timeStamp:1130,
+  target:{closest:()=>null}}),true);
+ assert.equal(accepted.length,1);
+ assert.deepEqual(accepted[0].data.__novaCaptureWorld,{x:20,y:-10});
+ assert.equal(bridge.mouseProjectionFailures,0);
+});
