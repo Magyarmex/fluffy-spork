@@ -25,6 +25,8 @@ test('opt-in final renderer probe preserves return value and stops at bounded sa
  assert.equal(s.restored,true);assert.equal(s.frames,60);
  assert.equal(s.meanMs,30.5);assert.equal(s.p50Ms,30);
  assert.equal(s.p95Ms,57);assert.equal(s.p99Ms,60);assert.equal(s.maxMs,60);
+ assert.equal(s.renderOver16_67Pct,73.333);
+ assert.equal(s.renderOver33_33Pct,45);
  assert.equal(h.mod.render,h.original,'real renderer must be restored');
  assert.equal(h.listeners.size,0,'visibility listener must be released');
  assert.equal(h.draws(),60,'instrumentation must not duplicate renders');
