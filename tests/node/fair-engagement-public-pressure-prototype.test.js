@@ -387,3 +387,41 @@ test('negative control: recent witnessed bearing can be reassigned after shooter
   }finally{s.g.destroy();}
  });
 });
+
+// Candidate event-time observer witness. The origin must be recorded only
+// when this observer actually sees the shot; this helper never reads the
+// shooter's later coordinates or private target slot.
+function eventOriginShotPressure(g,observer,target,witness,{maxAge=1.25,cone=.95}={}){
+ const now=Number(g.time),fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
+ if(!witness||!Number.isFinite(now)||!Number.isFinite(witness.at)||
+    now-witness.at<0||now-witness.at>maxAge||
+    !Number.isFinite(witness.x)||!Number.isFinite(witness.y)||
+    !Number.isFinite(witness.angle)||
+    !fair.inGameplayViewport(g,observer,target)||
+    (typeof g.hasLineOfSight==='function'&&
+      (!g.hasLineOfSight(observer.x,observer.y,witness.x,witness.y,3)||
+       !g.hasLineOfSight(witness.x,witness.y,target.x,target.y,3))))return 0;
+ const angle=Math.atan2(target.y-witness.y,target.x-witness.x);
+ return Math.cos(angle-witness.angle)>=cone?1:0;
+}
+test('event-time public shot origin prevents shooter-relocation retargeting',()=>{
+ withSeed(1517826,()=>{
+  const s=scene();
+  try{
+   const {g,observer,left,right,other}=s;
+   g.hasLineOfSight=()=>true;
+   other.x=0;other.y=0;
+   const witness=Object.freeze({x:other.x,y:other.y,angle:0,at:9.9});
+   assert.equal(eventOriginShotPressure(g,observer,right,witness),1);
+   assert.equal(eventOriginShotPressure(g,observer,left,witness),0);
+   other.x=-200;
+   assert.equal(eventOriginShotPressure(g,observer,right,witness),1,
+    'a relocated shooter cannot move the witnessed firing origin');
+   assert.equal(eventOriginShotPressure(g,observer,left,witness),0,
+    'a relocated shooter cannot turn an old east shot into a new left attack');
+   g.time=12;
+   assert.equal(eventOriginShotPressure(g,observer,right,witness),0,
+    'historical origin must expire even when the shooter stays visible');
+  }finally{s.g.destroy();}
+ });
+});
