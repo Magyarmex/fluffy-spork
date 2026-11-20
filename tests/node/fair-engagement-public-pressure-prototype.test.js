@@ -15,6 +15,7 @@ function publicPressure(g,observer,target,{radius=260,cap=3,metrics=null}={}){
      !(q.hp>0)||!Number.isFinite(q.x)||!Number.isFinite(q.y))continue;
   // Same-team bodies are not attackers merely because they are nearby.
   if(typeof g.areAllies==='function'&&g.areAllies(q,target))continue;
+  if(typeof g.areHostile==='function'&&!g.areHostile(q,target))continue;
   // Visibility is from the deciding observer, not global team knowledge.
   if(!fair.inGameplayViewport(g,observer,q))continue;
   // Physical proximity is public; private AI target IDs and postures are not.
@@ -92,6 +93,11 @@ test('public proximity cannot count a visible teammate as pressure on its ally',
    assert.equal(publicPressure(g,observer,right),1,
     'unrelated visible candidate retains ordinary pressure');
    g.areAllies=original;
+   const hostile=g.areHostile;
+   g.areHostile=(a,b)=>!(a===other&&b===left||a===left&&b===other);
+   assert.equal(publicPressure(g,observer,left),1,
+    'neutral bystander is not a hostile commitment either');
+   g.areHostile=hostile;
   }finally{s.g.destroy();}
  });
 });
