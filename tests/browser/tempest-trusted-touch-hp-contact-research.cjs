@@ -26,7 +26,7 @@ const halfRate=process.env.NOVA_TEMPEST_HALF_RATE==='1';
     if(this===window.__novaTempestHpGame){
      if(halfRate){
       pendingDt+=Math.max(0,Number(args[0])||0);
-      if(pendingDt<1/30-0.0001)return;
+      if(pendingDt<1/30-0.001)return;
       args[0]=Math.min(1/30,pendingDt);
       pendingDt=Math.max(0,pendingDt-args[0]);
      }
@@ -233,8 +233,15 @@ const halfRate=process.env.NOVA_TEMPEST_HALF_RATE==='1';
   }
   assert.equal(errors.length,0,
    'no browser page errors during short-touch trials: '+JSON.stringify(errors));
+  const sampledTimes=await page.evaluate(()=>window.__novaTempestHp.updates.map(u=>u.at));
+  const sampleGaps=sampledTimes.slice(1).map((t,i)=>t-sampledTimes[i])
+   .filter(g=>Number.isFinite(g)&&g>0&&g<100).sort((a,b)=>a-b);
+  const medianSampleGapMs=sampleGaps.length?
+   sampleGaps[Math.floor(sampleGaps.length/2)]:null;
   console.log('NOVA_TEMPEST_TRUSTED_20MS_DIAGNOSTIC '+JSON.stringify({
-   requestedHoldMs:20,halfRateSamplingPilot:halfRate,attempts:shortTrials.length,
+   requestedHoldMs:20,halfRateSamplingPilot:halfRate,
+   medianObservedGameUpdateGapMs:medianSampleGapMs,
+   attempts:shortTrials.length,
    shotTrials:shortTrials.filter(t=>t.births>0).length,
    hitTrials:shortTrials.filter(t=>t.hits>0).length,
    trials:shortTrials
