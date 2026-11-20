@@ -126,3 +126,27 @@ test('dense visible target choice scans each AI assignment once, not per candida
   assert.ok(originalReads > optimizedReads * 10,
     'expected fewer candidate reads: ' + optimizedReads + ' versus ' + originalReads);
 });
+
+test('friendly or same-target assignments cannot masquerade as hostile focus fire', () => {
+  const T = boot();
+  const observer = { id: 1, x: 0, y: 0, hp: 100, maxHp: 100, alive: true,
+    cls: 'basic', team: 1, ai: { state: 'hunt', __v1112TargetId: -1 } };
+  const a = { id: 2, x: 100, y: 0, hp: 100, maxHp: 100, alive: true,
+    cls: 'basic', team: 2, spawnShieldT: 0 };
+  const b = { id: 3, x: -100, y: 0, hp: 100, maxHp: 100, alive: true,
+    cls: 'basic', team: 2, spawnShieldT: 0 };
+  const teammate = { id: 4, x: 120, y: 0, hp: 100, maxHp: 100, alive: true,
+    cls: 'basic', team: 2, ai: { state: 'hunt', __v1112TargetId: 2 } };
+  const g = { tanks: [observer, a, b, teammate], w: 1000, h: 700,
+    cam: { zoom: 1 }, time: 1 };
+  const baseline = T.chooseTarget(g, classes, observer, observer.ai, 1)?.id;
+  teammate.ai.__v1112TargetId = 3;
+  assert.equal(T.chooseTarget(g, classes, observer, observer.ai, 1)?.id, baseline,
+    'an allied private assignment must not alter target selection');
+  teammate.team = 1;
+  const attackingA = T.chooseTarget(g, classes, observer, observer.ai, 1)?.id;
+  teammate.ai.__v1112TargetId = 2;
+  const attackingB = T.chooseTarget(g, classes, observer, observer.ai, 1)?.id;
+  assert.notEqual(attackingA, attackingB,
+    'genuinely hostile pressure should still affect the soft saturation score');
+});
