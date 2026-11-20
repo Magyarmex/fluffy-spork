@@ -63,7 +63,7 @@ wrap('game/engine',function(engine){var Game=engine.Game;if(!Game||Game.prototyp
   for(var vi=0;vi<roster.length;vi++){
    var v=roster[vi];if(!v||v===t||v.alive===false||!hostile(this,t,v)||!Number.isFinite(v.x)||!Number.isFinite(v.y))continue;
    var dx=v.x-shotX,dy=v.y-shotY,dist=Math.hypot(dx,dy);
-   if(dist>1e-6&&(dx*cos+dy*sin)/dist>.75&&(!this.hasLineOfSight||this.hasLineOfSight(shotX,shotY,v.x,v.y,3)))candidateVictims.push(v);
+   if(dist>1e-6&&(dx*cos+dy*sin)/dist>.75)candidateVictims.push(v);
   }
  }
  var ts=this.__novaFairShotWitnesses||this.tanks||[];for(var i=0;i<ts.length;i++){var o=ts[i];if(!o||o.id===t.id||!o.ai||o.alive===false)continue;var fair=window.__NOVA_FAIR_ENGAGEMENT__;if(fair&&typeof fair.inGameplayViewport==='function'&&!fair.inGameplayViewport(this,o,t))continue;if(!visible(this,o,t))continue;o.ai.__v181ObservedShotId=t.id;o.ai.__v181ObservedShotAt=this.time||0;o.ai.__v181ObservedShotAngle=shotAngle;o.ai.__v181ObservedShotX=shotX;o.ai.__v181ObservedShotY=shotY;
