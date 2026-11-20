@@ -14,7 +14,20 @@ class SubtickFirePulse {
       const samePending = self.pending && e &&
         (self.pending.type === 'mouse' ? e.pointerType === 'mouse' :
          e.pointerId === self.pending.id && e.pointerType === self.pending.type);
-      if (samePending) self.release();
+      // A new right-stick press supersedes a released, unsampled shot from
+      // another pointer. The old pointer still owns Input.aim until release()
+      // replays its deferred up, so inspect the same physical right-side
+      // boundary as canonical Input.pd before processing the new down.
+      // A left movement thumb or a UI button must NOT steal that shot.
+      let newAimPress=false;
+      if(self.pending&&e&&(e.pointerType==='touch'||e.pointerType==='pen')&&
+         e.pointerId!==self.pending.id&&input.canvas&&
+         Number.isFinite(e.clientX)&&!(e.target?.closest?.('[data-ui]'))){
+        const rect=input.canvas.getBoundingClientRect();
+        newAimPress=Number.isFinite(rect.left)&&rect.width>0&&
+         e.clientX-rect.left>=rect.width*.45;
+      }
+      if (samePending||newAimPress) self.release();
       const priorAimId = input.stickId && input.stickId.aim;
       const priorFire = input.firing;
       const out = self.old.pd.call(this,e);
