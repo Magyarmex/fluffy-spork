@@ -13,6 +13,8 @@ function publicPressure(g,observer,target,{radius=260,cap=3,metrics=null}={}){
   if(metrics)metrics.bodyChecks=(metrics.bodyChecks||0)+1;
   if(!q||q.id===observer.id||q.id===target.id||q.alive===false||
      !(q.hp>0)||!Number.isFinite(q.x)||!Number.isFinite(q.y))continue;
+  // Same-team bodies are not attackers merely because they are nearby.
+  if(typeof g.areAllies==='function'&&g.areAllies(q,target))continue;
   // Visibility is from the deciding observer, not global team knowledge.
   if(!fair.inGameplayViewport(g,observer,q))continue;
   // Physical proximity is public; private AI target IDs and postures are not.
@@ -72,6 +74,24 @@ test('a visible physical participant changes only the nearby target pressure',()
    assert.deepEqual([publicPressure(g,observer,left),publicPressure(g,observer,right)],[2,1]);
    other.alive=false;
    assert.deepEqual([publicPressure(g,observer,left),publicPressure(g,observer,right)],baseline);
+  }finally{s.g.destroy();}
+ });
+});
+
+test('public proximity cannot count a visible teammate as pressure on its ally',()=>{
+ withSeed(1517808,()=>{
+  const s=scene();
+  try{
+   const {g,observer,left,right,other}=s;
+   other.x=-330;other.y=0;
+   assert.equal(publicPressure(g,observer,left),2,'baseline physical crowd');
+   const original=g.areAllies;
+   g.areAllies=(a,b)=>a===other&&b===left||a===left&&b===other;
+   assert.equal(publicPressure(g,observer,left),1,
+    'visible allied body is not an attacker merely by proximity');
+   assert.equal(publicPressure(g,observer,right),1,
+    'unrelated visible candidate retains ordinary pressure');
+   g.areAllies=original;
   }finally{s.g.destroy();}
  });
 });
