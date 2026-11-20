@@ -129,3 +129,23 @@ test('actual Battle Sense tryFire witness stores firing origin only on real proj
  assert.equal(hidden.ai.__v181ObservedShotX,undefined,
   'occluded observer must not gain the firing origin');
 });
+
+test('missing witnessed shot timestamp cannot become a time-zero crossfire',()=>{
+ const helper=loadBattleSense();
+ const observer=tank(1,undefined,-200,0);
+ const target=tank(2,undefined,0,0);
+ const third=tank(3,undefined,100,0);
+ observer.ai={__v181ObservedShotId:target.id,
+  __v181ObservedShotAngle:0,__v181ObservedShotX:0,__v181ObservedShotY:0};
+ const g={tanks:[observer,target,third],
+  __novaFairVisibleTanks:[observer,target,third],
+  time:0,hasLineOfSight:()=>true};
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
+  'an absent timestamp is not a witnessed shot at match time zero');
+ observer.ai.__v181ObservedShotAt=null;
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
+  'a null timestamp is not a witnessed shot at match time zero');
+ observer.ai.__v181ObservedShotAt=0;
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
+  'a genuine time-zero shot remains a valid crossfire witness');
+});
