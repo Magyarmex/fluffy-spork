@@ -370,6 +370,28 @@ test('inbound projectile proxy still depends on non-public bullet owner ID',()=>
   'same visible projectile produces a different answer from private owner ID');
 });
 
+// The safe public-position estimate is deliberately NOT a hit predictor.
+// A rapidly moving target can leave the apparent projectile lane before the
+// round arrives. This negative control blocks treating pressure as damage.
+test('public inbound lane is not a certified future hit on a moving target',()=>{
+ const T=boot(),{g,observer,a}=world();
+ const shooter=tank(22,0,90,3,0);
+ g.tanks.push(shooter);
+ observer.ai.__v181ObservedShotId=shooter.id;
+ observer.ai.__v181ObservedShotAt=g.time-.1;
+ observer.ai.__v181ObservedShotAngle=Math.atan2(-90,100);
+ a.x=100;a.y=0;a.r=15;a.vx=0;a.vy=1200;
+ const bullet={x:40,y:0,vx:200,vy:0,r:3,ttl:1,ownerId:shooter.id};
+ g.bullets=[bullet];
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),1,
+  'static visible lane still signals pressure without hidden velocity');
+ const seconds=(a.x-bullet.x)/bullet.vx;
+ const futureMiss=Math.hypot(a.x-(bullet.x+bullet.vx*seconds),
+  (a.y+a.vy*seconds)-(bullet.y+bullet.vy*seconds));
+ assert.ok(futureMiss>a.r+bullet.r+5,
+  'actual moving target escapes the predicted static lane');
+});
+
 test('public base score exactly matches shipping before private saturation', () => {
   const T = boot(), { g, observer, a, b, hidden } = world();
   for (const target of [a, b]) {
