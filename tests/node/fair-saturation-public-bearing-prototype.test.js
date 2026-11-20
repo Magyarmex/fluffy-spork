@@ -275,6 +275,10 @@ test('visible inbound projectile pressure requires a live public intercept lane'
  shooter.team=3;
  assert.equal(visibleInboundProjectileCount(T,g,observer,b),0,
   'a projectile heading away from the other candidate is not pressure');
+ let losCalls=0;g.bullets=[];
+ g.hasLineOfSight=()=>{losCalls++;return true;};
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),0);
+ assert.equal(losCalls,0,'empty projectile field must avoid terrain LOS work');
 });
 test('visible projectile choice ignores offscreen private intent and offscreen bullets',()=>{
  const T=boot(),{g,observer,a,b,hidden}=world();
