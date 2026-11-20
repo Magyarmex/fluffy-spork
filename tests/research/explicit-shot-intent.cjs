@@ -53,7 +53,12 @@ class ExplicitShotIntent {
      Number.isFinite(p.queuedAt)&&performance.now()-p.queuedAt>=0&&performance.now()-p.queuedAt<=50&&
      game.status==='playing'&&!game.paused&&!input.__novaInputPaused&&
      !(game.__testWindow&&game.__testWindow.document.hidden);
-   if(!canPlay)return self.oldUpdate.apply(this,args);
+   if(!canPlay){
+    // A stale or revoked release is not a recovered pulse. Clear it before
+    // the underlying research counter can mistake it for a fired intent.
+    if(p)self.pulse.release();
+    return self.oldUpdate.apply(this,args);
+   }
    const touch=p.type==='touch'||p.type==='pen';
    const dx=input.aim.dx,dy=input.aim.dy,len=Math.hypot(dx,dy);
    const valid=touch?Number.isFinite(len)&&len>=9:p.type==='mouse';
