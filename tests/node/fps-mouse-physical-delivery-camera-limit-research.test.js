@@ -52,3 +52,35 @@ test('a physically old mouse release can be projected using a newer delivery-tim
     caveat:'controlled synthetic camera transition, not measured browser dispatch lag'
   }));
 });
+
+test('Controller rendered-camera easing can differ from a raw cam DOM-time projection',()=>{
+  process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+  const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+  const g=bootGame();
+  try{
+    const i=g.input;
+    g.status='playing';g.paused=false;
+    Object.assign(g.cam,{x:0,y:0,zoom:1});
+    Object.assign(g.player,{x:300,y:0,vx:0,vy:0,alive:true});
+    g.zoom=1.5;
+    g.__novaTacticalCamera=null;
+    i.mouseX=600;i.mouseY=300;i.mouseActive=true;
+    const rect=i.canvas.getBoundingClientRect();
+    const rawX=g.cam.x+(i.mouseX-rect.left-g.w*.5)/g.cam.zoom;
+    g.__novaMouseAimFrameDt=1/30;
+    g.__novaMouseCenterAimPending=true;
+    g.lerpAngle(0,0,.5);
+    const rendered=g.__novaMouseAimCamera;
+    assert.ok(rendered&&Number.isFinite(rendered.x)&&Number.isFinite(rendered.zoom),
+      'actual Controller overlay must publish its rendered mouse camera');
+    const renderedX=rendered.x+(i.mouseX-rect.left-g.w*.5)/rendered.zoom;
+    assert.ok(Math.abs(renderedX-rawX)>1,
+      'raw cam capture is not certified to match eased rendered camera');
+    assert.ok(rendered.zoom>g.cam.zoom && rendered.zoom<g.zoom,
+      'rendered zoom should ease between current and target zoom');
+    console.log('MOUSE_RENDERED_CAMERA_PROJECTION_LIMIT_RESEARCH '+JSON.stringify({
+      rawX,renderedX,rawZoom:g.cam.zoom,renderedZoom:rendered.zoom,
+      caveat:'constructed camera easing; no actual browser pixel/input-to-photon validation'
+    }));
+  }finally{g.destroy();}
+});
