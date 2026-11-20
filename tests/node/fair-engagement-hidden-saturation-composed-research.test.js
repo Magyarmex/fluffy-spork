@@ -50,3 +50,42 @@ test('composed Fair Engagement target choice is altered by offscreen private AI 
   }finally{g.destroy();}
  });
 });
+
+test('composed Fair Engagement ignores allied private slots while retaining hostile pressure',()=>{
+ withSeed(1517802,()=>{
+  const g=bootGame();
+  try{
+   const T=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
+   const classes=g.__testWindow.__novaMakeRequire('')('game/classes');
+   const bots=g.tanks.filter(t=>t&&t.ai&&!t.isPlayer);
+   assert.ok(bots.length>=4,'composed world needs four AI tanks');
+   const [observer,a,b,attacker]=bots.slice(0,4);
+   for(const [i,t] of [observer,a,b,attacker].entries()){
+    Object.assign(t,{x:i===1?100:i===2?-100:i===3?120:0,y:0,
+     cls:'twin',tier:1,hp:100,maxHp:100,alive:true,spawnShieldT:0,
+     team:i===0?1:2});
+    Object.assign(t.ai,{state:i===3?'hunt':'wander',
+     __v1112TargetId:-1,__v1105TargetId:-1,__v180TargetId:-1,
+     targetId:-1,__v180Posture:null,__v180LastAttacker:-1});
+   }
+   g.tanks=[observer,a,b,attacker];
+   g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
+   g.areAllies=(x,y)=>x.team===y.team;
+   g.areHostile=(x,y)=>x.team!==y.team;
+   g.w=800;g.h=600;g.cam.zoom=1;g.time=10;
+   const choose=()=>T.chooseTarget(g,classes,observer,observer.ai,g.time);
+   attacker.ai.__v1112TargetId=a.id;
+   const first=choose();
+   attacker.ai.__v1112TargetId=b.id;
+   assert.equal(choose(),first,
+    'an allied bot changing its private assignment cannot create hostile saturation');
+   attacker.team=1;
+   attacker.ai.__v1112TargetId=a.id;
+   const pressA=choose();
+   attacker.ai.__v1112TargetId=b.id;
+   const pressB=choose();
+   assert.notEqual(pressA,pressB,
+    'a genuinely hostile attack assignment still changes soft pressure');
+  }finally{g.destroy();}
+ });
+});
