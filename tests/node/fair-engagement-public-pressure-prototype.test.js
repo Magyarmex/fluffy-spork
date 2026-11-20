@@ -203,11 +203,26 @@ test('natural composed match samples public-pressure candidate incidence without
    try{
     g.sfx.muted=true;g.sfx.startMusic=()=>{};
     g.status='playing';g.paused=false;
+    // Test-only event-time origin capture, AFTER the real Battle Sense wrapper.
+    // Never feed this metadata back into the AI or alter firing behavior.
+    const origins=new Map(),originalTryFire=g.tryFire;
+    g.tryFire=function(shooter){
+     const before=this.bullets.length,result=originalTryFire.apply(this,arguments);
+     if(this.bullets.length>before&&shooter){
+      for(const o of this.tanks){
+       if(o&&o.ai&&o.ai.__v181ObservedShotId===shooter.id&&
+          Math.abs(o.ai.__v181ObservedShotAt-this.time)<1e-8)
+        origins.set(o.id,{id:shooter.id,x:shooter.x,y:shooter.y,at:this.time});
+      }
+     }
+     return result;
+    };
     const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
     const stats={seed,frames:0,playingFrames:0,visiblePairs:0,privateAssignments:0,
      proximityPositive:0,projectilePositive:0,witnessPositive:0,
      bodyChecks:0,bulletChecks:0,eligiblePairs:0,nearestPairDistance:null,
-     fairCrossfireEligible:0,crossfirePositive:0};
+     fairCrossfireEligible:0,crossfirePositive:0,
+     originWitnessSamples:0,relocatedWitnessSamples:0,maxWitnessShooterTravel:0};
     for(let frame=0;frame<720;frame++){
      g.update(1/60);stats.frames++;
      if(g.status==='playing')stats.playingFrames++;
@@ -227,6 +242,17 @@ test('natural composed match samples public-pressure candidate incidence without
       }
       if(!fair.inGameplayViewport(g,observer,target))continue;
       stats.visiblePairs++;
+      const origin=origins.get(observer.id);
+      if(origin&&observer.ai.__v181ObservedShotId===origin.id&&
+         Math.abs(observer.ai.__v181ObservedShotAt-origin.at)<1e-8){
+       const shooter=g.getTank(origin.id);
+       if(shooter&&Number.isFinite(shooter.x)&&Number.isFinite(shooter.y)){
+        const travel=Math.hypot(shooter.x-origin.x,shooter.y-origin.y);
+        stats.originWitnessSamples++;
+        if(travel>30)stats.relocatedWitnessSamples++;
+        stats.maxWitnessShooterTravel=Math.max(stats.maxWitnessShooterTravel,travel);
+       }
+      }
       if(fair.saturation(g,target.id,observer.id)>0)stats.privateAssignments++;
       if(publicPressure(g,observer,target,{metrics:stats})>0)stats.proximityPositive++;
       if(publicProjectileThreat(g,observer,target,{metrics:stats})>0)stats.projectilePositive++;
