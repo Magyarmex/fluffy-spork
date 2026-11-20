@@ -58,3 +58,32 @@ test('default history covers 120ms at high 240Hz presentation without unbounded 
  assert.equal(h.record(1200,geometry(100)),true);
  assert.equal(h.frames.length,48);
 });
+
+test('deterministic randomized chronology oracle never projects from a future frame',()=>{
+ let seed=1517800;const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
+ for(let world=0;world<200;world++){
+  const h=new PresentedCameraHistory({capacity:48,maxAgeMs:120});
+  let at=1000;const frames=[];
+  for(let j=0;j<48;j++){
+   at+=2+rand()*30;
+   const x=rand()*1000-500,zoom=.5+rand()*2;
+   const frame={at,x,zoom};frames.push(frame);
+   assert.equal(h.record(at,geometry(x,zoom)),true);
+  }
+  for(let j=0;j<100;j++){
+   const physical=frames[0].at-20+rand()*(frames.at(-1).at-frames[0].at+50);
+   const delivery=physical+rand()*160;
+   const result=h.project(event(physical),{timestampTrusted:true,timestampExact:true,
+     physicalAtMs:physical,deliveryMs:delivery});
+   const candidates=frames.filter(f=>f.at<=physical);
+   const expected=candidates.at(-1);
+   const legal=expected&&physical-expected.at<=120&&delivery-physical<=120;
+   if(!legal)assert.equal(result,null);
+   else{
+    assert.ok(result);
+    assert.ok(result.frameAt<=physical);
+    assert.ok(Math.abs(result.x-(expected.x+200/expected.zoom))<1e-8);
+   }
+  }
+ }
+});
