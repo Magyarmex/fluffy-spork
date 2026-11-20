@@ -54,7 +54,7 @@ class ExplicitShotIntent {
    const physicalAge=p&&p.physicalAt!==null?now-p.physicalAt:null;
    const holdMs=p&&p.physicalDownAt!==null&&p.physicalAt!==null
     ?p.physicalAt-p.physicalDownAt:null;
-   const canPlay=!!p&&p.player===game.player&&game.player?.alive===true&&
+   const canPlay=!!p&&p.player===game.player&&game.player?.alive!==false&&
      age>=0&&age<=50&&
      (p.physicalDownAt===null)===(p.physicalAt===null)&&
      (physicalAge===null||(physicalAge>=0&&physicalAge<=50))&&
