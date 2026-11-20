@@ -26,7 +26,7 @@ class PresentedCameraHistory {
   }
   project(event,{timestampTrusted=false,timestampExact=false,physicalAtMs:at,deliveryMs}={}) {
     if(!timestampTrusted||!timestampExact||!Number.isFinite(at)||at<=0||
-       !Number.isFinite(deliveryMs)||at>deliveryMs||
+       !Number.isFinite(deliveryMs)||at>deliveryMs||!event||
        !Number.isFinite(event.clientX)||!Number.isFinite(event.clientY)){
       this.invalid++;return null;
     }
