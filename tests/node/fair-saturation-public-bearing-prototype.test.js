@@ -93,11 +93,11 @@ function witnessedShotCount(T, g, observer, target, C = classes) {
 function visibleInboundProjectileCount(T,g,observer,target,C=classes){
  if(!observer||!target||!T.canPerceive(g,C,observer,target)||
     typeof g.hasLineOfSight!=='function')return 0;
- const owners=new Set();
+ const owners=new Set(),ext=T.viewportHalfExtents(g);
  for(const b of g.bullets||[]){
   if(!b||b.dead||!(Number(b.ttl)>0)||!Number.isFinite(b.x)||
      !Number.isFinite(b.y)||!Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
-     !T.inGameplayWorldPoint(g,observer,b.x,b.y))continue;
+     Math.abs(b.x-observer.x)>ext.x||Math.abs(b.y-observer.y)>ext.y)continue;
   const shooter=(g.tanks||[]).find(t=>t&&t.id===b.ownerId);
   if(!shooter||shooter===observer||shooter===target||
      !hostile(g,shooter,target)||!T.canPerceive(g,C,observer,shooter)||
