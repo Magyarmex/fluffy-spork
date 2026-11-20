@@ -79,10 +79,10 @@ test('real composed projectile birth does not recognize a victim absent at firin
   assert.equal(observer.ai.__v181ObservedShotX,0);
   assert.equal(observer.ai.__v181ObservedShotY,0);
   assert.equal(observer.ai.__v181ObservedShotAngle,0);
-  assert.ok(Array.isArray(observer.ai.__v181ObservedShotVictims));
-  assert.equal(observer.ai.__v181ObservedShotVictims.includes(third),false);
-  assert.equal(Object.isFrozen(observer.ai.__v181ObservedShotVictims),true,
-   'empty witness memory must be shared immutable state, not per-shot garbage');
+  assert.equal(observer.ai.__v181ObservedShotVictims,null);
+  assert.equal((observer.ai.__v181ObservedShotVictims?.has(third)===true),false);
+  assert.equal(observer.ai.__v181ObservedShotVictimCount,0,
+   'empty witness memory must not allocate a retaining collection');
   g.tanks=[observer,shooter,third];
   g.__novaFairVisibleTanks=g.tanks;
   g.areHostile=()=>true;g.areAllies=()=>false;
@@ -107,7 +107,7 @@ test('real projectile birth records event-time observer-visible third party',()=
   g.__novaFairShotWitnesses=g.tanks;
   const before=g.bullets.length;g.tryFire(shooter);
   assert.ok(g.bullets.length>before);
-  assert.ok(observer.ai.__v181ObservedShotVictims.includes(third),
+  assert.ok((observer.ai.__v181ObservedShotVictims?.has(third)===true),
    'observer must have seen the victim inside the actual firing-time lane');
   g.time=10.5;third.x=0;third.y=100;
   assert.equal(helper.thirdPartyVector(g,observer,shooter,{}).weight,.62,
@@ -131,7 +131,7 @@ test('a victim hidden at firing time cannot become a retroactive witness',()=>{
   assert.ok(g.bullets.length>before);
   assert.equal(observer.ai.__v181ObservedShotId,shooter.id,
    'observer can see the shooter firing');
-  assert.equal(observer.ai.__v181ObservedShotVictims.includes(third),false,
+  assert.equal((observer.ai.__v181ObservedShotVictims?.has(third)===true),false,
    'occluded victim was not visible to this observer at shot birth');
   g.hasLineOfSight=()=>true;g.time=10.5;
   assert.equal(helper.thirdPartyVector(g,observer,shooter,{}).weight,0,
@@ -153,7 +153,7 @@ test('a victim outside observer viewport at shot time cannot appear retroactivel
   const before=g.bullets.length;g.tryFire(shooter);
   assert.ok(g.bullets.length>before);
   assert.equal(observer.ai.__v181ObservedShotId,shooter.id);
-  assert.equal(observer.ai.__v181ObservedShotVictims.includes(third),false,
+  assert.equal((observer.ai.__v181ObservedShotVictims?.has(third)===true),false,
    'off-viewport victim must not enter event-time public witness memory');
   third.x=100;g.time=10.5;
   assert.equal(helper.thirdPartyVector(g,observer,shooter,{}).weight,0,
@@ -190,9 +190,9 @@ test('two observers receive different public victim memories for the same shot',
   assert.ok(g.bullets.length>before);
   assert.equal(a.ai.__v181ObservedShotId,shooter.id);
   assert.equal(b.ai.__v181ObservedShotId,shooter.id);
-  assert.ok(a.ai.__v181ObservedShotVictims.includes(third),
+  assert.ok((a.ai.__v181ObservedShotVictims?.has(third)===true),
    'observer A saw the victim in the shot lane');
-  assert.equal(b.ai.__v181ObservedShotVictims.includes(third),false,
+  assert.equal((b.ai.__v181ObservedShotVictims?.has(third)===true),false,
    'observer B cannot inherit A\'s victim knowledge through cover');
  }finally{g.destroy();}
 });
