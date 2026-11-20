@@ -37,7 +37,6 @@ function witnessedDuel(g,observer,target,third){
  var shooter=a.__v181ObservedShotId===target.id?target:
    a.__v181ObservedShotId===third.id?third:null;
  if(!shooter)return false;
- if(a.__v181ObservedShooterRef&&a.__v181ObservedShooterRef!==shooter)return false;
  var victim=shooter===target?third:target;
  var bearing=a.__v181ObservedShotAngle;
  if(!Number.isFinite(bearing))return false;
@@ -67,7 +66,7 @@ wrap('game/engine',function(engine){var Game=engine.Game;if(!Game||Game.prototyp
    if(dist>1e-6&&(dx*cos+dy*sin)/dist>.75)candidateVictims.push(v);
   }
  }
- var ts=this.__novaFairShotWitnesses||this.tanks||[];for(var i=0;i<ts.length;i++){var o=ts[i];if(!o||o.id===t.id||!o.ai||o.alive===false)continue;var fair=window.__NOVA_FAIR_ENGAGEMENT__;if(fair&&typeof fair.inGameplayViewport==='function'&&!fair.inGameplayViewport(this,o,t))continue;if(!visible(this,o,t))continue;o.ai.__v181ObservedShotId=t.id;o.ai.__v181ObservedShooterRef=t;o.ai.__v181ObservedShotAt=this.time||0;o.ai.__v181ObservedShotAngle=shotAngle;o.ai.__v181ObservedShotX=shotX;o.ai.__v181ObservedShotY=shotY;
+ var ts=this.__novaFairShotWitnesses||this.tanks||[];for(var i=0;i<ts.length;i++){var o=ts[i];if(!o||o.id===t.id||!o.ai||o.alive===false)continue;var fair=window.__NOVA_FAIR_ENGAGEMENT__;if(fair&&typeof fair.inGameplayViewport==='function'&&!fair.inGameplayViewport(this,o,t))continue;if(!visible(this,o,t))continue;o.ai.__v181ObservedShotId=t.id;o.ai.__v181ObservedShotAt=this.time||0;o.ai.__v181ObservedShotAngle=shotAngle;o.ai.__v181ObservedShotX=shotX;o.ai.__v181ObservedShotY=shotY;
  var observedVictims=null;
  for(var ci=0;ci<candidateVictims.length;ci++){
   var victim=candidateVictims[ci];if(victim===o)continue;
