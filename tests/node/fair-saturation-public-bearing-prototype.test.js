@@ -1205,8 +1205,11 @@ test('composed nuke pickup credits a non-firing collector on real HP damage',()=
     }
     return out;
    };
-   g.applyPowerup(owner,'nuke');
-   assert.ok(contacts>0,'actual nuke must reduce target HP');
+   g.status='playing';
+   g.powerups=[{id:987654,kind:'powerup',type:'nuke',x:0,y:0,ttl:20,born:g.time}];
+   g.updatePowerups(1/60);
+   assert.equal(g.powerups.length,0,'real pickup collection must consume nuke');
+   assert.ok(contacts>0,'collected nuke must reduce target HP');
    assert.equal(g.bullets.length,0,'collector fired no projectile');
    assert.ok(naiveWitnesses>0,'naive owner-ID hit witness mistakes nuke for fire');
    assert.equal(causeScope,null,'nuke scope must unwind after pickup');
