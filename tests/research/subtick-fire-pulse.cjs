@@ -12,10 +12,11 @@ function physicalReleaseAt(e) {
 function releaseIsFresh(p, now) {
   const queuedAge = now - p.queuedAt;
   const physicalAge = p.physicalAt === null ? null : now - p.physicalAt;
-  const pressAge = p.physicalDownAt === null ? null : now - p.physicalDownAt;
+  const holdMs = p.physicalDownAt === null || p.physicalAt === null
+    ? null : p.physicalAt - p.physicalDownAt;
   return queuedAge >= 0 && queuedAge <= 50 &&
     (physicalAge === null || (physicalAge >= 0 && physicalAge <= 50)) &&
-    (pressAge === null || (pressAge >= 0 && pressAge <= 50));
+    (holdMs === null || (holdMs >= 0 && holdMs <= 50));
 }
 class SubtickFirePulse {
   constructor(game, timeline) {
