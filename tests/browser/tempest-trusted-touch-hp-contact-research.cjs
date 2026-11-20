@@ -111,6 +111,7 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
       }
       touchOwners.delete(e.pointerId);
      }
+     window.__novaTempestHp.aimOwnerId=activeTouch?.id??null;
     },{capture:true,passive:true});
    window.addEventListener('blur',()=>{pendingShot=null;activeTouch=null;touchOwners.clear();});
    document.addEventListener('visibilitychange',()=>{
@@ -317,6 +318,31 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
    assert.equal(afterCancel.latches,beforeCancel,'cancel cannot queue a shot intent');
    assert.equal(afterCancel.aimActive,false,'cancel releases aim ownership');
    assert.equal(afterCancel.firing,false,'cancel releases firing ownership');
+   // Real twin-stick players hold movement while aiming. A second pointerdown
+   // must not overwrite the first right-stick shot owner.
+   const right={...origin,id:1501};
+   const left={...origin,x:box.x+box.width*.28,id:1502};
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[right]});
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+    {...right,x:right.x+35,y:right.y-20}]});
+   await page.waitForFunction(()=>{
+    const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
+    return g?.input?.stickId?.aim>=0&&r.aimOwnerId===g.input.stickId.aim;
+   },null,{timeout:5000});
+   const rightOwner=await page.evaluate(()=>window.__novaTempestHp.aimOwnerId);
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+    {...right,x:right.x+35,y:right.y-20},left]});
+   const twoFinger=await page.evaluate(()=>({
+    tracked:window.__novaTempestHp.aimOwnerId,
+    physical:window.__novaTempestHpGame.input.stickId.aim
+   }));
+   assert.equal(twoFinger.tracked,rightOwner,
+    'movement-stick second thumb must not steal the pending aim owner');
+   assert.equal(twoFinger.physical,rightOwner,
+    'physical aim owner must remain unchanged by movement touch');
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+   await page.waitForFunction(()=>window.__novaTempestHpGame.input.stickId.aim===-1,
+    null,{timeout:5000});
   }
   assert.equal(errors.length,0,
    'no browser page errors during short-touch trials: '+JSON.stringify(errors));
