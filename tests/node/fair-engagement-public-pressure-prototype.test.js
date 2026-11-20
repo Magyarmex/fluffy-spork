@@ -94,7 +94,7 @@ test('negative control: mere proximity falsely counts a passive bystander',()=>{
 });
 
 function publicProjectileThreat(g,observer,target,{horizon=.35,margin=28,metrics=null}={}){
- const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
+ const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT__;
  for(const b of g.bullets||[]){
   if(metrics)metrics.bulletChecks=(metrics.bulletChecks||0)+1;
   if(!b||b.dead||!(b.ttl>0)||!Number.isFinite(b.x)||
@@ -207,7 +207,7 @@ test('natural composed match samples public-pressure candidate incidence without
 function movingProjectileThreat(g,observer,target,observedVelocity,{horizon=.35,margin=28}={}){
  if(!observedVelocity||!Number.isFinite(observedVelocity.vx)||
     !Number.isFinite(observedVelocity.vy))return 0;
- const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
+ const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT__;
  for(const b of g.bullets||[]){
   if(!b||b.dead||!(b.ttl>0)||!Number.isFinite(b.x)||
      !Number.isFinite(b.y)||!Number.isFinite(b.vx)||
