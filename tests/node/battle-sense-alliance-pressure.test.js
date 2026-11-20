@@ -154,6 +154,12 @@ test('missing witnessed shot timestamp cannot become a time-zero crossfire',()=>
  observer.ai.__v181ObservedShotAt=0;
  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
   'a genuine time-zero shot remains a valid crossfire witness');
+ g.time=1.25;
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
+  'the established 1.25-second witness boundary is preserved');
+ g.time=1.250001;
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
+  'the existing witness expiry remains strict');
 });
 
 test('Battle Sense reload-punish window rejects untrusted shot times but accepts real time zero',()=>{
