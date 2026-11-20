@@ -38,13 +38,14 @@ function witnessedDuel(g,observer,target,third){
    a.__v181ObservedShotId===third.id?third:null;
  if(!shooter)return false;
  var victim=shooter===target?third:target;
- /* Event-time public witness set: later movement cannot rewrite a shot's intent. */
- if(Array.isArray(a.__v181ObservedShotVictims))return a.__v181ObservedShotVictims.indexOf(victim)!==-1;
  var bearing=a.__v181ObservedShotAngle;
  if(!Number.isFinite(bearing))return false;
  /* A witnessed bearing belongs to the firing origin, not the shooter's later hull. */
  var sx=a.__v181ObservedShotX,sy=a.__v181ObservedShotY;
  if(!Number.isFinite(sx)||!Number.isFinite(sy))return false;
+ /* Event-time public witness set: later movement cannot rewrite a shot's intent.
+  * Trusted origin and bearing remain mandatory even for cached candidates. */
+ if(Array.isArray(a.__v181ObservedShotVictims))return a.__v181ObservedShotVictims.indexOf(victim)!==-1;
  var toward=Math.atan2(victim.y-sy,victim.x-sx);
  return Math.cos(bearing-toward)>.75;
 }
