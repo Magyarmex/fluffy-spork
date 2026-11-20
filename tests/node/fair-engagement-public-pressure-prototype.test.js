@@ -215,6 +215,7 @@ test('natural composed match samples public-pressure candidate incidence without
      for(const observer of observers)for(const target of g.tanks){
       if(!target||target===observer||target.alive===false)continue;
       if(typeof g.areAllies==='function'&&g.areAllies(observer,target))continue;
+      if(typeof g.areHostile==='function'&&!g.areHostile(observer,target))continue;
       // Diagnose zero-witness natural samples without pretending distant
       // enemies are visible or changing the Fair Engagement viewport gate.
       const distance=Math.hypot(target.x-observer.x,target.y-observer.y);
