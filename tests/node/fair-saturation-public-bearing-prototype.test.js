@@ -864,3 +864,47 @@ test('composed Iron Will reflection credits a non-firing tank as damage source',
   }finally{g.destroy();}
  });
 });
+
+
+// A normal non-Controller drone can credit its owner's tank id without
+// the Controller dash presentation flag. A credited owner is not a physical
+// shooter witness. This uses the real composed Game's drone contact path.
+test('composed legacy drone contact credits owner without Controller dash flag',()=>{
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  const owner=g.player,victim=g.tanks.find(t=>t&&t!==owner);
+  assert.ok(owner&&victim);
+  try{
+   g.sfx.muted=true;
+   g.setClass(owner,'scout');owner.gene='controller';
+   Object.assign(owner,{x:0,y:0,vx:0,vy:0,hp:1000,maxHp:1000,
+    alive:true,spawnShieldT:0,droneRespawnT:Infinity,swarmT:0});
+   Object.assign(victim,{x:70,y:0,vx:0,vy:0,hp:1000,maxHp:1000,
+    alive:true,spawnShieldT:0,shieldT:0,bulwarkT:0,invulnT:0,
+    droneRespawnT:Infinity});
+   g.tanks=[owner,victim];
+   g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
+   g.drones=[];g.bullets=[];g.shapes=[];g.__novaTerrain=[];
+   g.__novaBattlefieldIndex=null;
+   g.spawnDrone(owner,0);
+   assert.equal(g.drones.length,1);
+   const d=g.drones[0];
+   Object.assign(d,{x:65,y:0,speed:0,attackCd:0,
+    targetRef:victim,targetId:victim.id,retargetT:1,hitFlash:0});
+   const original=g.damageTank,events=[];
+   g.damageTank=function(target,amount,sourceId,...rest){
+    const before=target.hp,flag=this.__novaDroneDamageOwner;
+    const out=original.call(this,target,amount,sourceId,...rest);
+    if(target.hp<before)events.push({targetId:target.id,sourceId,
+     flagged:flag===owner.id});
+    return out;
+   };
+   g.updateDrones(1/60);
+   assert.ok(events.some(e=>e.targetId===victim.id&&e.sourceId===owner.id&&!e.flagged),
+    'real legacy drone contact credits owner without a dash flag');
+   assert.equal(g.bullets.length,0,'owner did not fire a projectile');
+   assert.ok(victim.hp<1000,'legacy drone caused actual HP damage');
+  }finally{g.destroy();}
+ });
+});
