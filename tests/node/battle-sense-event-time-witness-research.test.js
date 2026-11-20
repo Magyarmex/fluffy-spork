@@ -157,6 +157,19 @@ test('a victim outside observer viewport at shot time cannot appear retroactivel
    'entering the viewport later cannot reveal a historical duel');
  }finally{g.destroy();}
 });
+test('cached candidate never bypasses trusted shot origin and bearing',()=>{
+ const w=scene();
+ try{
+  w.third.x=100;w.third.y=0;
+  w.observer.ai.__v181ObservedShotVictims=[w.third];
+  assert.equal(w.weight(),.62);
+  w.observer.ai.__v181ObservedShotAngle=NaN;
+  assert.equal(w.weight(),0,'invalid historical bearing cannot authenticate cached duel');
+  w.observer.ai.__v181ObservedShotAngle=0;
+  w.observer.ai.__v181ObservedShotX=NaN;
+  assert.equal(w.weight(),0,'invalid historical origin cannot authenticate cached duel');
+ }finally{w.g.destroy();}
+});
 test('research fixture uses canonical materialized 49-overlay composition',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  const scripts=[...html.matchAll(/<script[^>]+src=["']\.\/(nova-updates\/[^"']+)["']/g)];
