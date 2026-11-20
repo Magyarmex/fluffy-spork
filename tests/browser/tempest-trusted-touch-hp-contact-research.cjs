@@ -6,6 +6,9 @@ const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 const halfRate=process.env.NOVA_TEMPEST_HALF_RATE==='1';
 const latchMode=process.env.NOVA_TEMPEST_LATCH==='1';
+const explicitMode=process.env.NOVA_TEMPEST_EXPLICIT==='1';
+const {patchEngineHtml}=require('../research/explicit-shot-intent.cjs');
+assert.ok(!explicitMode||latchMode,'explicit intent pilot requires latch mode');
 assert.ok(!latchMode||halfRate,'latch pilot requires half-rate arm');
 const trialCount=Number(process.env.NOVA_TEMPEST_TRIALS||8);
 assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
@@ -16,9 +19,14 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
  const page=await context.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(String(e.stack||e)));
  try{
+  if(explicitMode)await page.route('http://127.0.0.1:8765/',async route=>{
+   const response=await route.fetch();
+   assert.equal(response.status(),200,'research shell must load');
+   await route.fulfill({response,body:patchEngineHtml(await response.text())});
+  });
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({timeout:45000});
-  await page.evaluate(({halfRate,latchMode})=>{
+  await page.evaluate(({halfRate,latchMode,explicitMode})=>{
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const start=Game.prototype.start,fire=Game.prototype.tryFire,damage=Game.prototype.damageTank,
     update=Game.prototype.update;
@@ -52,14 +60,24 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
       now-p.at>=0&&now-p.at<=50;
      const input=this.input,aim=input.aim;
      const prior={firing:input.firing,active:aim.active,dx:aim.dx,dy:aim.dy};
-     if(valid){input.firing=true;aim.active=true;aim.dx=p.dx;aim.dy=p.dy;
-      window.__novaTempestHp.latches.push({at:now,releaseAt:p.at});}
+     if(valid){
+      if(explicitMode){
+       const len=Math.hypot(p.dx,p.dy);
+       input.__novaShotIntent=Object.freeze({fire:true,
+        aim:Object.freeze({x:p.dx/len,y:p.dy/len})});
+      }else{input.firing=true;aim.active=true;aim.dx=p.dx;aim.dy=p.dy;}
+      window.__novaTempestHp.latches.push({at:now,releaseAt:p.at,
+       mode:explicitMode?'weapon-only':'whole-update'});
+     }
      window.__novaTempestHp.updates.push({at:performance.now(),gameTime:this.time,
       aimActive:!!input?.aim?.active,firing:!!input?.firing,
       aimMagnitude:Math.hypot(input?.aim?.dx||0,input?.aim?.dy||0)});
      try{return update.apply(this,args);}
-     finally{if(valid){input.firing=prior.firing;aim.active=prior.active;
-      aim.dx=prior.dx;aim.dy=prior.dy;}}
+     finally{if(valid){
+      if(explicitMode)delete input.__novaShotIntent;
+      else{input.firing=prior.firing;aim.active=prior.active;
+       aim.dx=prior.dx;aim.dy=prior.dy;}
+     }}
     }
     return update.apply(this,args);
    };
@@ -121,7 +139,7 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
    document.addEventListener('visibilitychange',()=>{
     if(document.hidden){pendingShot=null;activeTouch=null;touchOwners.clear();}
    });
-  },{halfRate,latchMode});
+  },{halfRate,latchMode,explicitMode});
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   const canvas=page.locator('canvas.absolute.inset-0');
   await canvas.waitFor({state:'visible',timeout:30000});
@@ -362,6 +380,7 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
    sampleGaps[Math.floor(sampleGaps.length/2)]:null;
   console.log('NOVA_TEMPEST_TRUSTED_20MS_DIAGNOSTIC '+JSON.stringify({
    requestedHoldMs:20,halfRateSamplingPilot:halfRate,latchPilot:latchMode,
+   explicitWeaponOnlyPilot:explicitMode,
    medianObservedGameUpdateGapMs:medianSampleGapMs,
    attempts:shortTrials.length,
    shotTrials:shortTrials.filter(t=>t.births>0).length,
