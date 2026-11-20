@@ -140,3 +140,49 @@ test('raw subtick pulse also rejects stale and dead-owner firing',async()=>{
   pulse.detach();
  }
 });
+
+test('trusted physical release time rejects late delivery despite a fresh handler',()=>{
+ for(const offset of [-120, 120]){
+  const f=setup();f.press();
+  const e={...event('pointerup',7),isTrusted:true,
+   timeStamp:performance.now()+offset};
+  f.input.pu(e);
+  f.game.update(1/30);
+  assert.equal(f.seen[0].intent,undefined,
+   'trusted release with stale/future physical timestamp cannot become fresh');
+  assert.equal(f.owner.intents,0);
+  assert.equal(f.owner.pulse.pulses,0);
+  f.owner.detach();
+ }
+});
+test('fresh trusted physical release retains exactly one weapon-only intent',()=>{
+ const f=setup();f.press();
+ f.input.pu({...event('pointerup',7),isTrusted:true,timeStamp:performance.now()});
+ f.game.update(1/30);
+ assert.equal(f.seen[0].intent?.fire,true);
+ assert.equal(f.seen[0].firing,false);
+ f.game.update(1/30);
+ assert.equal(f.seen[1].intent,undefined);
+ assert.equal(f.owner.intents,1);
+ f.owner.detach();
+});
+test('raw pulse also refuses a physically stale trusted release',()=>{
+ const {SubtickFirePulse}=require('../research/subtick-fire-pulse.cjs');
+ const input={aim:{active:false,dx:0,dy:0},stickId:{aim:-1},firing:false,touchSeen:true};
+ const timeline={input,reset(){},releaseAll(){}};
+ let shots=0;
+ input.pd=function(e){this.stickId.aim=e.pointerId;this.aim.active=true;this.firing=true;};
+ input.pm=function(){this.aim.dx=30;};
+ input.pu=function(){this.stickId.aim=-1;this.aim.active=false;this.firing=false;};
+ const game={input,player:{id:1,alive:true},status:'playing',paused:false,
+  __testWindow:{document:{hidden:false}},
+  update(){if(this.input.firing&&this.input.aim.active)shots++;}};
+ const pulse=new SubtickFirePulse(game,timeline);
+ input.pd(event('pointerdown',7));input.pm(event('pointermove',7));
+ input.pu({...event('pointerup',7),isTrusted:true,
+  timeStamp:performance.now()-120});
+ game.update(1/30);
+ assert.equal(shots,0);
+ assert.equal(pulse.pulses,0);
+ pulse.detach();
+});
