@@ -101,3 +101,18 @@ test('new right thumb supersedes stale aim, while left movement thumb preserves 
  assert.equal(left.seen[0].intent?.fire,true,'left thumb must not cancel prior shot');
  left.owner.detach();
 });
+
+test('centered tick before first deflection must not consume a later short shot',()=>{
+ const f=setup();
+ f.input.pd(event('pointerdown',7));
+ f.game.update(1/30);
+ assert.equal(f.owner.pulse.down?.sampled,false,'centered tick has no firing bearing');
+ f.input.pm({...event('pointermove',7),dx:30,dy:0});
+ f.release(7);f.game.update(1/30);
+ assert.equal(f.seen.at(-1).intent?.fire,true);
+ assert.equal(f.owner.intents,1);f.owner.detach();
+ const centered=setup();centered.input.pd(event('pointerdown',7));
+ centered.game.update(1/30);centered.release(7);centered.game.update(1/30);
+ assert.equal(centered.owner.intents,0,'centered-only tap must never fire');
+ centered.owner.detach();
+});
