@@ -14,6 +14,7 @@ function create({maxSamples=7200}={}){
  if(!Number.isInteger(maxSamples)||maxSamples<60||maxSamples>20000)
   throw Error('invalid render sample bound');
  var active=false,mod=null,original=null,wrapper=null,count=0,sum=0,
+  over16=0,over33=0,
   peak=0,reason='not-started',restored=true;
  var samples=new Float64Array(maxSamples);
  function clock(){
@@ -44,6 +45,8 @@ function create({maxSamples=7200}={}){
    restored,frames:count,maxSamples,meanMs:count?round(sum/count):null,
    p50Ms:round(percentile(ordered,.5)),p95Ms:round(percentile(ordered,.95)),
    p99Ms:round(percentile(ordered,.99)),maxMs:count?round(peak):null,
+   renderOver16_67Pct:count?round(over16*100/count):null,
+   renderOver33_33Pct:count?round(over33*100/count):null,
    caveat:'JS render-call CPU only; excludes GPU completion and physical input latency'};
  }
  function start(){
@@ -54,7 +57,7 @@ function create({maxSamples=7200}={}){
   if(!candidate||typeof candidate.render!=='function')
    throw Error('final game renderer unavailable');
   clock();
-  mod=candidate;original=mod.render;count=0;sum=0;peak=0;
+  mod=candidate;original=mod.render;count=0;sum=0;peak=0;over16=0;over33=0;
   reason='running';restored=false;
   wrapper=function(g){
    var eligible=active&&g&&g.status==='playing'&&!g.paused&&
@@ -67,6 +70,7 @@ function create({maxSamples=7200}={}){
    try{ms=clock()-t0;}catch(error){stop('clock-error',false);throw error;}
    if(Number.isFinite(ms)&&ms>=0){
     samples[count++]=ms;sum+=ms;if(ms>peak)peak=ms;
+    if(ms>1000/60)over16++;if(ms>1000/30)over33++;
    }else{stop('invalid-duration',false);return out;}
    if(count>=maxSamples)stop('limit',false);
    return out;
