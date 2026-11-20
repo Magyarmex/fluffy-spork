@@ -143,7 +143,9 @@ const {chromium}=require('playwright');
   for(let i=0;i<8;i++){
    const before=await page.evaluate(()=>{
     const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
-    g.player.fireCd=0;g.bullets=[];g.input.firing=false;
+    g.player.fireCd=0;g.player.__v17Heat=.56;
+    g.player.__v17Stability=1;g.player.__v17FiredAt=-100;
+    g.bullets=[];g.input.firing=false;
     window.__novaTempestHpTarget.hp=100000;
     return {events:r.events.length,births:r.births.length,hits:r.hits.length};
    });
