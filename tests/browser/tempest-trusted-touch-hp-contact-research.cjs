@@ -14,8 +14,14 @@ const {chromium}=require('playwright');
   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({timeout:45000});
   await page.evaluate(()=>{
    const Game=window.__novaMakeRequire('')('game/engine').Game;
-   const start=Game.prototype.start,fire=Game.prototype.tryFire,damage=Game.prototype.damageTank;
-   window.__novaTempestHp={births:[],hits:[],events:[],targetReady:false};
+   const start=Game.prototype.start,fire=Game.prototype.tryFire,damage=Game.prototype.damageTank,
+    update=Game.prototype.update;
+   window.__novaTempestHp={births:[],hits:[],events:[],updates:[],targetReady:false};
+   Game.prototype.update=function(...args){
+    if(this===window.__novaTempestHpGame)
+     window.__novaTempestHp.updates.push({at:performance.now(),gameTime:this.time});
+    return update.apply(this,args);
+   };
    Game.prototype.start=function(...args){
     if(!this.__novaDecorativeWorld)window.__novaTempestHpGame=this;
     return start.apply(this,args);
@@ -147,7 +153,8 @@ const {chromium}=require('playwright');
     g.player.__v17Stability=1;g.player.__v17FiredAt=-100;
     g.bullets=[];g.input.firing=false;
     window.__novaTempestHpTarget.hp=100000;
-    return {events:r.events.length,births:r.births.length,hits:r.hits.length};
+    return {events:r.events.length,births:r.births.length,hits:r.hits.length,
+     updates:r.updates.length};
    });
    const touch={...origin,id:100+i};
    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[touch]});
@@ -159,12 +166,13 @@ const {chromium}=require('playwright');
    const trial=await page.evaluate(before=>{
     const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
     const events=r.events.slice(before.events),births=r.births.slice(before.births),
-     hits=r.hits.slice(before.hits);
+     hits=r.hits.slice(before.hits),updates=r.updates.slice(before.updates);
     const down=events.find(e=>e.type==='pointerdown');
     const move=events.find(e=>e.type==='pointermove');
     const up=events.find(e=>e.type==='pointerup'||e.type==='pointercancel');
     return {trusted:events.every(e=>e.trusted),down:!!down,move:!!move,
      up:!!up,durationMs:down&&up?up.at-down.at:null,
+     updatesDuringTouch:down&&up?updates.filter(u=>u.at>=down.at&&u.at<=up.at).length:null,
      moveToReleaseMs:move&&up?up.at-move.at:null,
      births:births.length,hits:hits.length,
      postReleaseBirths:up?births.filter(b=>b.at>up.at).length:null,
