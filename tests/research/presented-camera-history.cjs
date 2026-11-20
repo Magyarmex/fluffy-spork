@@ -35,7 +35,7 @@ class PresentedCameraHistory {
       if(this.frames[i].at<=at){frame=this.frames[i];break;}
     }
     if(!frame){this.misses++;return null;}
-    if(at-frame.at>this.maxAgeMs){this.stale++;return null;}
+    if(deliveryMs-at>this.maxAgeMs||at-frame.at>this.maxAgeMs){this.stale++;return null;}
     const wx=frame.x+(event.clientX-frame.left-frame.width*.5)/frame.zoom;
     const wy=frame.y+(event.clientY-frame.top-frame.height*.5)/frame.zoom;
     if(!Number.isFinite(wx)||!Number.isFinite(wy)){this.invalid++;return null;}
