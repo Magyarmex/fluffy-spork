@@ -253,6 +253,7 @@ test('visible inbound projectile pressure requires a live public intercept lane'
  shooter.alive=true;shooter.team=a.team;
  assert.equal(visibleInboundProjectileCount(T,g,observer,a),0,
   'friendly fire must not be counted as hostile pressure');
+ shooter.team=3;
  assert.equal(visibleInboundProjectileCount(T,g,observer,b),0,
   'a projectile heading away from the other candidate is not pressure');
 });
