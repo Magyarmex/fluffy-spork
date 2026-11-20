@@ -18,7 +18,8 @@ function run(cameraAtReplay,captureAtDom=true){
  let now=1000;
  const timeline=new ChronologicalInput(i);
  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000},{
-  captureMouseWorld:captureAtDom?e=>{
+  captureMouseWorld:captureAtDom==='throw'?()=>{throw Error('unavailable camera');}:
+   captureAtDom?e=>{
    const rect=i.canvas.getBoundingClientRect();
    return {x:g.cam.x+(e.clientX-rect.left-g.w*.5)/g.cam.zoom,
     y:g.cam.y+(e.clientY-rect.top-g.h*.5)/g.cam.zoom};
@@ -43,12 +44,12 @@ function run(cameraAtReplay,captureAtDom=true){
   assert.ok(Math.abs(owner.pending.durationMs-30)<1e-7);
   const result={worldX:owner.pending.world.x,worldY:owner.pending.world.y,
    durationMs:owner.pending.durationMs,applied:timeline.applied,
-   replayCameraX:g.cam.x};
+   projectionFailures:bridge.mouseProjectionFailures,replayCameraX:g.cam.x};
   return result;
  }finally{owner.detach();g.destroy();}
 }
 test('DOM-time world target resists late camera movement; legacy replay still drifts',()=>{
- const stable=run(0),moved=run(100),legacy=run(100,false);
+ const stable=run(0),moved=run(100),legacy=run(100,false),failed=run(100,'throw');
  assert.equal(stable.applied,2);assert.equal(moved.applied,2);
  assert.ok(Math.abs(stable.worldX-200)<1e-8);
  assert.ok(Math.abs(moved.worldX-stable.worldX)<1e-8,
@@ -56,8 +57,13 @@ test('DOM-time world target resists late camera movement; legacy replay still dr
  assert.ok(Math.abs(legacy.worldX-stable.worldX-100)<1e-8,
   'negative control must still reproduce the original 100-unit drift');
  assert.equal(stable.durationMs,moved.durationMs);
+ assert.equal(stable.projectionFailures,0);
+ assert.equal(moved.projectionFailures,0);
+ assert.equal(failed.projectionFailures,1,'failed projection must be observable');
+ assert.ok(Math.abs(failed.worldX-legacy.worldX)<1e-8,
+  'projection failure preserves legacy fallback rather than inventing a world point');
  console.log('MOUSE_LATE_REPLAY_CAMERA_RESEARCH '+JSON.stringify({
-  stable,moved,legacy,projectionDrift:moved.worldX-stable.worldX,
+  stable,moved,legacy,failed,projectionDrift:moved.worldX-stable.worldX,
   caveat:'research-only injected capture-time projection; constructed camera mutation, not physical Android validation'
  }));
 });
