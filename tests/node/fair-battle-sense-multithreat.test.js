@@ -215,6 +215,8 @@ test('real AI firing witness drives another observer crossfire without target-pl
  assert.equal(self.ai.__v181ObservedShotId,target.id,
   'observer must actually witness the AI-fired shot');
  assert.equal(self.ai.__v181ObservedShotAngle,0);
+ assert.equal(self.ai.__v181ObservedShotX,target.x);
+ assert.equal(self.ai.__v181ObservedShotY,target.y);
  g.__fireDuringAI=false;
  ai.updateAI(self,g,1/60);
  assert.equal(self.ai.__v1112TargetId,target.id);
