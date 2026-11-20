@@ -107,6 +107,8 @@ class ChronologicalInput {
       const evt = {type:e.kind, __novaOriginalAt:d.__novaOriginalAt,
         __novaTimestampTrusted:d.__novaTimestampTrusted,
         __novaPhysicalTimestampExact:d.__novaPhysicalTimestampExact,
+        // Preserve physical DOM-time mouse target across delayed replay.
+        __novaCaptureWorld:d.__novaCaptureWorld,
         __novaReplayAt:e.at, __novaSampleAt:end,
         pointerId:d.pointerId, pointerType:d.pointerType,
         clientX, clientY, buttons:d.buttons,
@@ -188,11 +190,12 @@ module.exports = {ChronologicalInput, FixedStepPresentation, STEP};
 const KINDS = new Set(['pointerdown','pointermove','pointerup','pointercancel',
   'keydown','keyup','blur']);
 class BrowserEventTimeline {
-  constructor(timeline, clock, {maxFutureMs = 32, maxStaleMs = 2000} = {}) {
+  constructor(timeline, clock, {maxFutureMs = 32, maxStaleMs = 2000, captureMouseWorld = null} = {}) {
     if (!timeline || typeof timeline.push !== 'function' ||
         !clock || typeof clock.now !== 'function' ||
         !Number.isFinite(maxFutureMs) || maxFutureMs < 0 ||
-        !Number.isFinite(maxStaleMs) || maxStaleMs < 0)
+        !Number.isFinite(maxStaleMs) || maxStaleMs < 0 ||
+        (captureMouseWorld !== null && typeof captureMouseWorld !== 'function'))
       throw Error('invalid browser event timeline');
     this.timeline = timeline;
     this.clock = clock;
@@ -200,6 +203,10 @@ class BrowserEventTimeline {
     if (!Number.isFinite(this.startMs)) throw Error('invalid browser clock');
     this.maxFutureMs = maxFutureMs;
     this.maxStaleMs = maxStaleMs;
+    // Optional research-only DOM-time world projection. A delayed timeline
+    // replay must not re-aim a mouse shot after the camera moves.
+    this.captureMouseWorld = captureMouseWorld;
+    this.mouseProjectionFailures = 0;
     this.lastAt = 0;
     this.futureClamps = 0;
     this.futureSkewClamps = 0;
@@ -440,6 +447,17 @@ class BrowserEventTimeline {
     // capture. A later layout translation must not turn aim into movement.
     // Resizes remain a separate, deliberately unpromoted safety gate.
     const canvasOrigin=capturedCanvasOrigin;
+    let mouseWorld=null;
+    if(this.captureMouseWorld && event.pointerType==='mouse' &&
+       event.type==='pointerup' && Number.isFinite(event.clientX) &&
+       Number.isFinite(event.clientY)){
+      try{
+        const projected=this.captureMouseWorld(event);
+        if(projected && Number.isFinite(projected.x) && Number.isFinite(projected.y))
+          mouseWorld=Object.freeze({x:projected.x,y:projected.y});
+        else this.mouseProjectionFailures++;
+      }catch(_){this.mouseProjectionFailures++;}
+    }
     const target = event.target;
     const data = event.type === 'blur' ? {} : {
       __novaOriginalAt: originalAt, __novaTimestampTrusted: timestampTrusted,
@@ -456,6 +474,7 @@ class BrowserEventTimeline {
       targetIsUI: !!(target && typeof target.closest === 'function' &&
         target.closest('[data-ui],[role="dialog"],[role="button"],[contenteditable="true"]')),
       __novaCanvasOrigin:canvasOrigin,
+      __novaCaptureWorld:mouseWorld,
       // Preserve accepted stick ownership through stale-event quarantine.
       __novaCanvasSide:event.type==='pointerdown' && canvasOrigin &&
         Number.isFinite(event.clientX) ?
@@ -991,7 +1010,22 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
   const {BrowserEventTimeline}=require('./fixed-step-browser-events.cjs');
   const {BrowserInputCapture}=require('./fixed-step-browser-capture.cjs');
   const timeline=new ChronologicalInput(game.input);
-  const bridge=new BrowserEventTimeline(timeline,clock);
+  const bridge=new BrowserEventTimeline(timeline,clock,{
+    // Only the research weapon-intent pilot needs DOM-time mouse projection.
+    // A camera shift between event capture and chronological replay must not
+    // change the player's chosen world point. Invalid geometry is counted
+    // by the bridge and falls back to the legacy replay-time projection.
+    captureMouseWorld:shotOnlyPulseFactory?e=>{
+      const cam=game.cam,rect=canvas.getBoundingClientRect();
+      const z=Number(cam?.zoom)||Number(game.zoom);
+      if(!cam||!Number.isFinite(z)||z<=0||!Number.isFinite(cam.x)||
+         !Number.isFinite(cam.y)||!Number.isFinite(rect.left)||
+         !Number.isFinite(rect.top)||!Number.isFinite(game.w)||
+         !Number.isFinite(game.h))return null;
+      return {x:cam.x+(e.clientX-rect.left-game.w*.5)/z,
+        y:cam.y+(e.clientY-rect.top-game.h*.5)/z};
+    }:null
+  });
   const capture=new BrowserInputCapture(game.input,canvas,timeline,bridge,
     {window:win,document:doc,game});
   let owner,pulse=null;
