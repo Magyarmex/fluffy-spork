@@ -275,3 +275,40 @@ test('real composed AI update wrapper is sensitive to hidden private assignment'
  assert.equal(deadA.chosen,deadB.chosen,
   'dead hidden AI assignments must not affect real wrapper target choice');
 });
+
+function existingShotWitnessPressure(g,observer,target,{maxAge=1.25,cone=.95}={}){
+ const a=observer&&observer.ai,now=Number(g.time);
+ if(!a||!Number.isFinite(now)||!Number.isFinite(a.__v181ObservedShotAt)||
+    now-a.__v181ObservedShotAt<0||now-a.__v181ObservedShotAt>maxAge||
+    !Number.isFinite(a.__v181ObservedShotAngle))return 0;
+ const shooter=g.getTank&&g.getTank(a.__v181ObservedShotId);
+ const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
+ if(!shooter||shooter===observer||shooter===target||shooter.alive===false||
+    !fair.inGameplayViewport(g,observer,shooter)||
+    !fair.inGameplayViewport(g,observer,target))return 0;
+ const angle=Math.atan2(target.y-shooter.y,target.x-shooter.x);
+ return Math.cos(angle-a.__v181ObservedShotAngle)>=cone?1:0;
+}
+test('existing observer-owned Battle Sense shot witness can inform public pressure without new bullet scan',()=>{
+ withSeed(1517822,()=>{
+  const s=scene();
+  try{
+   const {g,observer,left,right,other}=s;
+   other.x=0;other.y=-200;
+   const angle=Math.atan2(left.y-other.y,left.x-other.x);
+   Object.assign(observer.ai,{__v181ObservedShotId:other.id,
+    __v181ObservedShotAt:9.9,__v181ObservedShotAngle:angle});
+   assert.equal(existingShotWitnessPressure(g,observer,left),1);
+   assert.equal(existingShotWitnessPressure(g,observer,right),0);
+   other.ai.__v1112TargetId=right.id;
+   assert.equal(existingShotWitnessPressure(g,observer,left),1,
+    'the shooter private target slot is irrelevant to observed shot geometry');
+   observer.ai.__v181ObservedShotAt=8;
+   assert.equal(existingShotWitnessPressure(g,observer,left),0,
+    'old observed fire cannot become permanent target pressure');
+   observer.ai.__v181ObservedShotAt=9.9;other.x=2000;
+   assert.equal(existingShotWitnessPressure(g,observer,left),0,
+    'the prototype refuses to use a hidden shooter current position');
+  }finally{s.g.destroy();}
+ });
+});
