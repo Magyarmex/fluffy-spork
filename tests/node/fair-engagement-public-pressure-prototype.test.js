@@ -31,7 +31,8 @@ function scene(){
    y:i===3?2000:0,hp:100,maxHp:100,alive:true,
    spawnShieldT:0,cls:'twin',tier:1});
   Object.assign(t.ai,{state:i===3?'hunt':'wander',__v1112TargetId:-1,
-   __v1105TargetId:-1,__v180TargetId:-1,targetId:-1});
+   __v1105TargetId:-1,__v180TargetId:-1,targetId:-1,
+   __v180Posture:null,__v180LastAttacker:-1});
  }
  g.tanks=[observer,left,right,other];
  g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
