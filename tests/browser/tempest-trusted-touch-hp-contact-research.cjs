@@ -154,7 +154,10 @@ const {chromium}=require('playwright');
     g.player.fireCd=0;g.player.__v17Heat=.56;
     g.player.__v17Stability=1;g.player.__v17FiredAt=-100;
     g.bullets=[];g.input.firing=false;
-    window.__novaTempestHpTarget.hp=100000;
+    Object.assign(g.player,{x:0,y:0,vx:0,vy:0,angle:0});
+    Object.assign(window.__novaTempestHpTarget,
+     {x:58,y:-23,vx:0,vy:0,hp:100000});
+    if(g.hash?.clear){g.hash.clear();for(const t of g.tanks)g.hash.insert(t);}
     return {events:r.events.length,births:r.births.length,hits:r.hits.length,
      updates:r.updates.length};
    });
