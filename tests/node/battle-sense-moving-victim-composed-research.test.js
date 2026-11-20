@@ -65,6 +65,7 @@ test('real composed projectile birth records the shot before victim relocation c
   const third=tank(9003,0,100,{});
   g.time=10;g.status='playing';g.paused=false;
   shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
+  g.cam.x=0;g.cam.y=0;g.cam.zoom=1;
   observer.x=-100;observer.y=0;
   g.hasLineOfSight=()=>true;
   g.__novaFairShotWitnesses=[observer];
