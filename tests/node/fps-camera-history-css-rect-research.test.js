@@ -56,3 +56,22 @@ test('untrusted and stale event timestamps never borrow historical geometry',()=
  assert.equal(history.invalid,1);
  assert.equal(history.stale,1);
 });
+
+test('deterministic CSS-scale metamorphic oracle preserves world aim over 2,000 layouts',()=>{
+ let seed=1517800;
+ const rand=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296;};
+ for(let i=0;i<2000;i++){
+  const width=200+rand()*1200,height=200+rand()*900;
+  const rectWidth=100+rand()*1400,rectHeight=100+rand()*1000;
+  const left=-200+rand()*400,top=-100+rand()*200;
+  const x=-500+rand()*1000,y=-500+rand()*1000,zoom=.3+rand()*3;
+  const u=rand(),v=rand();
+  const g=geometry({width,height,rectWidth,rectHeight,left,top,x,y,zoom});
+  const pointer=[left+u*rectWidth,top+v*rectHeight];
+  const p=project(g,pointer);
+  const expectedX=x+(u-.5)*width/zoom;
+  const expectedY=y+(v-.5)*height/zoom;
+  assert.ok(Math.abs(p.x-expectedX)<1e-8,'world x must be CSS-scale invariant');
+  assert.ok(Math.abs(p.y-expectedY)<1e-8,'world y must be CSS-scale invariant');
+ }
+});
