@@ -56,6 +56,7 @@ class ExplicitShotIntent {
     ?p.physicalAt-p.physicalDownAt:null;
    const canPlay=!!p&&p.player===game.player&&game.player?.alive===true&&
      age>=0&&age<=50&&
+     (p.physicalDownAt===null)===(p.physicalAt===null)&&
      (physicalAge===null||(physicalAge>=0&&physicalAge<=50))&&
      (holdMs===null||(holdMs>=0&&holdMs<=50))&&
      game.status==='playing'&&!game.paused&&!input.__novaInputPaused&&
