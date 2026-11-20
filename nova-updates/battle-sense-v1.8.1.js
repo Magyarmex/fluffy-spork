@@ -75,7 +75,7 @@ wrap('game/engine',function(engine){var Game=engine.Game;if(!Game||Game.prototyp
   if(fair&&typeof fair.inGameplayViewport==='function'&&!fair.inGameplayViewport(this,o,victim))continue;
   if(!visible(this,o,victim))continue;
   if(!observedVictims)observedVictims=new WeakSet();
-  observedVictims.add(victim);observedCount++;
+  if(!observedVictims.has(victim)){observedVictims.add(victim);observedCount++;}
  }
  o.ai.__v181ObservedShotVictims=observedVictims;
  o.ai.__v181ObservedShotVictimCount=observedCount;
