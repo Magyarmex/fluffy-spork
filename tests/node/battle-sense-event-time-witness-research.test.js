@@ -211,6 +211,20 @@ test('dead victim and replacement with reused ID cannot inherit a shot witness',
    'new tank object with reused ID cannot inherit old event-time witness');
  }finally{w.g.destroy();}
 });
+test('replacement shooter with reused ID cannot inherit the previous shot',()=>{
+ const w=scene();
+ try{
+  w.third.x=100;w.third.y=0;
+  w.observer.ai.__v181ObservedShotVictims=[w.third];
+  w.observer.ai.__v181ObservedShooterRef=w.target;
+  assert.equal(w.weight(),.62);
+  const replacement=tank(w.target.id,0,0,{});
+  w.g.tanks=[w.observer,replacement,w.third];
+  w.g.__novaFairVisibleTanks=w.g.tanks;
+  assert.equal(w.helper.thirdPartyVector(w.g,w.observer,replacement,{}).weight,0,
+   'a new shooter object with the same numeric ID must not inherit the shot');
+ }finally{w.g.destroy();}
+});
 test('research fixture uses canonical materialized 49-overlay composition',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  const scripts=[...html.matchAll(/<script[^>]+src=["']\.\/(nova-updates\/[^"']+)["']/g)];
