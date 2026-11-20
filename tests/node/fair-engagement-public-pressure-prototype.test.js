@@ -166,3 +166,36 @@ test('trajectory witness rejects departing, expired and near-miss projectiles',(
   }finally{s.g.destroy();}
  });
 });
+
+test('natural composed match samples public-pressure candidate incidence without changing AI',()=>{
+ for(const seed of [1517800,1517802]){
+  withSeed(seed,()=>{
+   const g=bootGame();
+   try{
+    g.sfx.muted=true;g.sfx.startMusic=()=>{};
+    g.status='playing';g.paused=false;
+    const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
+    const stats={seed,frames:0,visiblePairs:0,privateAssignments:0,
+     proximityPositive:0,projectilePositive:0};
+    for(let frame=0;frame<120;frame++){
+     g.update(1/60);stats.frames++;
+     if(frame%12!==0)continue;
+     const observers=g.tanks.filter(t=>t&&t.ai&&t.alive!==false).slice(0,5);
+     for(const observer of observers)for(const target of g.tanks){
+      if(!target||target===observer||target.alive===false||
+         !fair.inGameplayViewport(g,observer,target))continue;
+      if(typeof g.areAllies==='function'&&g.areAllies(observer,target))continue;
+      stats.visiblePairs++;
+      if(fair.saturation(g,target.id,observer.id)>0)stats.privateAssignments++;
+      if(publicPressure(g,observer,target)>0)stats.proximityPositive++;
+      if(publicProjectileThreat(g,observer,target)>0)stats.projectilePositive++;
+     }
+    }
+    assert.equal(stats.frames,120,'natural game must execute the full sample');
+    console.log('NOVA_PUBLIC_PRESSURE_NATURAL_RESEARCH '+JSON.stringify(stats));
+    // Descriptive incidence only; neither a causal AI-balance result nor a
+    // performance/device benchmark. No gameplay logic is patched.
+   }finally{g.destroy();}
+  });
+ }
+});
