@@ -96,8 +96,10 @@ function visibleInboundProjectileCount(T,g,observer,target,C=classes){
     typeof g.hasLineOfSight!=='function')return 0;
  // The exact owner ID is not public evidence. Only a recent, observer-owned
  // witnessed shooter may anchor an inbound lane; no private target slots.
- const witnessedId=observer.ai&&observer.ai.__v181ObservedShotId;
- if(witnessedId==null)return 0;
+ const a=observer.ai||{},witnessedId=a.__v181ObservedShotId;
+ const age=Number(g.time)-Number(a.__v181ObservedShotAt);
+ if(witnessedId==null||!Number.isFinite(age)||age<0||age>1.25||
+    !Number.isFinite(Number(a.__v181ObservedShotAngle)))return 0;
  const ext=T.viewportHalfExtents(g);
  let checkedWitness=false,shooter=null;
  for(const b of g.bullets||[]){
@@ -284,6 +286,12 @@ test('visible inbound projectile pressure requires a live public intercept lane'
  shooter.team=3;
  assert.equal(visibleInboundProjectileCount(T,g,observer,b),0,
   'a projectile heading away from the other candidate is not pressure');
+ g.bullets=[{x:40,y:0,vx:200,vy:0,r:3,ttl:1,ownerId:shooter.id}];
+ observer.ai.__v181ObservedShotAt=g.time-2;
+ let staleLOS=0;g.hasLineOfSight=()=>{staleLOS++;return true;};
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),0);
+ assert.equal(staleLOS,0,'stale public shot must avoid terrain queries');
+ observer.ai.__v181ObservedShotAt=g.time-.1;
  let losCalls=0;g.bullets=[];
  g.hasLineOfSight=()=>{losCalls++;return true;};
  assert.equal(visibleInboundProjectileCount(T,g,observer,a),0);
