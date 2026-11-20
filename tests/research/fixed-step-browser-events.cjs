@@ -21,6 +21,7 @@ class BrowserEventTimeline {
     // Optional research-only DOM-time world projection. A delayed timeline
     // replay must not re-aim a mouse shot after the camera moves.
     this.captureMouseWorld = captureMouseWorld;
+    this.mouseProjectionFailures = 0;
     this.lastAt = 0;
     this.futureClamps = 0;
     this.futureSkewClamps = 0;
@@ -269,7 +270,8 @@ class BrowserEventTimeline {
         const projected=this.captureMouseWorld(event);
         if(projected && Number.isFinite(projected.x) && Number.isFinite(projected.y))
           mouseWorld=Object.freeze({x:projected.x,y:projected.y});
-      }catch(_){/* Invalid projection is not a license to invent a target. */}
+        else this.mouseProjectionFailures++;
+      }catch(_){this.mouseProjectionFailures++;}
     }
     const target = event.target;
     const data = event.type === 'blur' ? {} : {
