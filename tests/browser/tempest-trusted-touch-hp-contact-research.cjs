@@ -57,6 +57,7 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
      const valid=latchMode&&p&&p.player===this.player&&this.player?.alive&&
       this.status==='playing'&&!this.paused&&!this.input?.__novaInputPaused&&
       !document.hidden&&this.input?.stickId?.aim===-1&&
+      !this.input?.firing&&!this.input?.aim?.active&&
       now-p.at>=0&&now-p.at<=50;
      const input=this.input,aim=input.aim;
      const prior={firing:input.firing,active:aim.active,dx:aim.dx,dy:aim.dy};
