@@ -162,10 +162,15 @@ const {chromium}=require('playwright');
      updates:r.updates.length};
    });
    const touch={...origin,id:100+i};
-   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[touch]});
-   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
-    {...touch,x:touch.x+35,y:touch.y-20}]});
-   await page.waitForTimeout(20);
+   // Queue the start and move in protocol order without waiting for two
+   // separate CDP round trips; those added ~45ms before the aim deflection.
+   const startDelivery=cdp.send('Input.dispatchTouchEvent',
+    {type:'touchStart',touchPoints:[touch]});
+   const moveDelivery=cdp.send('Input.dispatchTouchEvent',{type:'touchMove',
+    touchPoints:[{...touch,x:touch.x+35,y:touch.y-20}]});
+   await Promise.all([startDelivery,moveDelivery]);
+   // Node's timer is independent of the page's throttled RAF clock.
+   await new Promise(resolve=>setTimeout(resolve,20));
    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
    await page.waitForTimeout(140);
    const trial=await page.evaluate(before=>{
