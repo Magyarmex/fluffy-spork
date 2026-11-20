@@ -87,15 +87,16 @@ function targetDanger(classes,t){
   return clamp(v,0,1);
 }
 function saturation(g,targetId,selfId){
-  var n=0,ts=g&&g.tanks||[];
+  var n=0,ts=g&&g.tanks||[],target=null;
+  for(var j=0;j<ts.length;j++)if(ts[j]&&ts[j].id===targetId){target=ts[j];break;}
   for(var i=0;i<ts.length;i++){
     var q=ts[i];if(!q||q.id===selfId||!q.ai||!alive(q))continue;
     var a=q.ai,id=a.__v1112TargetId>=0?a.__v1112TargetId:(a.__v1105TargetId>=0?a.__v1105TargetId:(a.__v180TargetId>=0?a.__v180TargetId:a.targetId));
-    if(id===targetId&&hostile(g,q,(g.tanks||[]).find(function(t){return t&&t.id===targetId;}))&&(a.state==='hunt'||a.__v180Posture==='pressure'||a.__v180Posture==='flank'||a.__v180Posture==='route'))n++;
+    if(id===targetId&&hostile(g,q,target)&&(a.state==='hunt'||a.__v180Posture==='pressure'||a.__v180Posture==='flank'||a.__v180Posture==='route'))n++;
   }
   return n;
 }
-/* During one target choice the other tanks' target slots cannot change.
+/* An ally's target slot is not evidence of hostile pressure. This narrows\n * phantom saturation but does not make other bots' private slots public.\n * During one target choice the other tanks' target slots cannot change.
  * Count pressure assignments once instead of rescanning every AI tank for
  * every candidate. The observer itself is excluded exactly as before. */
 function saturationSnapshot(g,selfId){
