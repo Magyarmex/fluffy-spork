@@ -241,3 +241,30 @@ test('moving public target can cross a shot lane that static trajectory misses',
   }finally{s.g.destroy();}
  });
 });
+
+test('real composed AI update wrapper is sensitive to hidden private assignment',()=>{
+ function run(arm){
+  return withSeed(1517820,()=>{
+   const s=scene();
+   try{
+    const {g,fair,observer,left,right,other}=s;
+    const ai=g.__testWindow.__novaMakeRequire('')('game/ai');
+    const classes=g.__testWindow.__novaMakeRequire('')('game/classes');
+    const baseline=fair.chooseTarget(g,classes,observer,observer.ai,g.time);
+    assert.ok(baseline===left||baseline===right);
+    other.ai.__v1112TargetId=arm===0?baseline.id:(baseline===left?right:left).id;
+    observer.ai.__v1112NextThink=-1;
+    observer.ai.__v1112TargetId=-1;
+    observer.ai.__v1112InjectedId=-1;
+    ai.updateAI(observer,g,1/60);
+    return {chosen:observer.ai.__v1112TargetId,
+     expected:arm===0?(baseline===left?right:left).id:baseline.id};
+   }finally{s.g.destroy();}
+  });
+ }
+ const a=run(0),b=run(1);
+ assert.equal(a.chosen,a.expected);
+ assert.equal(b.chosen,b.expected);
+ assert.notEqual(a.chosen,b.chosen,
+  'actual shipping AI wrapper changes target from invisible private AI slot');
+});
