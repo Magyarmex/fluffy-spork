@@ -200,3 +200,15 @@ test('stalled long trusted hold is not mistaken for a short unsampled press',()=
  assert.equal(f.owner.pulse.pulses,0);
  f.owner.detach();
 });
+
+test('short physical hold may recover late within its independent release budget',()=>{
+ const f=setup(),now=performance.now();
+ f.input.pd({...event('pointerdown',7),isTrusted:true,timeStamp:now-60});
+ f.input.pm({...event('pointermove',7),dx:30,dy:0});
+ f.input.pu({...event('pointerup',7),isTrusted:true,timeStamp:now-40});
+ f.game.update(1/30);
+ assert.equal(f.seen[0].intent?.fire,true,
+  '20ms physical hold plus 40ms release-to-tick is still legal');
+ assert.equal(f.owner.intents,1);
+ f.owner.detach();
+});
