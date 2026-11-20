@@ -999,3 +999,50 @@ test('composed drone damage would forge a naive visible-owner hit witness',()=>{
   }finally{g.destroy();}
  });
 });
+
+
+// Composed splash attribution control: the tank credited for an explosion
+// need not have a currently visible projectile. The Blast Hardening scope is
+// authoritative evidence of splash, not proof of a direct shooter hit.
+test('composed splash marks physical blast cause before owner-credit witness',()=>{
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  const owner=g.player;
+  const [victim,observer]=g.tanks.filter(t=>t&&t.ai&&!t.isPlayer);
+  assert.ok(owner&&victim&&observer);
+  try{
+   g.sfx.muted=true;
+   g.setClass(owner,'scout');
+   for(const [t,x,y] of [[owner,0,0],[victim,70,0],[observer,0,90]])
+    Object.assign(t,{x,y,vx:0,vy:0,hp:1000,maxHp:1000,alive:true,
+     spawnShieldT:0,shieldT:0,bulwarkT:0,invulnT:0,tauntT:0});
+   g.tanks=[owner,victim,observer];
+   g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
+   g.shapes=[];g.drones=[];g.bullets=[];g.__novaTerrain=[];
+   g.__novaBattlefieldIndex=null;g.tmp=[];
+   if(g.hash&&g.hash.clear)g.hash.clear();
+   for(const t of g.tanks)g.hash.insert(t);
+   g.w=800;g.h=600;g.cam.zoom=1;g.time=10;
+   const T=g.__testFair,C=g.__testWindow.__novaMakeRequire('')('game/classes');
+   const original=g.damageTank;
+   let splashContacts=0,naiveWitnesses=0;
+   g.damageTank=function(target,amount,srcId,...rest){
+    const before=target.hp,blast=!!this.__v172HardBlast?.active;
+    const out=original.call(this,target,amount,srcId,...rest);
+    if(target===victim&&target.hp<before){
+     splashContacts++;
+     assert.ok(blast,'blast context must be active during physical damage');
+     assert.equal(srcId,owner.id,'splash credits explosion owner');
+     if(recordVisibleHit(T,this,observer,owner,target,C))naiveWitnesses++;
+    }
+    return out;
+   };
+   g.splashAt(0,0,120,.5,owner.id,0,'#fff',60);
+   assert.ok(splashContacts>0,'real composed blast must reduce victim HP');
+   assert.equal(g.bullets.length,0,'blast fixture emitted no projectile');
+   assert.ok(naiveWitnesses>0,'owner-ID witness wrongly implies direct fire');
+   assert.equal(g.__v172HardBlast.active,false,'blast scope must restore');
+  }finally{g.destroy();}
+ });
+});
