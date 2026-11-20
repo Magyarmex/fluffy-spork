@@ -37,7 +37,7 @@ test('opt-in fixed60 factory preserves CSS-scaled canvas center world target',()
   const expected={x:20,y:-10}; // physical CSS-rect center
   assert.ok(Math.abs(captured.x-expected.x)<1e-8&&
     Math.abs(captured.y-expected.y)<1e-8,
-   'CSS-scaled pointer center must remain the camera world center');
+   'CSS-scaled pointer center must remain the camera world center: '+JSON.stringify({captured,expected,bridgeFailures:pilot.bridge.mouseProjectionFailures,queued:pilot.timeline.applied,zoom:g.cam.zoom,cam:g.cam,worldFromBridge:pilot.bridge.captureMouseWorld&&pilot.bridge.captureMouseWorld(event('pointerup',1130,0))}));
   console.log('FIXED60_CSS_MOUSE_CAPTURE_PARITY '+JSON.stringify({
    expected,captured,canvasInternal:{w:800,h:600},
    canvasPresented:{w:400,h:300},
