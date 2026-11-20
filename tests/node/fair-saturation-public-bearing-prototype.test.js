@@ -606,7 +606,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
         physicalDamageEvents: 0, potentialHitWitnessPairs: 0,
         droneDamageEvents: 0, reflectionDamageEvents: 0,
         splashDamageEvents: 0, bodyDamageEvents: 0,
-        knownNonProjectileWitnessPairs: 0,
+        nestedDamageEvents: 0, knownNonProjectileWitnessPairs: 0,
         maxPotentialHitWitnessPairs: 0,
         acceptedHitWitnessPairs: 0, hitWitnessLOSCalls: 0,
         hitChangedSelections: 0, hitHumanSelections: 0,
@@ -617,7 +617,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
       const hadOwnDrones=Object.prototype.hasOwnProperty.call(g,'updateDrones');
       const originalBodies=g.bodyCollisions;
       const hadOwnBodies=Object.prototype.hasOwnProperty.call(g,'bodyCollisions');
-      let droneScope=0,bodyScope=0;
+      let droneScope=0,bodyScope=0,damageDepth=0;
       if(observe)g.updateDrones=function(...args){
         droneScope++;
         try{return originalDrones.apply(this,args);}finally{droneScope--;}
@@ -627,20 +627,24 @@ test('natural composed worlds report public-bearing sensitivity without changing
         try{return originalBodies.apply(this,args);}finally{bodyScope--;}
       };
       if(observe)g.damageTank=function(victim,amount,srcId,...rest){
-        const hp=Number(victim&&victim.hp);
-        const out=originalDamage.call(this,victim,amount,srcId,...rest);
+        const hp=Number(victim&&victim.hp),nested=damageDepth>0;
+        let out;
+        damageDepth++;
+        try{out=originalDamage.call(this,victim,amount,srcId,...rest);}
+        finally{damageDepth--;}
         if(Number.isFinite(hp)&&victim&&victim.hp<hp){
           result.physicalDamageEvents++;
           // A physical call-site scope can disprove a credited owner as the
           // actual shooter. Reflection outranks its nested caller; splash
           // outranks the generic owner ID. Unclassified is NOT projectile.
           const nonProjectile=this.__v17ReflectingIronWill?'reflection':
-            this.__v172HardBlast?.active?'splash':
+            nested?'nested':this.__v172HardBlast?.active?'splash':
             droneScope?'drone':bodyScope?'body':null;
           if(nonProjectile==='drone')result.droneDamageEvents++;
           if(nonProjectile==='reflection')result.reflectionDamageEvents++;
           if(nonProjectile==='splash')result.splashDamageEvents++;
           if(nonProjectile==='body')result.bodyDamageEvents++;
+          if(nonProjectile==='nested')result.nestedDamageEvents++;
           const shooter=(this.tanks||[]).find(t=>t&&t.id===srcId);
           if(shooter&&shooter!==victim){
             let possible=0,accepted=0;
@@ -749,6 +753,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
           else delete g.bodyCollisions;
           assert.equal(droneScope,0,'research drone scope must not leak');
           assert.equal(bodyScope,0,'research body scope must not leak');
+          assert.equal(damageDepth,0,'research damage recursion must unwind');
         }
         g.destroy();
       }
@@ -790,6 +795,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
       reflectionDamageEvents: observed.reflectionDamageEvents,
       splashDamageEvents: observed.splashDamageEvents,
       bodyDamageEvents: observed.bodyDamageEvents,
+      nestedDamageEvents: observed.nestedDamageEvents,
       knownNonProjectileWitnessPairs: observed.knownNonProjectileWitnessPairs,
       potentialHitWitnessPairs: observed.potentialHitWitnessPairs,
       acceptedHitWitnessPairs: observed.acceptedHitWitnessPairs,
@@ -1109,6 +1115,49 @@ test('composed tank collision credits non-firing hull as damage owner',()=>{
    assert.equal(g.bullets.length,0,'colliding hull fired no projectile');
    assert.ok(naiveWitnesses>0,'owner-ID witness confuses collision with fire');
    assert.equal(inBody,false,'body provenance scope must clear');
+  }finally{g.destroy();}
+ });
+});
+
+
+// Core Guardian-style taunt reflection is a separate recursive damageTank
+// cause, even without the later Iron Will overlay's explicit reflection flag.
+// Its credited defender ID must not certify that the defender fired.
+test('composed core taunt reflection credits non-firing defender via nested damage',()=>{
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  const defender=g.player,attacker=g.tanks.find(t=>t&&t!==defender);
+  assert.ok(defender&&attacker);
+  try{
+   g.sfx.muted=true;
+   g.setClass(defender,'scout');g.setClass(attacker,'scout');
+   Object.assign(defender,{x:0,y:0,hp:1000,maxHp:1000,alive:true,
+    spawnShieldT:0,shieldT:0,bulwarkT:0,invulnT:0,tauntT:2});
+   Object.assign(attacker,{x:100,y:0,hp:1000,maxHp:1000,alive:true,
+    spawnShieldT:0,shieldT:0,bulwarkT:0,invulnT:0,tauntT:0});
+   g.tanks=[defender,attacker];
+   g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
+   g.bullets=[];g.drones=[];g.__novaTerrain=[];g.time=10;
+   const original=g.damageTank,events=[];
+   let depth=0;
+   g.damageTank=function(target,amount,srcId,...rest){
+    const nested=depth>0,wasIronWill=!!this.__v17ReflectingIronWill;
+    const before=target.hp;
+    depth++;
+    let out;
+    try{out=original.call(this,target,amount,srcId,...rest);}
+    finally{depth--;}
+    if(target.hp<before)events.push({target:target.id,srcId,nested,wasIronWill});
+    return out;
+   };
+   g.damageTank(defender,20,attacker.id);
+   assert.equal(depth,0,'nested damage scope must unwind');
+   assert.equal(g.bullets.length,0,'defender did not fire');
+   assert.ok(events.some(e=>e.target===attacker.id&&
+    e.srcId===defender.id&&e.nested&&!e.wasIronWill),
+    'core taunt must credit non-firing defender without Iron Will flag');
+   assert.ok(attacker.hp<1000,'real nested reflection must damage attacker');
   }finally{g.destroy();}
  });
 });
