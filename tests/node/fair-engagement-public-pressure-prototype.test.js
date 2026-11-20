@@ -297,6 +297,8 @@ test('existing observer-owned Battle Sense shot witness can inform public pressu
   try{
    const {g,observer,left,right,other}=s;
    other.x=0;other.y=-200;
+   // Controlled open lane: isolate witness semantics from seeded terrain.
+   g.hasLineOfSight=()=>true;
    const angle=Math.atan2(left.y-other.y,left.x-other.x);
    Object.assign(observer.ai,{__v181ObservedShotId:other.id,
     __v181ObservedShotAt:9.9,__v181ObservedShotAngle:angle});
