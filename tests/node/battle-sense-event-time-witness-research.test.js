@@ -170,6 +170,29 @@ test('cached candidate never bypasses trusted shot origin and bearing',()=>{
   assert.equal(w.weight(),0,'invalid historical origin cannot authenticate cached duel');
  }finally{w.g.destroy();}
 });
+test('two observers receive different public victim memories for the same shot',()=>{
+ const g=bootGame();
+ try{
+  const shooter=g.player,observers=g.tanks.filter(t=>t!==shooter&&t.ai).slice(0,2);
+  assert.equal(observers.length,2);
+  const [a,b]=observers,third=tank(9003,100,0,{});
+  g.time=10;g.status='playing';g.paused=false;
+  shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
+  a.x=-100;a.y=0;b.x=-150;b.y=100;
+  g.tanks=[a,b,shooter,third];g.__novaFairVisibleTanks=g.tanks;
+  g.areHostile=()=>true;g.areAllies=()=>false;
+  g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===b.x&&ay===b.y&&bx===third.x&&by===third.y);
+  g.__novaFairShotWitnesses=[a,b];
+  const before=g.bullets.length;g.tryFire(shooter);
+  assert.ok(g.bullets.length>before);
+  assert.equal(a.ai.__v181ObservedShotId,shooter.id);
+  assert.equal(b.ai.__v181ObservedShotId,shooter.id);
+  assert.ok(a.ai.__v181ObservedShotVictims.includes(third),
+   'observer A saw the victim in the shot lane');
+  assert.equal(b.ai.__v181ObservedShotVictims.includes(third),false,
+   'observer B cannot inherit A\'s victim knowledge through cover');
+ }finally{g.destroy();}
+});
 test('research fixture uses canonical materialized 49-overlay composition',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  const scripts=[...html.matchAll(/<script[^>]+src=["']\.\/(nova-updates\/[^"']+)["']/g)];
