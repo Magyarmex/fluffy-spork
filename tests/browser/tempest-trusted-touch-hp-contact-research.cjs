@@ -375,9 +375,18 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
      'second thumb must not steal the actual aim owner');
     assert.equal(twoFinger.physical,rightOwner,
      'physical aim owner must match tracked right stick');
+    // Release aim while the movement thumb remains down; neither stick may
+    // steal the other's ownership or force a movement release.
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[left]});
+    await page.waitForFunction(()=>{
+     const i=window.__novaTempestHpGame.input;
+     return i.stickId.aim===-1&&i.stickId.move>=0;
+    },null,{timeout:5000});
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-    await page.waitForFunction(()=>window.__novaTempestHpGame.input.stickId.aim===-1,
-     null,{timeout:5000});
+    await page.waitForFunction(()=>{
+     const i=window.__novaTempestHpGame.input;
+     return i.stickId.aim===-1&&i.stickId.move===-1;
+    },null,{timeout:5000});
    }
   }
   if(explicitMode){
