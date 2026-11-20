@@ -5,11 +5,12 @@
 const KINDS = new Set(['pointerdown','pointermove','pointerup','pointercancel',
   'keydown','keyup','blur']);
 class BrowserEventTimeline {
-  constructor(timeline, clock, {maxFutureMs = 32, maxStaleMs = 2000} = {}) {
+  constructor(timeline, clock, {maxFutureMs = 32, maxStaleMs = 2000, captureMouseWorld = null} = {}) {
     if (!timeline || typeof timeline.push !== 'function' ||
         !clock || typeof clock.now !== 'function' ||
         !Number.isFinite(maxFutureMs) || maxFutureMs < 0 ||
-        !Number.isFinite(maxStaleMs) || maxStaleMs < 0)
+        !Number.isFinite(maxStaleMs) || maxStaleMs < 0 ||
+        (captureMouseWorld !== null && typeof captureMouseWorld !== 'function'))
       throw Error('invalid browser event timeline');
     this.timeline = timeline;
     this.clock = clock;
@@ -17,6 +18,9 @@ class BrowserEventTimeline {
     if (!Number.isFinite(this.startMs)) throw Error('invalid browser clock');
     this.maxFutureMs = maxFutureMs;
     this.maxStaleMs = maxStaleMs;
+    // Optional research-only DOM-time world projection. A delayed timeline
+    // replay must not re-aim a mouse shot after the camera moves.
+    this.captureMouseWorld = captureMouseWorld;
     this.lastAt = 0;
     this.futureClamps = 0;
     this.futureSkewClamps = 0;
@@ -257,6 +261,16 @@ class BrowserEventTimeline {
     // capture. A later layout translation must not turn aim into movement.
     // Resizes remain a separate, deliberately unpromoted safety gate.
     const canvasOrigin=capturedCanvasOrigin;
+    let mouseWorld=null;
+    if(this.captureMouseWorld && event.pointerType==='mouse' &&
+       event.type==='pointerup' && Number.isFinite(event.clientX) &&
+       Number.isFinite(event.clientY)){
+      try{
+        const projected=this.captureMouseWorld(event);
+        if(projected && Number.isFinite(projected.x) && Number.isFinite(projected.y))
+          mouseWorld=Object.freeze({x:projected.x,y:projected.y});
+      }catch(_){/* Invalid projection is not a license to invent a target. */}
+    }
     const target = event.target;
     const data = event.type === 'blur' ? {} : {
       __novaOriginalAt: originalAt, __novaTimestampTrusted: timestampTrusted,
@@ -273,6 +287,7 @@ class BrowserEventTimeline {
       targetIsUI: !!(target && typeof target.closest === 'function' &&
         target.closest('[data-ui],[role="dialog"],[role="button"],[contenteditable="true"]')),
       __novaCanvasOrigin:canvasOrigin,
+      __novaCaptureWorld:mouseWorld,
       // Preserve accepted stick ownership through stale-event quarantine.
       __novaCanvasSide:event.type==='pointerdown' && canvasOrigin &&
         Number.isFinite(event.clientX) ?
