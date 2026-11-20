@@ -33,7 +33,7 @@ function witnessedOpening(g,classes,t,target,now){if(!target||!visible(g,t,targe
 function witnessedDuel(g,observer,target,third){
  var a=observer&&observer.ai,now=Number(g&&g.time)||0;
  var at=a&&a.__v181ObservedShotAt;
- if(!a||!Number.isFinite(at)||now-at<0||now-at>1.25)return false;
+ if(!a||!Number.isFinite(at)||at<0||now-at<0||now-at>1.25)return false;
  var shooter=a.__v181ObservedShotId===target.id?target:
    a.__v181ObservedShotId===third.id?third:null;
  if(!shooter)return false;
