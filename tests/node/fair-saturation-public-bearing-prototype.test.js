@@ -908,3 +908,57 @@ test('composed legacy drone contact credits owner without Controller dash flag',
   }finally{g.destroy();}
  });
 });
+
+
+// Research falsification: a credited owner is NOT proof that the owner fired.
+// The legacy gene drone hits through the composed updateDrones path; a naive
+// srcId-based public witness accepts that owner as a shooter despite zero
+// projectile births. This must be rejected by a typed physical-cause gate
+// before the hit-pressure prototype can be considered for production.
+test('composed drone damage would forge a naive visible-owner hit witness',()=>{
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  const owner=g.player;
+  const [victim,observer]=g.tanks.filter(t=>t&&t.ai&&!t.isPlayer);
+  assert.ok(owner&&victim&&observer);
+  try{
+   g.sfx.muted=true;
+   g.setClass(owner,'scout');owner.gene='controller';
+   Object.assign(owner,{x:0,y:0,vx:0,vy:0,hp:1000,maxHp:1000,
+    alive:true,spawnShieldT:0,droneRespawnT:Infinity,swarmT:0});
+   Object.assign(victim,{x:70,y:0,vx:0,vy:0,hp:1000,maxHp:1000,
+    alive:true,spawnShieldT:0,shieldT:0,bulwarkT:0,invulnT:0});
+   Object.assign(observer,{x:0,y:90,vx:0,vy:0,hp:1000,maxHp:1000,
+    alive:true,spawnShieldT:0,shieldT:0,bulwarkT:0,invulnT:0});
+   g.tanks=[owner,victim,observer];
+   g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
+   g.drones=[];g.bullets=[];g.shapes=[];g.__novaTerrain=[];
+   g.__novaBattlefieldIndex=null;
+   g.w=800;g.h=600;g.cam.zoom=1;g.time=10;
+   g.spawnDrone(owner,0);
+   assert.equal(g.drones.length,1);
+   Object.assign(g.drones[0],{x:65,y:0,speed:0,attackCd:0,
+    targetRef:victim,targetId:victim.id,retargetT:1,hitFlash:0});
+   const T=g.__testFair,C=g.__testWindow.__novaMakeRequire('')('game/classes');
+   const original=g.damageTank;
+   let contact=0,forged=0;
+   g.damageTank=function(target,amount,srcId,...rest){
+    const before=target.hp;
+    const out=original.call(this,target,amount,srcId,...rest);
+    if(target===victim&&target.hp<before){
+     contact++;
+     assert.equal(srcId,owner.id,'drone hit credits its owner');
+     if(recordVisibleHit(T,this,observer,owner,target,C))forged++;
+    }
+    return out;
+   };
+   g.updateDrones(1/60);
+   assert.ok(contact>0,'real gene drone must damage victim');
+   assert.equal(g.bullets.length,0,'credited owner fired no projectile');
+   assert.ok(forged>0,'naive srcId witness falsely treats drone owner as shooter');
+   assert.equal(confirmedHitCount(g,observer,victim),1,
+    'naive hit-pressure count is contaminated by owner attribution');
+  }finally{g.destroy();}
+ });
+});
