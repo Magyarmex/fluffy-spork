@@ -225,6 +225,45 @@ function world() {
     cam: { zoom: 1 }, time: 10, hasLineOfSight: () => true };
   return { g, observer, a, b, hidden };
 }
+test('visible inbound projectile pressure requires a live public intercept lane',()=>{
+ const T=boot(),{g,observer,a,b}=world();
+ const shooter=tank(22,0,90,3,0);
+ g.tanks.push(shooter);
+ a.x=100;a.y=0;a.r=15;a.vx=0;a.vy=0;
+ g.bullets=[{x:40,y:0,vx:200,vy:0,r:3,ttl:1,ownerId:shooter.id}];
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),1,
+  'visible projectile with visible shooter and clear intercept is pressure');
+ g.bullets.push({...g.bullets[0],x:50});
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),1,
+  'two rounds from one owner must not double-count saturation');
+ g.bullets[0].ttl=.05;g.bullets[1].ttl=.05;
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),0,
+  'rounds expiring before intercept are not pressure');
+ g.bullets[0].ttl=1;g.bullets[1].ttl=1;
+ g.hasLineOfSight=()=>false;
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),0,
+  'cover must suppress apparent inbound lanes');
+ g.hasLineOfSight=()=>true;
+ shooter.x=2000;shooter.y=2000;
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),0,
+  'offscreen shooter identity is not public evidence');
+ assert.equal(visibleInboundProjectileCount(T,g,observer,b),0,
+  'a projectile heading away from the other candidate is not pressure');
+});
+test('visible projectile choice ignores offscreen private intent and offscreen bullets',()=>{
+ const T=boot(),{g,observer,a,b,hidden}=world();
+ const shooter=tank(22,0,90,3,0);
+ g.tanks.push(shooter);
+ g.bullets=[{x:40,y:0,vx:200,vy:0,r:3,ttl:1,ownerId:shooter.id},
+  {x:2000,y:2000,vx:-500,vy:-500,r:3,ttl:1,ownerId:hidden.id}];
+ hidden.ai.__v1112TargetId=a.id;
+ const first=publicChoice(T,g,observer,classes,'projectile')?.id;
+ hidden.ai.__v1112TargetId=b.id;
+ const second=publicChoice(T,g,observer,classes,'projectile')?.id;
+ assert.equal(first,second,'private hidden target assignments cannot change choice');
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),1,
+  'offscreen projectile cannot add pressure to a visible candidate');
+});
 test('public base score exactly matches shipping before private saturation', () => {
   const T = boot(), { g, observer, a, b, hidden } = world();
   for (const target of [a, b]) {
