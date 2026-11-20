@@ -12,7 +12,7 @@ function setup({epoch=false}={}){
  const history=new PresentedCameraHistory({maxAgeMs:120});
  history.record(1090,geometry(0));
  history.record(1160,geometry(100));
- let now=1200;
+ let now=1000;
  const accepted=[];
  const timeline={sampled:0,last:0,input:{},push(at,kind,data){
   accepted.push({at,kind,data});this.last=at;return true;
@@ -35,7 +35,7 @@ function setup({epoch=false}={}){
  return {history,bridge,accepted,release,setNow:v=>{now=v;}};
 }
 test('late DOM delivery keeps last physically presented world target across camera motion',()=>{
- const s=setup();
+ const s=setup();s.setNow(1200);
  assert.equal(s.bridge.capture(s.release()),true);
  assert.equal(s.accepted.length,1);
  const e=s.accepted[0];
@@ -50,7 +50,7 @@ test('late DOM delivery keeps last physically presented world target across came
  assert.notEqual(e.data.__novaCaptureWorld.x,300);
 });
 test('epoch-style DOM timestamps can share the same physical camera clock',()=>{
- const s=setup({epoch:true});
+ const s=setup({epoch:true});s.setNow(1200);
  assert.equal(s.bridge.capture(s.release()),true);
  assert.deepEqual(s.accepted[0].data.__novaCaptureWorld,{x:200,y:0});
  assert.ok(Math.abs(s.accepted[0].at-.13)<1e-9);
@@ -61,7 +61,7 @@ test('old camera frames and untrusted DOM timestamps never invent targets',()=>{
  assert.equal(s.bridge.capture(s.release()),true);
  assert.equal(s.accepted[0].data.__novaCaptureWorld,null);
  assert.equal(s.bridge.mouseProjectionFailures,1);
- const t=setup();
+ const t=setup();t.setNow(1200);
  assert.equal(t.bridge.capture(t.release(0)),true);
  assert.equal(t.accepted[0].data.__novaTimestampTrusted,false);
  assert.equal(t.accepted[0].data.__novaCaptureWorld,null);
