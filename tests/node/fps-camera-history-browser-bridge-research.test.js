@@ -124,3 +124,26 @@ test('future-skewed and future-clamped releases cannot borrow a historical camer
   if(physical>1232)assert.equal(s.accepted[0].data.__novaTimestampTrusted,false);
  }
 });
+
+test('camera history must sample inside interpolated render before pose restoration',()=>{
+ const {FixedStepPosePresentation}=require('../research/fixed-step-presentation.cjs');
+ const game={cam:{x:0,y:0},player:null,status:'playing',paused:false,
+  tanks:[],drones:[],shapes:[],bullets:[],
+  update(){this.cam.x+=60;},destroy(){}};
+ const pose=new FixedStepPosePresentation(game,{enabled:true});
+ const h=new PresentedCameraHistory();
+ try{
+  game.update(1/60);
+  assert.equal(game.cam.x,60);
+  pose.draw((g)=>{
+   assert.equal(g.cam.x,30,'the canvas sees an interpolated camera');
+   assert.equal(h.record(1000,geometry(g.cam.x)),true);
+  },game,800,600,.5);
+  assert.equal(game.cam.x,60,'render must restore authoritative simulation camera');
+  const projected=h.project({clientX:600,clientY:300},
+   {timestampTrusted:true,timestampExact:true,physicalAtMs:1010,deliveryMs:1020});
+  assert.equal(projected.x,230);
+  assert.notEqual(projected.x,260,
+   'post-render simulation camera is not the displayed camera');
+ }finally{pose.stop();}
+});
