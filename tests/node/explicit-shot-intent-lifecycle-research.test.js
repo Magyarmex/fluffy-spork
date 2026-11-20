@@ -70,3 +70,14 @@ test('detach and destroy restore original update and hook owners',()=>{
  assert.equal(g.game.destroyed,true);
  assert.equal(g.owner.pulse,null);
 });
+test('stale queued release and dead player never fire a delayed weapon intent',async()=>{
+ const stale=setup();stale.press();stale.release();
+ await new Promise(resolve=>setTimeout(resolve,75));
+ stale.game.update(1/30);
+ assert.equal(stale.seen[0].intent,undefined,'expired release must not fire late');
+ stale.owner.detach();
+ const dead=setup();dead.press();dead.release();dead.game.player.alive=false;
+ dead.game.update(1/30);
+ assert.equal(dead.seen[0].intent,undefined,'dead player cannot fire queued intent');
+ dead.owner.detach();
+});
