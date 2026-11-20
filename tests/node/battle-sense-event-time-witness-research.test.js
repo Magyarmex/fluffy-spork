@@ -70,6 +70,7 @@ test('real composed projectile birth does not recognize a victim absent at firin
   g.cam.x=0;g.cam.y=0;g.cam.zoom=1;
   observer.x=-100;observer.y=0;
   g.hasLineOfSight=()=>true;
+  g.tanks=[observer,shooter];
   g.__novaFairShotWitnesses=[observer];
   const before=g.bullets.length;
   g.tryFire(shooter);
