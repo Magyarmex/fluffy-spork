@@ -206,6 +206,28 @@ test('actual Live Vector + Fair Engagement engine wrappers drive AI swarm throug
   assert.equal(g.getTank, originalGetTank, 'temporary bridge restored after engine update');
   assert.equal(a.ai.targetId, 8, 'real AI target restored');
   assert.equal(a.ai.__v1112TargetId, 8, 'fair perception target not overwritten');
+  // The actual composed engine wrapper must obey the same neutral acquisition
+  // rule; a source-extracted helper test alone does not prove runtime wiring.
+  const human = {
+    id: 9, cls: 'gunner', team: 2, x: 315, y: 0,
+    hp: 100, maxHp: 100, vx: 0, vy: 0, alive: true,
+    spawnShieldT: 0, isPlayer: true
+  };
+  g.tanks = [a, rival, human];
+  g.player = human;
+  a.__novaLiveVectorAI = null;
+  a.ai.targetId = -1;
+  g.time = 2;
+  g.updateDrones(1 / 60);
+  assert.equal(a.__novaLiveVectorAI.targetId, rival.id,
+    'composed AI Controller must not prefer a farther human');
+  human.x = 290;
+  a.__novaLiveVectorAI = null;
+  a.ai.targetId = -1;
+  g.time = 3;
+  g.updateDrones(1 / 60);
+  assert.equal(a.__novaLiveVectorAI.targetId, human.id,
+    'composed AI Controller may target a genuinely nearer human');
   // Shared View must never resurrect a target explicitly rejected by the
   // later Fair Engagement contract, even though its old planner can see it.
   for (const cls of controllerClasses) for (const hz of [30,60,120,240]) {
