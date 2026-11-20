@@ -56,6 +56,35 @@ test('composed Battle Sense: victim departure can erase a genuine witnessed firi
   assert.equal(w.weight(),0,'cover must still veto the inferred crossfire');
  }finally{w.g.destroy();}
 });
+test('real composed projectile birth records the shot before victim relocation changes crossfire',()=>{
+ const g=bootGame(),helper=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__;
+ try{
+  const shooter=g.player;
+  const observer=g.tanks.find(t=>t!==shooter&&t.ai);
+  assert.ok(shooter&&observer,'composed Game must provide a player and AI witness');
+  const third=tank(9003,0,100,{});
+  g.time=10;g.status='playing';g.paused=false;
+  shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
+  observer.x=-100;observer.y=0;
+  g.hasLineOfSight=()=>true;
+  g.__novaFairShotWitnesses=[observer];
+  const before=g.bullets.length;
+  g.tryFire(shooter);
+  assert.ok(g.bullets.length>before,'actual shipping Game must emit a projectile');
+  assert.equal(observer.ai.__v181ObservedShotId,shooter.id);
+  assert.equal(observer.ai.__v181ObservedShotX,0);
+  assert.equal(observer.ai.__v181ObservedShotY,0);
+  assert.equal(observer.ai.__v181ObservedShotAngle,0);
+  g.tanks=[observer,shooter,third];
+  g.__novaFairVisibleTanks=g.tanks;
+  g.areHostile=()=>true;g.areAllies=()=>false;
+  g.time=10.5;
+  assert.equal(helper.thirdPartyVector(g,observer,shooter,{}).weight,0);
+  third.x=100;third.y=0;
+  assert.equal(helper.thirdPartyVector(g,observer,shooter,{}).weight,.62,
+   'victim movement must reproduce the same defect after a real shot birth');
+ }finally{g.destroy();}
+});
 test('research fixture uses canonical materialized 49-overlay composition',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  const scripts=[...html.matchAll(/<script[^>]+src=["']\.\/(nova-updates\/[^"']+)["']/g)];
