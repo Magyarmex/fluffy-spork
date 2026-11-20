@@ -91,7 +91,8 @@ function witnessedShotCount(T, g, observer, target, C = classes) {
 // One owner contributes at most one pressure unit per target, so rapid-fire
 // classes do not manufacture arbitrary saturation merely by bullet count.
 function visibleInboundProjectileCount(T,g,observer,target,C=classes){
- if(!observer||!target||!T.canPerceive(g,C,observer,target)||
+ if(!observer||!target||!Number.isFinite(Number(g&&g.time))||
+    !T.canPerceive(g,C,observer,target)||
     typeof g.hasLineOfSight!=='function')return 0;
  // A projectile owner ID is not public by itself. Anchor it to the
  // observer's own recently witnessed shooter and shot bearing first.
@@ -238,6 +239,10 @@ test('visible inbound projectile pressure requires a live public intercept lane'
  g.bullets=[{x:40,y:0,vx:200,vy:0,r:3,ttl:1,ownerId:shooter.id}];
  assert.equal(visibleInboundProjectileCount(T,g,observer,a),1,
   'visible projectile with visible shooter and clear intercept is pressure');
+ const savedTime=g.time;g.time=NaN;
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),0,
+  'invalid match time cannot certify recent witnessed fire');
+ g.time=savedTime;
  g.bullets.push({...g.bullets[0],x:50});
  assert.equal(visibleInboundProjectileCount(T,g,observer,a),1,
   'two rounds from one owner must not double-count saturation');
