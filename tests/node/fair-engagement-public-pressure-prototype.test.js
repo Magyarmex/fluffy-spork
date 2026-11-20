@@ -204,11 +204,12 @@ test('natural composed match samples public-pressure candidate incidence without
     g.sfx.muted=true;g.sfx.startMusic=()=>{};
     g.status='playing';g.paused=false;
     const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
-    const stats={seed,frames:0,visiblePairs:0,privateAssignments:0,
+    const stats={seed,frames:0,playingFrames:0,visiblePairs:0,privateAssignments:0,
      proximityPositive:0,projectilePositive:0,witnessPositive:0,
      bodyChecks:0,bulletChecks:0,eligiblePairs:0,nearestPairDistance:null};
     for(let frame=0;frame<720;frame++){
      g.update(1/60);stats.frames++;
+     if(g.status==='playing')stats.playingFrames++;
      if(frame%30!==0)continue;
      const observers=g.tanks.filter(t=>t&&t.ai&&t.alive!==false);
      for(const observer of observers)for(const target of g.tanks){
@@ -231,6 +232,7 @@ test('natural composed match samples public-pressure candidate incidence without
      }
     }
     assert.equal(stats.frames,720,'natural game must execute the full sample');
+    stats.finalStatus=g.status;
     console.log('NOVA_PUBLIC_PRESSURE_NATURAL_RESEARCH '+JSON.stringify(stats));
     // Descriptive incidence only; neither a causal AI-balance result nor a
     // performance/device benchmark. No gameplay logic is patched.
