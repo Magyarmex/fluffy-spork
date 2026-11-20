@@ -93,13 +93,17 @@ function witnessedShotCount(T, g, observer, target, C = classes) {
 function visibleInboundProjectileCount(T,g,observer,target,C=classes){
  if(!observer||!target||!T.canPerceive(g,C,observer,target)||
     typeof g.hasLineOfSight!=='function')return 0;
+ // A projectile owner ID is not public by itself. Anchor it to the
+ // observer's own recently witnessed shooter and shot bearing first.
+ if(!witnessedShotCount(T,g,observer,target,C))return 0;
+ const witnessedId=observer.ai&&observer.ai.__v181ObservedShotId;
  const owners=new Set(),ext=T.viewportHalfExtents(g);
  for(const b of g.bullets||[]){
   if(!b||b.dead||!(Number(b.ttl)>0)||!Number.isFinite(b.x)||
      !Number.isFinite(b.y)||!Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
      Math.abs(b.x-observer.x)>ext.x||Math.abs(b.y-observer.y)>ext.y)continue;
   const shooter=(g.tanks||[]).find(t=>t&&t.id===b.ownerId);
-  if(!shooter||shooter===observer||shooter===target||
+  if(!shooter||shooter.id!==witnessedId||shooter===observer||shooter===target||
      !hostile(g,shooter,target)||!T.canPerceive(g,C,observer,shooter)||
      owners.has(shooter.id))continue;
   const dx=target.x-b.x,dy=target.y-b.y;
@@ -229,7 +233,10 @@ test('visible inbound projectile pressure requires a live public intercept lane'
  const T=boot(),{g,observer,a,b}=world();
  const shooter=tank(22,0,90,3,0);
  g.tanks.push(shooter);
- a.x=100;a.y=0;a.r=15;a.vx=0;a.vy=0;
+ observer.ai.__v181ObservedShotId=shooter.id;
+ observer.ai.__v181ObservedShotAt=g.time-.1;
+ observer.ai.__v181ObservedShotAngle=Math.atan2(-90,100);
+ a.x=a.y=0;a.r=15;a.vx=0;a.vy=0;
  g.bullets=[{x:40,y:0,vx:200,vy:0,r:3,ttl:1,ownerId:shooter.id}];
  assert.equal(visibleInboundProjectileCount(T,g,observer,a),1,
   'visible projectile with visible shooter and clear intercept is pressure');
@@ -261,6 +268,9 @@ test('visible projectile choice ignores offscreen private intent and offscreen b
  const T=boot(),{g,observer,a,b,hidden}=world();
  const shooter=tank(22,0,90,3,0);
  g.tanks.push(shooter);
+ observer.ai.__v181ObservedShotId=shooter.id;
+ observer.ai.__v181ObservedShotAt=g.time-.1;
+ observer.ai.__v181ObservedShotAngle=Math.atan2(-90,100);
  g.bullets=[{x:40,y:0,vx:200,vy:0,r:3,ttl:1,ownerId:shooter.id},
   {x:2000,y:2000,vx:-500,vy:-500,r:3,ttl:1,ownerId:hidden.id}];
  hidden.ai.__v1112TargetId=a.id;
