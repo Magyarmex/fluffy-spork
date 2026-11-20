@@ -10,14 +10,20 @@ const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {BrowserEventTimeline}=require('../research/fixed-step-browser-events.cjs');
 
-function run(cameraAtReplay){
+function run(cameraAtReplay,captureAtDom=true){
  const g=bootGame(),i=g.input,win=g.__testWindow;
  g.sfx.muted=true;i.autofire=false;
  g.status='playing';g.paused=false;
  Object.assign(g.cam,{x:0,y:0,zoom:1});
  let now=1000;
  const timeline=new ChronologicalInput(i);
- const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000});
+ const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000},{
+  captureMouseWorld:captureAtDom?e=>{
+   const rect=i.canvas.getBoundingClientRect();
+   return {x:g.cam.x+(e.clientX-rect.left-g.w*.5)/g.cam.zoom,
+    y:g.cam.y+(e.clientY-rect.top-g.h*.5)/g.cam.zoom};
+  }:null
+ });
  const owner=new DirectShotIntent(g,{window:win,document:win.document,
   rebindDomListeners:false,requireTrustedDuration:true,eventOriginMs:1000,
   maxIntentAgeMs:100,nowMs:()=>1180});
@@ -41,19 +47,17 @@ function run(cameraAtReplay){
   return result;
  }finally{owner.detach();g.destroy();}
 }
-test('research: observe late mouse projection drift without freezing it as desired behavior',()=>{
- const stable=run(0),moved=run(100);
+test('DOM-time world target resists late camera movement; legacy replay still drifts',()=>{
+ const stable=run(0),moved=run(100),legacy=run(100,false);
  assert.equal(stable.applied,2);assert.equal(moved.applied,2);
  assert.ok(Math.abs(stable.worldX-200)<1e-8);
- const drift=moved.worldX-stable.worldX;
- // Current research implementation drifts by +100; a future correct
- // capture-time projection should instead produce zero. Neither outcome
- // is a desired golden until browser-trusted behavior establishes the fix.
- assert.ok(Math.abs(drift)<1e-8||Math.abs(drift-100)<1e-8,
-  'unexpected mouse target projection outside the two researched policies');
+ assert.ok(Math.abs(moved.worldX-stable.worldX)<1e-8,
+  'a captured physical world target must not drift with the replay camera');
+ assert.ok(Math.abs(legacy.worldX-stable.worldX-100)<1e-8,
+  'negative control must still reproduce the original 100-unit drift');
  assert.equal(stable.durationMs,moved.durationMs);
  console.log('MOUSE_LATE_REPLAY_CAMERA_RESEARCH '+JSON.stringify({
-  stable,moved,projectionDrift:moved.worldX-stable.worldX,
-  caveat:'constructed camera mutation between DOM capture and replay; no browser-trusted frequency or player damage established'
+  stable,moved,legacy,projectionDrift:moved.worldX-stable.worldX,
+  caveat:'research-only injected capture-time projection; constructed camera mutation, not physical Android validation'
  }));
 });
