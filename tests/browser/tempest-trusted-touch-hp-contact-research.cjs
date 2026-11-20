@@ -135,6 +135,55 @@ const {chromium}=require('playwright');
   assert.equal(report.aimActive,false);
   assert.equal(report.firing,false);
   assert.equal(errors.length,0,'no browser page errors: '+JSON.stringify(errors));
+  // Diagnostic only: a ~20ms trusted touch is shorter than a 30Hz frame.
+  // Never require a shot on every short gesture: Chromium delivery phase,
+  // presentation cadence and OS scheduling vary. Record real event timing,
+  // physical HP contact and any post-release births without forcing a frame.
+  const shortTrials=[];
+  for(let i=0;i<8;i++){
+   const before=await page.evaluate(()=>{
+    const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
+    g.player.fireCd=0;g.bullets=[];g.input.firing=false;
+    window.__novaTempestHpTarget.hp=100000;
+    return {events:r.events.length,births:r.births.length,hits:r.hits.length};
+   });
+   const touch={...origin,id:100+i};
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[touch]});
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+    {...touch,x:touch.x+35,y:touch.y-20}]});
+   await page.waitForTimeout(20);
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+   await page.waitForTimeout(140);
+   const trial=await page.evaluate(before=>{
+    const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
+    const events=r.events.slice(before.events),births=r.births.slice(before.births),
+     hits=r.hits.slice(before.hits);
+    const down=events.find(e=>e.type==='pointerdown');
+    const move=events.find(e=>e.type==='pointermove');
+    const up=events.find(e=>e.type==='pointerup'||e.type==='pointercancel');
+    return {trusted:events.every(e=>e.trusted),down:!!down,move:!!move,
+     up:!!up,durationMs:down&&up?up.at-down.at:null,
+     moveToReleaseMs:move&&up?up.at-move.at:null,
+     births:births.length,hits:hits.length,
+     postReleaseBirths:up?births.filter(b=>b.at>up.at).length:null,
+     aimActive:g.input.aim.active,firing:g.input.firing,
+     stickId:g.input.stickId.aim};
+   },before);
+   assert.ok(trial.trusted&&trial.down&&trial.move&&trial.up,
+    'short trial must deliver trusted down/move/release');
+   assert.equal(trial.postReleaseBirths,0,
+    'short touch must not create projectiles after release');
+   assert.equal(trial.aimActive,false,'short trial must release aim ownership');
+   assert.equal(trial.firing,false,'short trial must release firing');
+   assert.equal(trial.stickId,-1,'short trial must clear aim pointer ID');
+   shortTrials.push(trial);
+  }
+  console.log('NOVA_TEMPEST_TRUSTED_20MS_DIAGNOSTIC '+JSON.stringify({
+   requestedHoldMs:20,attempts:shortTrials.length,
+   shotTrials:shortTrials.filter(t=>t.births>0).length,
+   hitTrials:shortTrials.filter(t=>t.hits>0).length,
+   trials:shortTrials
+  }));
   console.log('NOVA_TEMPEST_TRUSTED_TOUCH_REAL_HP '+JSON.stringify(report));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
