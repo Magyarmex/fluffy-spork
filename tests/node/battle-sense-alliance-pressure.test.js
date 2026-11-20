@@ -4,9 +4,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function loadBattleSense() {
+function loadBattleSense({spawnShot = false} = {}) {
   function Game() {}
-  Game.prototype.tryFire = function () {};
+  Game.prototype.tryFire = function (shooter) {
+    if (spawnShot) this.bullets.push({x:shooter.x,y:shooter.y});
+  };
   Game.prototype.updatePowerups = function () {};
   const modules = {
     'game/engine': function (module) { module.exports = { Game }; },
@@ -27,9 +29,9 @@ function loadBattleSense() {
     });
     return module.exports;
   }
-  load('game/engine');
+  const engine=load('game/engine');
   load('game/ai');
-  return context.window.__NOVA_BATTLE_SENSE_TEST__;
+  return Object.assign(context.window.__NOVA_BATTLE_SENSE_TEST__,{Game:engine.Game});
 }
 
 function tank(id, teamId, x = 0, y = 0) {
@@ -93,4 +95,27 @@ test('Battle Sense witnessed crossfire keeps its event-time firing origin after 
  observer.ai.__v181ObservedShotX=NaN;
  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
   'missing trusted origin fails closed instead of reading current hull location');
+});
+
+test('actual Battle Sense tryFire witness stores firing origin only on real projectile birth',()=>{
+ const helper=loadBattleSense({spawnShot:true}),g=new helper.Game();
+ const shooter={...tank(1,undefined,25,40),angle:Math.PI/4};
+ const observer={...tank(2,undefined,80,40),ai:{}};
+ Object.assign(g,{bullets:[],tanks:[shooter,observer],time:10,hasLineOfSight:()=>true});
+ g.tryFire(shooter);
+ assert.equal(g.bullets.length,1);
+ assert.equal(observer.ai.__v181ObservedShotId,shooter.id);
+ assert.equal(observer.ai.__v181ObservedShotX,25);
+ assert.equal(observer.ai.__v181ObservedShotY,40);
+ assert.equal(observer.ai.__v181ObservedShotAngle,Math.PI/4);
+ shooter.x=200;shooter.y=-90;
+ assert.equal(observer.ai.__v181ObservedShotX,25,
+  'subsequent shooter movement cannot mutate the captured shot origin');
+ assert.equal(observer.ai.__v181ObservedShotY,40);
+ const noShot=loadBattleSense(),empty=new noShot.Game();
+ const other={...tank(3,undefined,10,10),ai:{}};
+ Object.assign(empty,{bullets:[],tanks:[shooter,other],time:10,hasLineOfSight:()=>true});
+ empty.tryFire(shooter);
+ assert.equal(other.ai.__v181ObservedShotX,undefined,
+  'failed/no-projectile fire attempt cannot create an observed origin');
 });
