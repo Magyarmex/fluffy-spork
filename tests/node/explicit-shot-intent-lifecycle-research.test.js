@@ -116,3 +116,27 @@ test('centered tick before first deflection must not consume a later short shot'
  assert.equal(centered.owner.intents,0,'centered-only tap must never fire');
  centered.owner.detach();
 });
+
+test('raw subtick pulse also rejects stale and dead-owner firing',async()=>{
+ const {SubtickFirePulse}=require('../research/subtick-fire-pulse.cjs');
+ for(const mode of ['stale','dead']){
+  const input={aim:{active:false,dx:0,dy:0},stickId:{aim:-1},firing:false,touchSeen:true};
+  const timeline={input,reset(){},releaseAll(){}};
+  let shots=0;
+  input.pd=function(e){this.stickId.aim=e.pointerId;this.aim.active=true;this.firing=true;};
+  input.pm=function(){this.aim.dx=30;};
+  input.pu=function(){this.stickId.aim=-1;this.aim.active=false;this.firing=false;};
+  const game={input,player:{id:1,alive:true},status:'playing',paused:false,
+   __testWindow:{document:{hidden:false}},
+   update(){if(this.input.firing&&this.input.aim.active&&this.input.aim.dx>=9)shots++;}};
+  const pulse=new SubtickFirePulse(game,timeline);
+  input.pd(event('pointerdown',7));input.pm(event('pointermove',7));
+  input.pu(event('pointerup',7));
+  if(mode==='stale')await new Promise(resolve=>setTimeout(resolve,75));
+  if(mode==='dead')game.player.alive=false;
+  game.update(1/30);
+  assert.equal(shots,0,mode+' raw pulse cannot replay a revoked shot');
+  assert.equal(pulse.pulses,0,mode+' cannot count a recovered shot');
+  pulse.detach();
+ }
+});
