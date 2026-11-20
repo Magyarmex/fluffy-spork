@@ -250,7 +250,7 @@ test('visible inbound projectile pressure requires a live public intercept lane'
  observer.ai.__v181ObservedShotId=shooter.id;
  observer.ai.__v181ObservedShotAt=g.time-.1;
  observer.ai.__v181ObservedShotAngle=Math.atan2(-90,100);
- a.x=a.y=0;a.r=15;a.vx=0;a.vy=0;
+ a.x=100;a.y=0;a.r=15;a.vx=0;a.vy=0;
  g.bullets=[{x:40,y:0,vx:200,vy:0,r:3,ttl:1,ownerId:shooter.id}];
  assert.equal(visibleInboundProjectileCount(T,g,observer,a),1,
   'visible projectile with visible shooter and clear intercept is pressure');
