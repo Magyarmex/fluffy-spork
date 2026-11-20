@@ -239,6 +239,8 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
     const previousUpdate=move?[...r.updates].reverse().find(u=>u.at<=move.at):null;
     const nextUpdate=move?r.updates.find(u=>u.at>move.at):null;
     return {recoveredIntents:latches.length,
+     recoveredLatencyMs:latches.map(l=>l.at-l.releaseAt),
+     postReleaseProjectileLatencyMs:up?births.filter(b=>b.at>up.at).map(b=>b.at-up.at):[],
      phaseSincePreviousUpdateMs:previousUpdate?move.at-previousUpdate.at:null,
      phaseUntilNextUpdateMs:nextUpdate?nextUpdate.at-move.at:null,
      trusted:events.every(e=>e.trusted),down:!!down,move:!!move,
@@ -262,8 +264,12 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
     'a delivered deflection must occur within the measured touch lifetime');
    // A short move may be coalesced before release. Record that as an input
    // delivery outcome rather than falsely requiring an aim deflection.
-   if(latchMode)assert.ok(trial.postReleaseBirths<=trial.recoveredIntents,
-    'only a bounded deliberate intent may fire after release');
+   if(latchMode){
+    assert.ok(trial.postReleaseBirths<=trial.recoveredIntents,
+     'only a bounded deliberate intent may fire after release');
+    assert.ok(trial.recoveredLatencyMs.every(ms=>ms>=0&&ms<=50),
+     'a recovered shot intent must expire after 50ms');
+   }
    else assert.equal(trial.postReleaseBirths,0,
     'baseline short touch must not create projectiles after release');
    assert.equal(trial.aimActive,false,'short trial must release aim ownership');
