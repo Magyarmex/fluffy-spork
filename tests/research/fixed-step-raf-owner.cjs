@@ -378,10 +378,16 @@ function createFixedStepBrowserPilot(game,{window:win,document:doc,clock,
       const z=Number(cam?.zoom)||Number(game.zoom);
       if(!cam||!Number.isFinite(z)||z<=0||!Number.isFinite(cam.x)||
          !Number.isFinite(cam.y)||!Number.isFinite(rect.left)||
-         !Number.isFinite(rect.top)||!Number.isFinite(game.w)||
-         !Number.isFinite(game.h))return null;
-      return {x:cam.x+(e.clientX-rect.left-game.w*.5)/z,
-        y:cam.y+(e.clientY-rect.top-game.h*.5)/z};
+         !Number.isFinite(rect.top)||!Number.isFinite(rect.width)||
+         !Number.isFinite(rect.height)||rect.width<=0||rect.height<=0||
+         !Number.isFinite(game.w)||!Number.isFinite(game.h)||
+         !(game.w>0)||!(game.h>0)||!Number.isFinite(e.clientX)||
+         !Number.isFinite(e.clientY))return null;
+      // DOM events use the presented CSS rectangle, not Game's internal
+      // canvas-space width/height. Preserve the visual world target when
+      // CSS transforms scale or translate the canvas.
+      return {x:cam.x+((e.clientX-rect.left)/rect.width-.5)*game.w/z,
+        y:cam.y+((e.clientY-rect.top)/rect.height-.5)*game.h/z};
     }:null
   });
   const capture=new BrowserInputCapture(game.input,canvas,timeline,bridge,
