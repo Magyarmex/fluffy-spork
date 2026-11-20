@@ -4,10 +4,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function loadBattleSense({spawnShot = false} = {}) {
+function loadBattleSense({spawnShot = false, moveAfterShot = false} = {}) {
   function Game() {}
   Game.prototype.tryFire = function (shooter) {
     if (spawnShot) this.bullets.push({x:shooter.x,y:shooter.y});
+    if (moveAfterShot) { shooter.x += 90; shooter.y -= 60; }
   };
   Game.prototype.updatePowerups = function () {};
   const modules = {
@@ -98,7 +99,7 @@ test('Battle Sense witnessed crossfire keeps its event-time firing origin after 
 });
 
 test('actual Battle Sense tryFire witness stores firing origin only on real projectile birth',()=>{
- const helper=loadBattleSense({spawnShot:true}),g=new helper.Game();
+ const helper=loadBattleSense({spawnShot:true,moveAfterShot:true}),g=new helper.Game();
  const shooter={...tank(1,undefined,25,40),angle:Math.PI/4};
  const observer={...tank(2,undefined,80,40),ai:{}};
  Object.assign(g,{bullets:[],tanks:[shooter,observer],time:10,hasLineOfSight:()=>true});
@@ -108,6 +109,8 @@ test('actual Battle Sense tryFire witness stores firing origin only on real proj
  assert.equal(observer.ai.__v181ObservedShotX,25);
  assert.equal(observer.ai.__v181ObservedShotY,40);
  assert.equal(observer.ai.__v181ObservedShotAngle,Math.PI/4);
+ assert.equal(shooter.x,115,'test weapon mutates hull after projectile birth');
+ assert.equal(shooter.y,-20);
  shooter.x=200;shooter.y=-90;
  assert.equal(observer.ai.__v181ObservedShotX,25,
   'subsequent shooter movement cannot mutate the captured shot origin');
