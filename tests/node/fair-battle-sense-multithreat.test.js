@@ -389,3 +389,31 @@ test('49-overlay Game records real player projectile firing origin for a legitim
   }finally{g.destroy();}
  });
 });
+
+test('composed Fair Engagement rejects incomplete time-zero shot knowledge',()=>{
+ for(const invalid of [undefined,null,'0',-1]){
+  const {g,ai,self}=scene();
+  g.time=0;
+  self.ai.__v181ObservedShotAt=invalid;
+  ai.updateAI(self,g,1/60);
+  assert.notEqual(self.ai.__v181Mode,'crossfire',
+   'no synthetic duel from invalid time '+String(invalid));
+  assert.equal(self.ai.__v1112TargetId,2,
+   'invalid shot metadata must not change legitimate primary target');
+ }
+ for(const invalidBearing of [undefined,null,'0']){
+  const {g,ai,self}=scene();
+  g.time=0;
+  self.ai.__v181ObservedShotAt=0;
+  self.ai.__v181ObservedShotAngle=invalidBearing;
+  ai.updateAI(self,g,1/60);
+  assert.notEqual(self.ai.__v181Mode,'crossfire',
+   'invalid bearing cannot create a witnessed duel: '+String(invalidBearing));
+ }
+ const {g,ai,self}=scene();
+ g.time=0;
+ self.ai.__v181ObservedShotAt=0;
+ ai.updateAI(self,g,1/60);
+ assert.equal(self.ai.__v181Mode,'crossfire',
+  'an actual witnessed shot at match time zero remains valid');
+});

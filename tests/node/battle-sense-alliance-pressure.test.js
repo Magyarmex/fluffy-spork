@@ -129,3 +129,69 @@ test('actual Battle Sense tryFire witness stores firing origin only on real proj
  assert.equal(hidden.ai.__v181ObservedShotX,undefined,
   'occluded observer must not gain the firing origin');
 });
+
+test('missing witnessed shot timestamp cannot become a time-zero crossfire',()=>{
+ const helper=loadBattleSense();
+ const observer=tank(1,undefined,-200,0);
+ const target=tank(2,undefined,0,0);
+ const third=tank(3,undefined,100,0);
+ observer.ai={__v181ObservedShotId:target.id,
+  __v181ObservedShotAngle:0,__v181ObservedShotX:0,__v181ObservedShotY:0};
+ const g={tanks:[observer,target,third],
+  __novaFairVisibleTanks:[observer,target,third],
+  time:0,hasLineOfSight:()=>true};
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
+  'an absent timestamp is not a witnessed shot at match time zero');
+ observer.ai.__v181ObservedShotAt=null;
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
+  'a null timestamp is not a witnessed shot at match time zero');
+ observer.ai.__v181ObservedShotAt='0';
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
+  'a string-coerced timestamp is not an authenticated numeric witness');
+ observer.ai.__v181ObservedShotAt=-1;
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
+  'a negative pre-match time cannot masquerade as a fresh shot');
+ observer.ai.__v181ObservedShotAt=0;
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
+  'a genuine time-zero shot remains a valid crossfire witness');
+ g.time=1.25;
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
+  'the established 1.25-second witness boundary is preserved');
+ g.time=1.250001;
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
+  'the existing witness expiry remains strict');
+});
+
+test('Battle Sense reload-punish window rejects untrusted shot times but accepts real time zero',()=>{
+ const helper=loadBattleSense();
+ const target={...tank(2,undefined,100,0),cls:'cannon'};
+ const observer={...tank(1,undefined,0,0),ai:{__v181ObservedShotId:target.id}};
+ const classes={CLASSES:{cannon:{bullet:{reload:1.2}}}};
+ const g={hasLineOfSight:()=>true};
+ for(const bad of [undefined,null,'0',-0.1,-1,NaN,Infinity]){
+  observer.ai.__v181ObservedShotAt=bad;
+  assert.equal(helper.witnessedOpening(g,classes,observer,target,.2),0,
+   'untrusted shot time must not grant reload-punish knowledge: '+String(bad));
+ }
+ observer.ai.__v181ObservedShotAt=0;
+ assert.ok(helper.witnessedOpening(g,classes,observer,target,.2)>0,
+  'real game-time-zero shot must retain its legitimate punish window');
+});
+
+test('missing or coerced shot bearing cannot invent an eastbound duel',()=>{
+ const helper=loadBattleSense();
+ const observer={...tank(1,undefined,-200,0),ai:{
+  __v181ObservedShotId:2,__v181ObservedShotAt:0,
+  __v181ObservedShotX:0,__v181ObservedShotY:0}};
+ const target=tank(2,undefined,0,0),third=tank(3,undefined,100,0);
+ const g={time:0,tanks:[observer,target,third],
+  __novaFairVisibleTanks:[observer,target,third],hasLineOfSight:()=>true};
+ for(const bad of [undefined,null,'0',NaN,Infinity]){
+  observer.ai.__v181ObservedShotAngle=bad;
+  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
+   'untrusted bearing cannot imply a shot to the east: '+String(bad));
+ }
+ observer.ai.__v181ObservedShotAngle=0;
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
+  'a legitimate numeric eastbound bearing remains valid');
+});
