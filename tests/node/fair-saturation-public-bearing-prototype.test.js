@@ -91,7 +91,8 @@ function witnessedShotCount(T, g, observer, target, C = classes) {
 // One owner contributes at most one pressure unit per target, so rapid-fire
 // classes do not manufacture arbitrary saturation merely by bullet count.
 function visibleInboundProjectileCount(T,g,observer,target,C=classes){
- if(!observer||!target||!Number.isFinite(Number(g&&g.time))||
+ if(!alive(observer)||!alive(target)||target.spawnShieldT>0||
+    !Number.isFinite(Number(g&&g.time))||
     !T.canPerceive(g,C,observer,target)||
     typeof g.hasLineOfSight!=='function')return 0;
  // The exact owner ID is not public evidence. Only a recent, observer-owned
@@ -251,6 +252,14 @@ test('visible inbound projectile pressure requires a live public intercept lane'
  g.bullets=[{x:40,y:0,vx:200,vy:0,r:3,ttl:1,ownerId:shooter.id}];
  assert.equal(visibleInboundProjectileCount(T,g,observer,a),1,
   'visible projectile with visible shooter and clear intercept is pressure');
+ a.spawnShieldT=1;
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),0,
+  'spawn-protected target cannot be certified as damaged by a lane');
+ a.spawnShieldT=0;
+ observer.alive=false;
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),0,
+  'dead observer cannot acquire new public pressure');
+ observer.alive=true;
  const savedTime=g.time;g.time=NaN;
  assert.equal(visibleInboundProjectileCount(T,g,observer,a),0,
   'invalid match time cannot certify recent witnessed fire');
