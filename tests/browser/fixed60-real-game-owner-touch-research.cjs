@@ -80,13 +80,13 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    const baseStart=Game.prototype.start;
    window.__novaFixedResearch={births:0,volleyBirthWallMs:[],updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],appliedTouchEvents:[],frames:[],poseFrames:[]};
    const profile=window.__novaFixedResearch;
-   // For the held-three-shot gate, request a real controlled ~66.7ms
+   // For the held-three-shot gate, request a real controlled 75ms
    // RAF interval. A requested 50ms interval can arrive as ~40ms after
    // native RAF alignment, producing only two updates and a false failure.
    // Keep the actual delivered interval <100ms (foreground stall quarantine)
    // and require three real updates plus a projectile. Other research arms
    // retain their original 30Hz gate schedule.
-   const gateGaps=controlledGate&&activeBurst?[200/3,50/3,50/3,50/3]:
+   const gateGaps=controlledGate&&activeBurst?[75,50/3,50/3,50/3]:
     [250/3,50/3,50/3,50/3];
    let gateNext=null,gateIndex=0,gateToken=0;
    const gatePending=new Map();
@@ -432,7 +432,7 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
     const beforeFrame=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
     await page.evaluate(controlled=>{
      // Arm at the next real RAF boundary. The controlled research arm
-     // delivers an actual bounded ~66.7ms callback; do not manufacture foreground
+     // delivers an actual bounded ~75ms callback; do not manufacture foreground
      // stalls that can legitimately revoke touch ownership.
      window.__novaFixedResearch.armShotOnThree=true;
      if(!controlled){const end=performance.now()+65;while(performance.now()<end){}}
