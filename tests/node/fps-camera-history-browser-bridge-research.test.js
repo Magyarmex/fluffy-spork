@@ -149,3 +149,69 @@ test('camera history must sample inside interpolated render before pose restorat
    'post-render simulation camera is not the displayed camera');
  }finally{pose.stop();}
 });
+
+test('browser event-time bridge preserves center aim on CSS-scaled presented canvas',()=>{
+ const history=new PresentedCameraHistory({maxAgeMs:120});
+ assert.equal(history.record(1090,{x:20,y:-10,zoom:2,width:800,height:600,
+  rect:{left:100,top:50,width:400,height:300}}),true);
+ let now=1000;
+ const accepted=[];
+ const timeline={sampled:0,last:0,input:{},push(at,kind,data){
+  accepted.push({at,kind,data});this.last=at;return true;
+ }};
+ const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000},{
+  captureMouseWorld:(e,physicalMeta)=>history.project(e,physicalMeta)
+ });
+ now=1200;
+ assert.equal(bridge.capture({type:'pointerup',pointerType:'mouse',
+  pointerId:1,button:0,buttons:0,clientX:300,clientY:200,timeStamp:1130,
+  target:{closest:()=>null}}),true);
+ assert.equal(accepted.length,1);
+ assert.deepEqual(accepted[0].data.__novaCaptureWorld,{x:20,y:-10});
+ assert.equal(bridge.mouseProjectionFailures,0);
+});
+
+test('scaled CSS pointer survives browser replay into actual player projectile bearing',()=>{
+ const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+ const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
+ const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
+ const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
+ g.sfx.muted=true;i.autofire=false;g.status='playing';g.paused=false;
+ g.w=800;g.h=600;Object.assign(g.cam,{x:0,y:0,zoom:1});
+ // A CSS transform halves the presented rectangle without changing Game.w.
+ i.canvas.getBoundingClientRect=()=>({left:100,top:50,width:400,height:300});
+ const history=new PresentedCameraHistory({maxAgeMs:120});
+ assert.equal(history.record(1090,{x:0,y:0,zoom:1,width:800,height:600,
+  rect:{left:100,top:50,width:400,height:300}}),true);
+ let now=1000;
+ const timeline=new ChronologicalInput(i);
+ const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000},{
+  captureMouseWorld:(e,m)=>history.project(e,m)
+ });
+ const owner=new DirectShotIntent(g,{window:win,document:doc,
+  rebindDomListeners:false,requireTrustedDuration:true,eventOriginMs:1000,
+  maxIntentAgeMs:50,nowMs:()=>1175});
+ const pointer=(type,timeStamp,buttons)=>({type,timeStamp,pointerType:'mouse',
+  pointerId:1,button:0,buttons,clientX:400,clientY:200,
+  target:{closest:()=>null}});
+ try{
+  now=1100;assert.equal(bridge.capture(pointer('pointerdown',1100,1)),true);
+  g.cam.x=100;
+  now=1170;assert.equal(bridge.capture(pointer('pointerup',1130,0)),true);
+  timeline.consumeThrough(.2);
+  assert.ok(owner.pending&&owner.pending.world);
+  assert.ok(Math.abs(owner.pending.world.x-200)<1e-8);
+  assert.ok(Math.abs(owner.pending.world.y)<1e-8);
+  Object.assign(g.player,{x:0,y:0,angle:0,fireCd:0});
+  const born=[];const fire=g.tryFire;
+  g.tryFire=function(t,...args){
+   const before=this.bullets.length,result=fire.call(this,t,...args);
+   if(t===g.player)born.push(...this.bullets.slice(before).map(b=>({vx:b.vx,vy:b.vy})));
+   return result;
+  };
+  g.update(1/60);
+  assert.ok(born.length>0,'real player projectile must be born');
+  assert.ok(born[0].vx>0,'historical CSS-scaled target is east, not west');
+  assert.equal(owner.intents,1);
+ }finally{owner.detach();g.destroy();}
+});

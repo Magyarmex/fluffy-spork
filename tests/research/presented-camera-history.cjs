@@ -38,8 +38,14 @@ class PresentedCameraHistory {
     }
     if(!frame){this.misses++;return null;}
     if(deliveryMs-at>this.maxAgeMs||at-frame.at>this.maxAgeMs){this.stale++;return null;}
-    const wx=frame.x+(event.clientX-frame.left-frame.width*.5)/frame.zoom;
-    const wy=frame.y+(event.clientY-frame.top-frame.height*.5)/frame.zoom;
+    // PointerEvent.clientX/Y are CSS viewport pixels; Game width/height are
+    // canvas-space units. A CSS-scaled canvas (including portrait containment)
+    // must map the captured pointer through the *presented* rectangle before
+    // converting to world coordinates. The old formula only worked at 1:1.
+    const sx=(event.clientX-frame.left)/frame.rectWidth;
+    const sy=(event.clientY-frame.top)/frame.rectHeight;
+    const wx=frame.x+(sx-.5)*frame.width/frame.zoom;
+    const wy=frame.y+(sy-.5)*frame.height/frame.zoom;
     if(!Number.isFinite(wx)||!Number.isFinite(wy)){this.invalid++;return null;}
     return Object.freeze({x:wx,y:wy,frameAt:frame.at,ageMs:at-frame.at});
   }
