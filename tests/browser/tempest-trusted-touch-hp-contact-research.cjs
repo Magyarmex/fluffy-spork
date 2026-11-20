@@ -276,6 +276,24 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
     trial.hits===0?'projectile-without-hp-contact':'hp-contact';
    shortTrials.push(trial);
   }
+  if(latchMode){
+   // A browser-trusted cancellation is not a deliberate completed shot.
+   const beforeCancel=await page.evaluate(()=>window.__novaTempestHp.latches.length);
+   const canceled={...origin,id:999};
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[canceled]});
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+    {...canceled,x:canceled.x+35,y:canceled.y-20}]});
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});
+   await page.waitForTimeout(140);
+   const afterCancel=await page.evaluate(()=>({
+    latches:window.__novaTempestHp.latches.length,
+    aimActive:window.__novaTempestHpGame.input.aim.active,
+    firing:window.__novaTempestHpGame.input.firing
+   }));
+   assert.equal(afterCancel.latches,beforeCancel,'cancel cannot queue a shot intent');
+   assert.equal(afterCancel.aimActive,false,'cancel releases aim ownership');
+   assert.equal(afterCancel.firing,false,'cancel releases firing ownership');
+  }
   assert.equal(errors.length,0,
    'no browser page errors during short-touch trials: '+JSON.stringify(errors));
   const sampledTimes=await page.evaluate(()=>window.__novaTempestHp.updates.map(u=>u.at));
