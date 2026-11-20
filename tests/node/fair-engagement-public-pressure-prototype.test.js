@@ -253,16 +253,19 @@ test('real composed AI update wrapper is sensitive to hidden private assignment'
     const baseline=fair.chooseTarget(g,classes,observer,observer.ai,g.time);
     assert.ok(baseline===left||baseline===right);
     other.ai.__v1112TargetId=arm===0?baseline.id:(baseline===left?right:left).id;
+    const publicBefore=JSON.stringify(g.tanks.map(t=>[t.id,t.x,t.y,t.hp,t.alive]));
     observer.ai.__v1112NextThink=-1;
     observer.ai.__v1112TargetId=-1;
     observer.ai.__v1112InjectedId=-1;
     ai.updateAI(observer,g,1/60);
     return {chosen:observer.ai.__v1112TargetId,
-     expected:arm===0?(baseline===left?right:left).id:baseline.id};
+     publicBefore,expected:arm===0?(baseline===left?right:left).id:baseline.id};
    }finally{s.g.destroy();}
   });
  }
  const a=run(0),b=run(1);
+ assert.equal(a.publicBefore,b.publicBefore,
+  'the two real AI wrapper arms must have identical public tank state');
  assert.equal(a.chosen,a.expected);
  assert.equal(b.chosen,b.expected);
  assert.notEqual(a.chosen,b.chosen,
