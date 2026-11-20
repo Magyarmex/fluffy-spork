@@ -116,7 +116,7 @@ class SubtickFirePulse {
         if(p.player!==game.player||p.player?.alive!==true||!releaseIsFresh(p,now))
           self.release();
       }
-      if (self.down && self.down.player !== game.player) {
+      if (self.down && (self.down.player !== game.player || self.down.player?.alive !== true)) {
         // A held press from a dead/replaced life must not keep firing or
         // commanding the new life while waiting for a later physical release.
         const down=self.down; self.down=null;
@@ -126,7 +126,8 @@ class SubtickFirePulse {
         // A replaced life must not inherit that old pointer aim ownership.
         if (down.type === 'mouse') input.mouseActive = false;
       }
-      const canPlay = game.status === 'playing' && !game.paused && !input.__novaInputPaused &&
+      const canPlay = game.status === 'playing' && game.player?.alive === true &&
+        !game.paused && !input.__novaInputPaused &&
         !(game.__testWindow && game.__testWindow.document.hidden);
       if (!canPlay) {
         self.release();
