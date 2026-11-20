@@ -173,6 +173,21 @@ test('cached candidate never bypasses trusted shot origin and bearing',()=>{
   assert.equal(w.weight(),0,'invalid historical origin cannot authenticate cached duel');
  }finally{w.g.destroy();}
 });
+test('missing or malformed historical victim memory fails closed rather than tracking later motion',()=>{
+ const w=scene();
+ try{
+  w.third.x=100;w.third.y=0;
+  for(const legacy of [undefined,{},'legacy',42]){
+   w.observer.ai.__v181ObservedShotVictims=legacy;
+   assert.equal(w.weight(),0,'untrusted legacy witness memory must not infer a new duel');
+   w.third.x=0;w.third.y=100;
+   assert.equal(w.weight(),0,'later movement must not change the fail-closed result');
+   w.third.x=100;w.third.y=0;
+  }
+  w.observer.ai.__v181ObservedShotVictims=[w.third];
+  assert.equal(w.weight(),.62,'valid event-time candidate remains effective');
+ }finally{w.g.destroy();}
+});
 test('two observers receive different public victim memories for the same shot',()=>{
  const g=bootGame();
  try{
