@@ -52,11 +52,12 @@ class ExplicitShotIntent {
    const now=performance.now();
    const age=p&&Number.isFinite(p.queuedAt)?now-p.queuedAt:Infinity;
    const physicalAge=p&&p.physicalAt!==null?now-p.physicalAt:null;
-   const pressAge=p&&p.physicalDownAt!==null?now-p.physicalDownAt:null;
+   const holdMs=p&&p.physicalDownAt!==null&&p.physicalAt!==null
+    ?p.physicalAt-p.physicalDownAt:null;
    const canPlay=!!p&&p.player===game.player&&game.player?.alive===true&&
      age>=0&&age<=50&&
      (physicalAge===null||(physicalAge>=0&&physicalAge<=50))&&
-     (pressAge===null||(pressAge>=0&&pressAge<=50))&&
+     (holdMs===null||(holdMs>=0&&holdMs<=50))&&
      game.status==='playing'&&!game.paused&&!input.__novaInputPaused&&
      !(game.__testWindow&&game.__testWindow.document.hidden);
    if(!canPlay){
