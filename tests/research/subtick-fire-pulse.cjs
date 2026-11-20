@@ -117,8 +117,17 @@ class SubtickFirePulse {
         self.release();
         // Keep the press's original player identity across multiple ticks.
         // Mark it sampled so a later release cannot manufacture a second shot.
-        if (canPlay && self.down) self.down.sampled = true;
-        else self.down = null;
+        // A centered touch can span a tick before the thumb deflects.
+        // Sampling that centered press is NOT sampling a firing bearing.
+        // Mark consumed only after a tick saw an actual aimed shot.
+        if (canPlay && self.down) {
+          const d=self.down,aim=input.aim;
+          const sampled=d.type==='mouse'
+            ? !!input.mouseActive&&!!input.firing
+            : input.stickId?.aim===d.id&&!!aim?.active&&!!input.firing&&
+              Math.hypot(aim.dx||0,aim.dy||0)>=9;
+          if(sampled)d.sampled=true;
+        } else self.down = null;
       }
     };
     timeline.releaseAll = function() { self.release(); self.down = null; self.canceled++; return self.old.releaseAll.apply(this,arguments); };
