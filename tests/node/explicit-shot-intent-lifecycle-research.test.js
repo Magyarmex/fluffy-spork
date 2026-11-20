@@ -77,9 +77,11 @@ test('stale queued release and dead player never fire a delayed weapon intent',a
  await new Promise(resolve=>setTimeout(resolve,75));
  stale.game.update(1/30);
  assert.equal(stale.seen[0].intent,undefined,'expired release must not fire late');
+ assert.equal(stale.owner.pulse.pulses,0,'expired release must not count as recovered');
  stale.owner.detach();
  const dead=setup();dead.press();dead.release();dead.game.player.alive=false;
  dead.game.update(1/30);
  assert.equal(dead.seen[0].intent,undefined,'dead player cannot fire queued intent');
+ assert.equal(dead.owner.pulse.pulses,0,'dead player must not count as recovered');
  dead.owner.detach();
 });
