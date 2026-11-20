@@ -142,7 +142,8 @@ test('missing witnessed shot timestamp cannot become a time-zero crossfire',()=>
  const target=tank(2,undefined,0,0);
  const third=tank(3,undefined,100,0);
  observer.ai={__v181ObservedShotId:target.id,
-  __v181ObservedShotAngle:0,__v181ObservedShotX:0,__v181ObservedShotY:0};
+  __v181ObservedShotAngle:0,__v181ObservedShotX:0,__v181ObservedShotY:0,
+  __v181ObservedShotVictims:new WeakSet([third])};
  const g={tanks:[observer,target,third],
   __novaFairVisibleTanks:[observer,target,third],
   time:0,hasLineOfSight:()=>true};
@@ -158,7 +159,6 @@ test('missing witnessed shot timestamp cannot become a time-zero crossfire',()=>
  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
   'a negative pre-match time cannot masquerade as a fresh shot');
  observer.ai.__v181ObservedShotAt=0;
- observer.ai.__v181ObservedShotVictims=new WeakSet([third]);
  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
   'a genuine time-zero shot remains a valid crossfire witness');
  g.time=1.25;
@@ -189,8 +189,10 @@ test('missing or coerced shot bearing cannot invent an eastbound duel',()=>{
  const helper=loadBattleSense();
  const observer={...tank(1,undefined,-200,0),ai:{
   __v181ObservedShotId:2,__v181ObservedShotAt:0,
-  __v181ObservedShotX:0,__v181ObservedShotY:0}};
+  __v181ObservedShotX:0,__v181ObservedShotY:0,
+  __v181ObservedShotVictims:new WeakSet()}};
  const target=tank(2,undefined,0,0),third=tank(3,undefined,100,0);
+ observer.ai.__v181ObservedShotVictims.add(third);
  const g={time:0,tanks:[observer,target,third],
   __novaFairVisibleTanks:[observer,target,third],hasLineOfSight:()=>true};
  for(const bad of [undefined,null,'0',NaN,Infinity]){
@@ -199,7 +201,6 @@ test('missing or coerced shot bearing cannot invent an eastbound duel',()=>{
    'untrusted bearing cannot imply a shot to the east: '+String(bad));
  }
  observer.ai.__v181ObservedShotAngle=0;
- observer.ai.__v181ObservedShotVictims=new WeakSet([third]);
  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
   'a legitimate numeric eastbound bearing remains valid');
 });
