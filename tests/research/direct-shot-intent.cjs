@@ -64,6 +64,11 @@ class DirectShotIntent {
     this.captureMouse=e=>{
       const x=Number.isFinite(e.clientX)?e.clientX:i.mouseX;
       const y=Number.isFinite(e.clientY)?e.clientY:i.mouseY;
+      // The browser timeline may preserve a physical DOM-time projection.
+      // Prefer it over replay-time camera coordinates when present.
+      const captured=e&&e.__novaCaptureWorld;
+      if(captured&&Number.isFinite(captured.x)&&Number.isFinite(captured.y))
+        return Object.freeze({x,y,world:Object.freeze({x:captured.x,y:captured.y})});
       let world=null;
       if(Number.isFinite(x)&&Number.isFinite(y)&&game.cam&&i.canvas&&
          typeof i.canvas.getBoundingClientRect==='function'){
