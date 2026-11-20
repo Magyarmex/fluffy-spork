@@ -91,7 +91,9 @@ function witnessedShotCount(T, g, observer, target, C = classes) {
 // One owner contributes at most one pressure unit per target, so rapid-fire
 // classes do not manufacture arbitrary saturation merely by bullet count.
 function visibleInboundProjectileCount(T,g,observer,target,C=classes){
- if(!alive(observer)||!alive(target)||target.spawnShieldT>0||
+ if(!T||typeof T.canPerceive!=='function'||
+    typeof T.viewportHalfExtents!=='function'||
+    !alive(observer)||!alive(target)||target.spawnShieldT>0||
     !Number.isFinite(Number(g&&g.time))||
     !T.canPerceive(g,C,observer,target)||
     typeof g.hasLineOfSight!=='function')return 0;
@@ -252,6 +254,8 @@ test('visible inbound projectile pressure requires a live public intercept lane'
  g.bullets=[{x:40,y:0,vx:200,vy:0,r:3,ttl:1,ownerId:shooter.id}];
  assert.equal(visibleInboundProjectileCount(T,g,observer,a),1,
   'visible projectile with visible shooter and clear intercept is pressure');
+ assert.equal(visibleInboundProjectileCount({canPerceive:T.canPerceive},g,observer,a),0,
+  'missing viewport owner must abstain rather than invent a sensor');
  a.spawnShieldT=1;
  assert.equal(visibleInboundProjectileCount(T,g,observer,a),0,
   'spawn-protected target cannot be certified as damaged by a lane');
