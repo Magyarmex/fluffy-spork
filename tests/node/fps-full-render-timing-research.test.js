@@ -70,3 +70,12 @@ test('unavailable module, invalid bound and background tab fail closed',()=>{
  h.document.hidden=false;h.window.__novaMakeRequire=undefined;
  assert.throws(()=>h.api.create().start(),/loader/);
 });
+
+test('nonfinite clock during an active render releases the instrumentation owner',()=>{
+ const h=harness(),p=h.api.create({maxSamples:60});p.start();
+ h.window.performance.now=()=>NaN;
+ assert.throws(()=>h.mod.render(game),/invalid monotonic clock/);
+ assert.equal(p.snapshot().reason,'clock-error');
+ assert.equal(h.mod.render,h.original);
+ assert.equal(h.listeners.size,0);
+});
