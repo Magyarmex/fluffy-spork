@@ -94,18 +94,17 @@ function visibleInboundProjectileCount(T,g,observer,target,C=classes){
  if(!observer||!target||!Number.isFinite(Number(g&&g.time))||
     !T.canPerceive(g,C,observer,target)||
     typeof g.hasLineOfSight!=='function')return 0;
- // A projectile owner ID is not public by itself. Anchor it to the
- // observer's own recently witnessed shooter and shot bearing first.
- if(!witnessedShotCount(T,g,observer,target,C))return 0;
+ // The exact owner ID is not public evidence. Only a recent, observer-owned
+ // witnessed shooter may anchor an inbound lane; no private target slots.
  const witnessedId=observer.ai&&observer.ai.__v181ObservedShotId;
+ if(witnessedId==null)return 0;
  const ext=T.viewportHalfExtents(g);
+ let checkedWitness=false,shooter=null;
  for(const b of g.bullets||[]){
-  if(!b||b.dead||!(Number(b.ttl)>0)||!Number.isFinite(b.x)||
-     !Number.isFinite(b.y)||!Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
+  if(!b||b.dead||b.ownerId!==witnessedId||!(Number(b.ttl)>0)||
+     !Number.isFinite(b.x)||!Number.isFinite(b.y)||
+     !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
      Math.abs(b.x-observer.x)>ext.x||Math.abs(b.y-observer.y)>ext.y)continue;
-  const shooter=(g.tanks||[]).find(t=>t&&t.id===b.ownerId);
-  if(!shooter||shooter.id!==witnessedId||shooter===observer||shooter===target||
-     !hostile(g,shooter,target)||!T.canPerceive(g,C,observer,shooter))continue;
   const dx=target.x-b.x,dy=target.y-b.y;
   const vx=b.vx-(Number.isFinite(target.vx)?target.vx:0);
   const vy=b.vy-(Number.isFinite(target.vy)?target.vy:0);
@@ -118,10 +117,20 @@ function visibleInboundProjectileCount(T,g,observer,target,C=classes){
   const missX=dx-vx*at,missY=dy-vy*at;
   const radius=Math.max(1,Number(target.r)||15)+Math.max(0,Number(b.r)||0)+5;
   if(missX*missX+missY*missY>radius*radius)continue;
+  // The expensive observer-owned witness and terrain checks run only after
+  // a visible, live projectile passes cheap TTL/intercept geometry.
+  if(!checkedWitness){
+   checkedWitness=true;
+   if(!witnessedShotCount(T,g,observer,target,C))return 0;
+   shooter=(g.tanks||[]).find(q=>q&&q.id===witnessedId);
+   if(!shooter||shooter===observer||shooter===target||
+      !hostile(g,shooter,target)||!T.canPerceive(g,C,observer,shooter))
+     return 0;
+  }
   if(!g.hasLineOfSight(observer.x,observer.y,b.x,b.y,2)||
      !g.hasLineOfSight(observer.x,observer.y,shooter.x,shooter.y,2)||
      !g.hasLineOfSight(b.x,b.y,target.x,target.y,2))continue;
-  return 1; // Latest witnessed shooter is unique; extra bullets add no pressure.
+  return 1; // Single latest witnessed shooter; extra bullets add no pressure.
  }
  return 0;
 }
