@@ -85,3 +85,19 @@ test('stale queued release and dead player never fire a delayed weapon intent',a
  assert.equal(dead.owner.pulse.pulses,0,'dead player must not count as recovered');
  dead.owner.detach();
 });
+
+test('new right thumb supersedes stale aim, while left movement thumb preserves it',()=>{
+ const right=setup();right.input.canvas={getBoundingClientRect:()=>({left:0,width:390})};
+ right.press(7);right.release(7);
+ right.input.pd({...event('pointerdown',8),clientX:300});
+ assert.equal(right.input.stickId.aim,8,'new right thumb must own the stick');
+ right.game.update(1/30);
+ assert.equal(right.seen[0].intent,undefined,'old right-thumb release is superseded');
+ right.owner.detach();
+ const left=setup();left.input.canvas={getBoundingClientRect:()=>({left:0,width:390})};
+ left.press(7);left.release(7);
+ left.input.pd({...event('pointerdown',8),clientX:50});
+ left.game.update(1/30);
+ assert.equal(left.seen[0].intent?.fire,true,'left thumb must not cancel prior shot');
+ left.owner.detach();
+});
