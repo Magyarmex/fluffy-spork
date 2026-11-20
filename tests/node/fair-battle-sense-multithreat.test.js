@@ -58,6 +58,7 @@ function scene({width=1000,cover=false}={}){
  self.ai.__v181ObservedShotAngle=0;
  self.ai.__v181ObservedShotX=target.x;
  self.ai.__v181ObservedShotY=target.y;
+ self.ai.__v181ObservedShotVictims=new WeakSet([duelist]);
  g.tanks=[self,target,duelist];
  if(cover)g.hasLineOfSight=(ax,ay,bx,by)=>!(
   ax===target.x&&ay===target.y&&bx===duelist.x&&by===duelist.y);
