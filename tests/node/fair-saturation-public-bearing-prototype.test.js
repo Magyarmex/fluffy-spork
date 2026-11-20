@@ -628,7 +628,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
           // actual shooter. Reflection outranks its nested caller; splash
           // outranks the generic owner ID. Unclassified is NOT projectile.
           const nonProjectile=this.__v17ReflectingIronWill?'reflection':
-            droneScope?'drone':this.__v172HardBlast?.active?'splash':null;
+            this.__v172HardBlast?.active?'splash':droneScope?'drone':null;
           if(nonProjectile==='drone')result.droneDamageEvents++;
           if(nonProjectile==='reflection')result.reflectionDamageEvents++;
           if(nonProjectile==='splash')result.splashDamageEvents++;
