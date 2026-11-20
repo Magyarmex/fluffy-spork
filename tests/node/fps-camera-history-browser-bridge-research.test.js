@@ -19,13 +19,10 @@ function setup({epoch=false}={}){
  }};
  const clock={now:()=>now,timeOrigin:1793560000000};
  const bridge=new BrowserEventTimeline(timeline,clock,{
-  captureMouseWorld:e=>{
-   // Adapter deliberately normalizes the raw DOM timestamp to the same
-   // monotonic clock as the displayed-camera history.
-   const raw=e.timeStamp;
-   const physical=raw>1e11?raw-clock.timeOrigin:raw;
-   const projected=history.project(e,{timestampTrusted:true,
-    timestampExact:true,physicalAtMs:physical,deliveryMs:now});
+  captureMouseWorld:(e,physicalMeta)=>{
+   // The bridge, not the caller, owns normalization of epoch-style and
+   // monotonic event timestamps. Never trust the raw event clock here.
+   const projected=history.project(e,physicalMeta);
    return projected&&{x:projected.x,y:projected.y};
   }
  });
@@ -81,9 +78,8 @@ test('historical mouse projection survives chronological replay into real Game p
  let now=1000;
  const timeline=new ChronologicalInput(i);
  const bridge=new BrowserEventTimeline(timeline,{now:()=>now,timeOrigin:1793560000000},{
-  captureMouseWorld:e=>{
-   const p=history.project(e,{timestampTrusted:true,timestampExact:true,
-    physicalAtMs:e.timeStamp,deliveryMs:now});
+  captureMouseWorld:(e,physicalMeta)=>{
+   const p=history.project(e,physicalMeta);
    return p&&{x:p.x,y:p.y};
   }
  });
