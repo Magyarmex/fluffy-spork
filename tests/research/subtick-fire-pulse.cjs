@@ -12,8 +12,10 @@ function physicalReleaseAt(e) {
 function releaseIsFresh(p, now) {
   const queuedAge = now - p.queuedAt;
   const physicalAge = p.physicalAt === null ? null : now - p.physicalAt;
+  const pressAge = p.physicalDownAt === null ? null : now - p.physicalDownAt;
   return queuedAge >= 0 && queuedAge <= 50 &&
-    (physicalAge === null || (physicalAge >= 0 && physicalAge <= 50));
+    (physicalAge === null || (physicalAge >= 0 && physicalAge <= 50)) &&
+    (pressAge === null || (pressAge >= 0 && pressAge <= 50));
 }
 class SubtickFirePulse {
   constructor(game, timeline) {
@@ -48,9 +50,9 @@ class SubtickFirePulse {
       if (e && e.target && typeof e.target.closest === 'function' && e.target.closest('[data-ui]')) return out;
       if (e && e.pointerType === 'mouse') {
         if (e.button === 0 && !priorFire && input.firing && !input.touchSeen)
-          self.down = {type:'mouse', id:e.pointerId, player:self.game.player, sampled:false};
+          self.down = {type:'mouse', id:e.pointerId, player:self.game.player, sampled:false,physicalDownAt:physicalReleaseAt(e)};
       } else if (e && input.stickId && input.stickId.aim === e.pointerId &&
-                 input.aim.active && priorAimId !== e.pointerId) self.down = {type:e.pointerType, id:e.pointerId, player:self.game.player, sampled:false};
+                 input.aim.active && priorAimId !== e.pointerId) self.down = {type:e.pointerType, id:e.pointerId, player:self.game.player, sampled:false,physicalDownAt:physicalReleaseAt(e)};
       return out;
     };
     input.pm = function(e) {
@@ -67,7 +69,8 @@ class SubtickFirePulse {
           pointerId:self.down.id,__novaOriginalAt:e.__novaOriginalAt,
           __novaTimestampTrusted:e.__novaTimestampTrusted},type:'mouse',id:self.down.id,
           player:self.down.player,queuedAt:performance.now(),
-          physicalAt:physicalReleaseAt(e)};
+          physicalAt:physicalReleaseAt(e),
+          physicalDownAt:self.down.physicalDownAt};
         self.down = null;
         return; // The later native mouseup/pointerup is also suppressed.
       }
@@ -94,7 +97,8 @@ class SubtickFirePulse {
       if (same && !down.sampled && aimValid && self.game.status === 'playing' && !self.game.paused &&
           !input.__novaInputPaused && !(self.game.__testWindow && self.game.__testWindow.document.hidden)) {
         self.pending = {event:e, type:down.type, id:down.id, player:down.player,queuedAt:performance.now(),
-          physicalAt:physicalReleaseAt(e)}; self.down = null;
+          physicalAt:physicalReleaseAt(e),
+          physicalDownAt:down.physicalDownAt}; self.down = null;
         return; // Hold only through the immediately following Game.update.
       }
       if (same) self.down = null;
