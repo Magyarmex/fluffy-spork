@@ -357,6 +357,7 @@ test('no-target contest uses public class speed without private rival stats',()=
 
 
 test('49-overlay Game records real player projectile firing origin for a legitimate AI witness',()=>{
+ process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
  const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
  withSeed(1517832,()=>{
   const g=bootGame();
