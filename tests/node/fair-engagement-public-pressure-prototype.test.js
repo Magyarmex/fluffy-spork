@@ -146,3 +146,23 @@ test('negative control: trajectory-only pressure overcounts an occluded bullet',
   }finally{s.g.destroy();}
  });
 });
+
+test('trajectory witness rejects departing, expired and near-miss projectiles',()=>{
+ withSeed(1517816,()=>{
+  const s=scene();
+  try{
+   const {g,observer,left}=s;
+   const bullet={x:-200,y:0,vx:400,vy:0,ttl:1,dead:false};
+   g.bullets=[bullet];
+   assert.equal(publicProjectileThreat(g,observer,left),1);
+   bullet.vx=-400;
+   assert.equal(publicProjectileThreat(g,observer,left),0,'departing shot');
+   bullet.vx=400;bullet.ttl=.1;
+   assert.equal(publicProjectileThreat(g,observer,left),0,'expires before contact');
+   bullet.ttl=1;bullet.y=70;
+   assert.equal(publicProjectileThreat(g,observer,left),0,'trajectory misses target');
+   bullet.y=0;bullet.dead=true;
+   assert.equal(publicProjectileThreat(g,observer,left),0,'already removed projectile');
+  }finally{s.g.destroy();}
+ });
+});
