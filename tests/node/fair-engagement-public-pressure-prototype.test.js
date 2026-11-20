@@ -73,3 +73,21 @@ test('a visible physical participant changes only the nearby target pressure',()
   }finally{s.g.destroy();}
  });
 });
+
+test('negative control: mere proximity falsely counts a passive bystander',()=>{
+ withSeed(1517810,()=>{
+  const s=scene();
+  try{
+   const {g,fair,observer,left,other}=s;
+   other.x=-330;other.y=0;other.ai.state='idle';
+   other.ai.__v1112TargetId=-1;
+   assert.equal(publicPressure(g,observer,left),2,
+    'physical proxy counts the nearby but passive bystander');
+   assert.equal(fair.saturation(g,left.id,observer.id),0,
+    'current private-slot scorer excludes an idle non-attacker');
+   // This intentionally falsifies treating proximity as verified attack
+   // commitment. A production replacement needs observed fire/trajectory
+   // or a better bounded public witness before changing target scores.
+  }finally{s.g.destroy();}
+ });
+});
