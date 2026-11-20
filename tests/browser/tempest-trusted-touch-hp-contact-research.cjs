@@ -404,11 +404,27 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
    .filter(g=>Number.isFinite(g)&&g>0&&g<100).sort((a,b)=>a-b);
   const medianSampleGapMs=sampleGaps.length?
    sampleGaps[Math.floor(sampleGaps.length/2)]:null;
+  // Compare only phase-overlapping cohorts: identical trial numbers are not
+  // matched physical input phases across independent Chromium runs.
+  const phaseBuckets={'0-8ms':{trials:0,shots:0,recovered:0},
+   '8-16ms':{trials:0,shots:0,recovered:0},
+   '16-24ms':{trials:0,shots:0,recovered:0},
+   '24ms+':{trials:0,shots:0,recovered:0},
+   'unknown':{trials:0,shots:0,recovered:0}};
+  for(const t of shortTrials){
+   const phase=t.phaseSincePreviousUpdateMs;
+   const key=!Number.isFinite(phase)?'unknown':phase<8?'0-8ms':
+    phase<16?'8-16ms':phase<24?'16-24ms':'24ms+';
+   const bucket=phaseBuckets[key];
+   bucket.trials++;bucket.shots+=Number(t.births>0);
+   bucket.recovered+=Number(t.recoveredIntents>0);
+  }
   console.log('NOVA_TEMPEST_TRUSTED_20MS_DIAGNOSTIC '+JSON.stringify({
    requestedHoldMs:20,halfRateSamplingPilot:halfRate,latchPilot:latchMode,
    explicitWeaponOnlyPilot:explicitMode,
    medianObservedGameUpdateGapMs:medianSampleGapMs,
    attempts:shortTrials.length,
+   phaseBuckets,
    shotTrials:shortTrials.filter(t=>t.births>0).length,
    hitTrials:shortTrials.filter(t=>t.hits>0).length,
    trials:shortTrials
