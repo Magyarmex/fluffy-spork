@@ -56,6 +56,8 @@ function scene({width=1000,cover=false}={}){
  self.ai.__v181ObservedShotId=target.id;
  self.ai.__v181ObservedShotAt=9.9;
  self.ai.__v181ObservedShotAngle=0;
+ self.ai.__v181ObservedShotX=target.x;
+ self.ai.__v181ObservedShotY=target.y;
  g.tanks=[self,target,duelist];
  if(cover)g.hasLineOfSight=(ax,ay,bx,by)=>!(
   ax===target.x&&ay===target.y&&bx===duelist.x&&by===duelist.y);
@@ -184,6 +186,9 @@ test('AI-fired shots reach genuinely visible non-primary witnesses, never remote
  assert.equal(other.ai.__v181ObservedShotId,1,
   'non-primary local witness sees actual AI-fired projectile');
  assert.equal(other.ai.__v181ObservedShotAngle,0);
+ assert.equal(other.ai.__v181ObservedShotX,shooter.x);
+ assert.equal(other.ai.__v181ObservedShotY,shooter.y);
+ assert.equal(remote.ai.__v181ObservedShotX,undefined);
  assert.equal(remote.ai.__v181ObservedShotId,undefined,
   'offscreen observer cannot receive hidden global firing information');
  assert.equal(Object.prototype.hasOwnProperty.call(g,'__novaFairShotWitnesses'),false);
