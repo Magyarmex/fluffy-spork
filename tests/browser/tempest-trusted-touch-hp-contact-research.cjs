@@ -4,6 +4,10 @@
 // natural match, short-pulse FPS comparison, or physical-device latency.
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
+const halfRate=process.env.NOVA_TEMPEST_HALF_RATE==='1';
+const trialCount=Number(process.env.NOVA_TEMPEST_TRIALS||8);
+assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
+ 'short-touch research trials must stay bounded');
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
  const context=await browser.newContext({viewport:{width:390,height:780},deviceScaleFactor:2,isMobile:true,hasTouch:true});
@@ -12,16 +16,27 @@ const {chromium}=require('playwright');
  try{
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({timeout:45000});
-  await page.evaluate(()=>{
+  await page.evaluate(halfRate=>{
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const start=Game.prototype.start,fire=Game.prototype.tryFire,damage=Game.prototype.damageTank,
     update=Game.prototype.update;
    window.__novaTempestHp={births:[],hits:[],events:[],updates:[],targetReady:false};
+   // Research-only: keep the actual Game.update/combat chain, but sample it
+   // at roughly half the host RAF cadence. This is NOT a native 30Hz display
+   // or a shipping scheduler: real callback timestamps remain the authority.
+   let pendingDt=0;
    Game.prototype.update=function(...args){
-    if(this===window.__novaTempestHpGame)
+    if(this===window.__novaTempestHpGame){
+     if(halfRate){
+      pendingDt+=Math.max(0,Number(args[0])||0);
+      if(pendingDt<1/30-0.001)return;
+      args[0]=Math.min(1/30,pendingDt);
+      pendingDt=Math.max(0,pendingDt-args[0]);
+     }
      window.__novaTempestHp.updates.push({at:performance.now(),gameTime:this.time,
       aimActive:!!this.input?.aim?.active,firing:!!this.input?.firing,
       aimMagnitude:Math.hypot(this.input?.aim?.dx||0,this.input?.aim?.dy||0)});
+    }
     return update.apply(this,args);
    };
    Game.prototype.start=function(...args){
@@ -51,7 +66,7 @@ const {chromium}=require('playwright');
      if(e.pointerType==='touch')window.__novaTempestHp.events.push({
       type,trusted:e.isTrusted,at:performance.now(),pointerId:e.pointerId});
     },{capture:true,passive:true});
-  });
+  },halfRate);
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   const canvas=page.locator('canvas.absolute.inset-0');
   await canvas.waitFor({state:'visible',timeout:30000});
@@ -148,7 +163,7 @@ const {chromium}=require('playwright');
   // presentation cadence and OS scheduling vary. Record real event timing,
   // physical HP contact and any post-release births without forcing a frame.
   const shortTrials=[];
-  for(let i=0;i<8;i++){
+  for(let i=0;i<trialCount;i++){
    const before=await page.evaluate(()=>{
     const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
     g.player.fireCd=0;g.player.__v17Heat=.56;
@@ -179,7 +194,8 @@ const {chromium}=require('playwright');
    const endDelivery=cdp.send('Input.dispatchTouchEvent',
     {type:'touchEnd',touchPoints:[]});
    await Promise.all([startDelivery,moveDelivery,endDelivery]);
-   await page.waitForTimeout(140);
+   // Deterministic jitter reduces repeated host-frame phase alignment.
+   await page.waitForTimeout(140+(i*37)%97);
    const trial=await page.evaluate(before=>{
     const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
     const events=r.events.slice(before.events),births=r.births.slice(before.births),
@@ -187,7 +203,11 @@ const {chromium}=require('playwright');
     const down=events.find(e=>e.type==='pointerdown');
     const move=events.find(e=>e.type==='pointermove');
     const up=events.find(e=>e.type==='pointerup'||e.type==='pointercancel');
-    return {trusted:events.every(e=>e.trusted),down:!!down,move:!!move,
+    const previousUpdate=move?[...r.updates].reverse().find(u=>u.at<=move.at):null;
+    const nextUpdate=move?r.updates.find(u=>u.at>move.at):null;
+    return {phaseSincePreviousUpdateMs:previousUpdate?move.at-previousUpdate.at:null,
+     phaseUntilNextUpdateMs:nextUpdate?nextUpdate.at-move.at:null,
+     trusted:events.every(e=>e.trusted),down:!!down,move:!!move,
      up:!!up,durationMs:down&&up?up.at-down.at:null,
      updatesDuringTouch:down&&up?updates.filter(u=>u.at>=down.at&&u.at<=up.at).length:null,
      activeAimSamples:down&&up?updates.filter(u=>u.at>=down.at&&u.at<=up.at&&u.aimActive).length:null,
@@ -221,8 +241,15 @@ const {chromium}=require('playwright');
   }
   assert.equal(errors.length,0,
    'no browser page errors during short-touch trials: '+JSON.stringify(errors));
+  const sampledTimes=await page.evaluate(()=>window.__novaTempestHp.updates.map(u=>u.at));
+  const sampleGaps=sampledTimes.slice(1).map((t,i)=>t-sampledTimes[i])
+   .filter(g=>Number.isFinite(g)&&g>0&&g<100).sort((a,b)=>a-b);
+  const medianSampleGapMs=sampleGaps.length?
+   sampleGaps[Math.floor(sampleGaps.length/2)]:null;
   console.log('NOVA_TEMPEST_TRUSTED_20MS_DIAGNOSTIC '+JSON.stringify({
-   requestedHoldMs:20,attempts:shortTrials.length,
+   requestedHoldMs:20,halfRateSamplingPilot:halfRate,
+   medianObservedGameUpdateGapMs:medianSampleGapMs,
+   attempts:shortTrials.length,
    shotTrials:shortTrials.filter(t=>t.births>0).length,
    hitTrials:shortTrials.filter(t=>t.hits>0).length,
    trials:shortTrials
