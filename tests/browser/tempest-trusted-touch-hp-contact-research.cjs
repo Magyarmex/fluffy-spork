@@ -5,6 +5,8 @@
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 const halfRate=process.env.NOVA_TEMPEST_HALF_RATE==='1';
+const latchMode=process.env.NOVA_TEMPEST_LATCH==='1';
+assert.ok(!latchMode||halfRate,'latch pilot requires half-rate arm');
 const trialCount=Number(process.env.NOVA_TEMPEST_TRIALS||8);
 assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
  'short-touch research trials must stay bounded');
@@ -16,11 +18,12 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
  try{
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({timeout:45000});
-  await page.evaluate(halfRate=>{
+  await page.evaluate(({halfRate,latchMode})=>{
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const start=Game.prototype.start,fire=Game.prototype.tryFire,damage=Game.prototype.damageTank,
     update=Game.prototype.update;
-   window.__novaTempestHp={births:[],hits:[],events:[],updates:[],targetReady:false};
+   window.__novaTempestHp={births:[],hits:[],events:[],updates:[],latches:[],targetReady:false};
+   let activeTouch=null,pendingShot=null;
    // Research-only: keep the actual Game.update/combat chain, but sample it
    // at roughly half the host RAF cadence. This is NOT a native 30Hz display
    // or a shipping scheduler: real callback timestamps remain the authority.
@@ -33,9 +36,21 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
       args[0]=Math.min(1/30,pendingDt);
       pendingDt=Math.max(0,pendingDt-args[0]);
      }
+     if(activeTouch&&this.input?.firing&&this.input?.aim?.active&&
+        Math.hypot(this.input.aim.dx,this.input.aim.dy)>=9)activeTouch.sampled=true;
+     const p=pendingShot;pendingShot=null;
+     const valid=latchMode&&p&&p.player===this.player&&this.status==='playing'&&
+      !this.paused&&!document.hidden&&performance.now()-p.at<=50;
+     const input=this.input,aim=input.aim;
+     const prior={firing:input.firing,active:aim.active,dx:aim.dx,dy:aim.dy};
+     if(valid){input.firing=true;aim.active=true;aim.dx=p.dx;aim.dy=p.dy;
+      window.__novaTempestHp.latches.push({at:performance.now(),releaseAt:p.at});}
      window.__novaTempestHp.updates.push({at:performance.now(),gameTime:this.time,
-      aimActive:!!this.input?.aim?.active,firing:!!this.input?.firing,
-      aimMagnitude:Math.hypot(this.input?.aim?.dx||0,this.input?.aim?.dy||0)});
+      aimActive:!!input?.aim?.active,firing:!!input?.firing,
+      aimMagnitude:Math.hypot(input?.aim?.dx||0,input?.aim?.dy||0)});
+     try{return update.apply(this,args);}
+     finally{if(valid){input.firing=prior.firing;aim.active=prior.active;
+      aim.dx=prior.dx;aim.dy=prior.dy;}}
     }
     return update.apply(this,args);
    };
@@ -63,10 +78,20 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
    };
    for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     document.addEventListener(type,e=>{
-     if(e.pointerType==='touch')window.__novaTempestHp.events.push({
-      type,trusted:e.isTrusted,at:performance.now(),pointerId:e.pointerId});
+     if(e.pointerType!=='touch')return;
+     window.__novaTempestHp.events.push({type,trusted:e.isTrusted,
+      at:performance.now(),pointerId:e.pointerId});
+     if(!latchMode||!e.isTrusted)return;
+     const g=window.__novaTempestHpGame;
+     if(type==='pointerdown')activeTouch={id:e.pointerId,player:g?.player,sampled:false};
+     if((type==='pointerup'||type==='pointercancel')&&activeTouch?.id===e.pointerId){
+      const a=g?.input?.aim,len=Math.hypot(a?.dx||0,a?.dy||0);
+      if(type==='pointerup'&&!activeTouch.sampled&&g?.input?.firing&&a?.active&&len>=9)
+       pendingShot={player:activeTouch.player,dx:a.dx,dy:a.dy,at:performance.now()};
+      activeTouch=null;
+     }
     },{capture:true,passive:true});
-  },halfRate);
+  },{halfRate,latchMode});
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   const canvas=page.locator('canvas.absolute.inset-0');
   await canvas.waitFor({state:'visible',timeout:30000});
@@ -174,7 +199,7 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
      {x:58,y:-23,vx:0,vy:0,hp:100000});
     if(g.hash?.clear){g.hash.clear();for(const t of g.tanks)g.hash.insert(t);}
     return {events:r.events.length,births:r.births.length,hits:r.hits.length,
-     updates:r.updates.length};
+     updates:r.updates.length,latches:r.latches.length};
    });
    const touch={...origin,id:100+i};
    // Queue the start and move in protocol order without waiting for two
@@ -199,13 +224,15 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
    const trial=await page.evaluate(before=>{
     const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
     const events=r.events.slice(before.events),births=r.births.slice(before.births),
-     hits=r.hits.slice(before.hits),updates=r.updates.slice(before.updates);
+     hits=r.hits.slice(before.hits),updates=r.updates.slice(before.updates),
+     latches=r.latches.slice(before.latches);
     const down=events.find(e=>e.type==='pointerdown');
     const move=events.find(e=>e.type==='pointermove');
     const up=events.find(e=>e.type==='pointerup'||e.type==='pointercancel');
     const previousUpdate=move?[...r.updates].reverse().find(u=>u.at<=move.at):null;
     const nextUpdate=move?r.updates.find(u=>u.at>move.at):null;
-    return {phaseSincePreviousUpdateMs:previousUpdate?move.at-previousUpdate.at:null,
+    return {recoveredIntents:latches.length,
+     phaseSincePreviousUpdateMs:previousUpdate?move.at-previousUpdate.at:null,
      phaseUntilNextUpdateMs:nextUpdate?nextUpdate.at-move.at:null,
      trusted:events.every(e=>e.trusted),down:!!down,move:!!move,
      up:!!up,durationMs:down&&up?up.at-down.at:null,
@@ -228,12 +255,15 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
     'a delivered deflection must occur within the measured touch lifetime');
    // A short move may be coalesced before release. Record that as an input
    // delivery outcome rather than falsely requiring an aim deflection.
-   assert.equal(trial.postReleaseBirths,0,
-    'short touch must not create projectiles after release');
+   if(latchMode)assert.ok(trial.postReleaseBirths<=trial.recoveredIntents,
+    'only a bounded deliberate intent may fire after release');
+   else assert.equal(trial.postReleaseBirths,0,
+    'baseline short touch must not create projectiles after release');
    assert.equal(trial.aimActive,false,'short trial must release aim ownership');
    assert.equal(trial.firing,false,'short trial must release firing');
    assert.equal(trial.stickId,-1,'short trial must clear aim pointer ID');
-   trial.outcome=!trial.move?'move-not-delivered':
+   trial.outcome=trial.recoveredIntents&&trial.births?'recovered-intent-projectile':
+    !trial.move?'move-not-delivered':
     trial.aimedFiringSamples===0?'no-deflected-simulation-sample':
     trial.births===0?'sampled-but-no-projectile':
     trial.hits===0?'projectile-without-hp-contact':'hp-contact';
@@ -247,7 +277,7 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
   const medianSampleGapMs=sampleGaps.length?
    sampleGaps[Math.floor(sampleGaps.length/2)]:null;
   console.log('NOVA_TEMPEST_TRUSTED_20MS_DIAGNOSTIC '+JSON.stringify({
-   requestedHoldMs:20,halfRateSamplingPilot:halfRate,
+   requestedHoldMs:20,halfRateSamplingPilot:halfRate,latchPilot:latchMode,
    medianObservedGameUpdateGapMs:medianSampleGapMs,
    attempts:shortTrials.length,
    shotTrials:shortTrials.filter(t=>t.births>0).length,
