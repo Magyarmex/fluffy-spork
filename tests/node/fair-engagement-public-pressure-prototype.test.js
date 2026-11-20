@@ -430,3 +430,32 @@ test('event-time public shot origin prevents shooter-relocation retargeting',()=
   }finally{s.g.destroy();}
  });
 });
+
+
+test('composed Battle Sense crossfire vector can falsely activate after witnessed shooter relocation',()=>{
+ withSeed(1517828,()=>{
+  const s=scene();
+  try{
+   const {g,observer,left,other}=s;
+   const battle=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__;
+   assert.ok(battle&&typeof battle.thirdPartyVector==='function');
+   g.hasLineOfSight=()=>true;
+   // Force the shipping Fair Engagement branch, not the legacy private-slot fallback.
+   g.__novaFairVisibleTanks=g.tanks;
+   other.x=0;other.y=0;
+   Object.assign(observer.ai,{__v181ObservedShotId:other.id,
+    __v181ObservedShotAt:9.9,__v181ObservedShotAngle:0});
+   const original=battle.thirdPartyVector(g,observer,left,{});
+   assert.equal(original.weight,0,'eastbound shot is not aimed at left-side target');
+   const shot=Object.freeze({x:other.x,y:other.y,at:9.9,angle:0});
+   other.x=-200;
+   const relocated=battle.thirdPartyVector(g,observer,left,{});
+   assert.equal(relocated.weight,.62,
+    'negative control: shipping crossfire logic treats old shot as leftward duel');
+   assert.equal(eventOriginShotPressure(g,observer,left,shot),0,
+    'frozen witnessed origin does not justify the new crossfire');
+   console.log('NOVA_BATTLE_SENSE_RELOCATION_COUNTEREXAMPLE '+JSON.stringify({
+    before:original.weight,after:relocated.weight,originWitness:0}));
+  }finally{s.g.destroy();}
+ });
+});
