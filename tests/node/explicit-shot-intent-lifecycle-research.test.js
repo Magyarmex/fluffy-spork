@@ -247,3 +247,18 @@ test('trusted events with unusable timestamps cannot be laundered as unverified'
   f.owner.detach();
  }
 });
+
+test('browser visibility guard works without Node-only __testWindow',()=>{
+ const {ownerDocumentHidden}=require('../research/subtick-fire-pulse.cjs');
+ const prior=globalThis.document;
+ try{
+  globalThis.document={hidden:true};
+  assert.equal(ownerDocumentHidden({}),true);
+  globalThis.document.hidden=false;
+  assert.equal(ownerDocumentHidden({}),false);
+  assert.equal(ownerDocumentHidden({__testWindow:{document:{hidden:true}}}),true);
+ }finally{
+  if(prior===undefined)delete globalThis.document;
+  else globalThis.document=prior;
+ }
+});
