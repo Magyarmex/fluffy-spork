@@ -2,7 +2,7 @@
 // RESEARCH ONLY. Preserve a bounded history of camera geometry actually
 // submitted to the canvas. Do not infer a camera from event delivery time.
 class PresentedCameraHistory {
-  constructor({capacity=12,maxAgeMs=120}={}) {
+  constructor({capacity=48,maxAgeMs=120}={}) {
     if(!Number.isInteger(capacity)||capacity<2||capacity>64||
        !Number.isFinite(maxAgeMs)||maxAgeMs<=0||maxAgeMs>1000)
       throw Error('invalid camera history budget');
