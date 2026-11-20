@@ -109,8 +109,13 @@ test('actual fixed-step browser factory freezes the DOM-time mouse world point',
    'camera movement after DOM capture cannot move the physical mouse target');
   assert.ok(Math.abs(pilot.pulse.pending.durationMs-30)<1e-7);
   Object.assign(g.player,{x:0,y:0,angle:0,fireCd:0});
+  const born=[];const originalFire=g.tryFire;
+  g.tryFire=function(t,...args){
+   const before=this.bullets.length,result=originalFire.call(this,t,...args);
+   if(t===g.player)born.push(...this.bullets.slice(before).map(b=>({vx:b.vx,vy:b.vy})));
+   return result;
+  };
   g.update(1/60);
-  const born=g.bullets.filter(b=>b.ownerId===g.player.id);
   assert.ok(born.length>0,'captured world target must create a real player projectile');
   assert.ok(born[0].vx>0,'projectile must aim toward the captured eastward world target');
   assert.equal(pilot.pulse.intents,1,'only one weapon intent may be consumed');
