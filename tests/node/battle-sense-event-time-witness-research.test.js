@@ -196,6 +196,21 @@ test('two observers receive different public victim memories for the same shot',
    'observer B cannot inherit A\'s victim knowledge through cover');
  }finally{g.destroy();}
 });
+test('dead victim and replacement with reused ID cannot inherit a shot witness',()=>{
+ const w=scene();
+ try{
+  w.third.x=100;w.third.y=0;
+  w.observer.ai.__v181ObservedShotVictims=[w.third];
+  assert.equal(w.weight(),.62);
+  w.third.alive=false;
+  assert.equal(w.weight(),0,'dead victim cannot remain an active crossfire contact');
+  const replacement=tank(w.third.id,100,0,{});
+  w.g.tanks=[w.observer,w.target,replacement];
+  w.g.__novaFairVisibleTanks=w.g.tanks;
+  assert.equal(w.weight(),0,
+   'new tank object with reused ID cannot inherit old event-time witness');
+ }finally{w.g.destroy();}
+});
 test('research fixture uses canonical materialized 49-overlay composition',()=>{
  const html=fs.readFileSync(path.join(root,'index.html'),'utf8');
  const scripts=[...html.matchAll(/<script[^>]+src=["']\.\/(nova-updates\/[^"']+)["']/g)];
