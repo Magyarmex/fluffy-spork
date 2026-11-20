@@ -80,6 +80,8 @@ test('real composed projectile birth does not recognize a victim absent at firin
   assert.equal(observer.ai.__v181ObservedShotAngle,0);
   assert.ok(Array.isArray(observer.ai.__v181ObservedShotVictims));
   assert.equal(observer.ai.__v181ObservedShotVictims.includes(third),false);
+  assert.equal(Object.isFrozen(observer.ai.__v181ObservedShotVictims),true,
+   'empty witness memory must be shared immutable state, not per-shot garbage');
   g.tanks=[observer,shooter,third];
   g.__novaFairVisibleTanks=g.tanks;
   g.areHostile=()=>true;g.areAllies=()=>false;
