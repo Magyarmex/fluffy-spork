@@ -120,10 +120,10 @@ class SubtickFirePulse {
         const p=self.pending,now=performance.now();
         // The raw pulse helper must be safe on its own, not only when
         // wrapped by ExplicitShotIntent. Never replay a stale/dead release.
-        if(p.player!==game.player||p.player?.alive!==true||!releaseIsFresh(p,now))
+        if(p.player!==game.player||p.player?.alive===false||!releaseIsFresh(p,now))
           self.release();
       }
-      if (self.down && (self.down.player !== game.player || self.down.player?.alive !== true)) {
+      if (self.down && (self.down.player !== game.player || self.down.player?.alive === false)) {
         // A held press from a dead/replaced life must not keep firing or
         // commanding the new life while waiting for a later physical release.
         const down=self.down; self.down=null;
@@ -133,7 +133,7 @@ class SubtickFirePulse {
         // A replaced life must not inherit that old pointer aim ownership.
         if (down.type === 'mouse') input.mouseActive = false;
       }
-      const canPlay = game.status === 'playing' && game.player?.alive === true &&
+      const canPlay = game.status === 'playing' && game.player?.alive !== false &&
         !game.paused && !input.__novaInputPaused &&
         !ownerDocumentHidden(game);
       if (!canPlay) {
