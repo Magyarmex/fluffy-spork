@@ -364,3 +364,26 @@ test('existing observer-owned Battle Sense shot witness can inform public pressu
   }finally{s.g.destroy();}
  });
 });
+
+test('negative control: recent witnessed bearing can be reassigned after shooter relocation',()=>{
+ withSeed(1517824,()=>{
+  const s=scene();
+  try{
+   const {g,observer,left,right,other}=s;
+   g.hasLineOfSight=()=>true;
+   // At event time the shooter is at the origin and fires east toward right.
+   other.x=0;other.y=0;
+   Object.assign(observer.ai,{__v181ObservedShotId:other.id,
+    __v181ObservedShotAt:9.9,__v181ObservedShotAngle:0});
+   assert.equal(existingShotWitnessPressure(g,observer,right),1);
+   assert.equal(existingShotWitnessPressure(g,observer,left),0);
+   // The old witness stores angle/ID but not event-time shooter position.
+   // Relocating the shooter west makes the same old bearing falsely imply
+   // a shot at left, despite no new observed shot.
+   other.x=-200;
+   assert.equal(existingShotWitnessPressure(g,observer,left),1,
+    'falsifier: current shooter location can retarget a historical shot');
+   // Do not promote this proxy without event-time origin/trajectory evidence.
+  }finally{s.g.destroy();}
+ });
+});
