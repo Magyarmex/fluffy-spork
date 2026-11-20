@@ -285,7 +285,9 @@ function existingShotWitnessPressure(g,observer,target,{maxAge=1.25,cone=.95}={}
  const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
  if(!shooter||shooter===observer||shooter===target||shooter.alive===false||
     !fair.inGameplayViewport(g,observer,shooter)||
-    !fair.inGameplayViewport(g,observer,target))return 0;
+    !fair.inGameplayViewport(g,observer,target)||
+    (typeof g.hasLineOfSight==='function'&&
+     !g.hasLineOfSight(observer.x,observer.y,shooter.x,shooter.y,3)))return 0;
  const angle=Math.atan2(target.y-shooter.y,target.x-shooter.x);
  return Math.cos(angle-a.__v181ObservedShotAngle)>=cone?1:0;
 }
@@ -306,7 +308,11 @@ test('existing observer-owned Battle Sense shot witness can inform public pressu
    observer.ai.__v181ObservedShotAt=8;
    assert.equal(existingShotWitnessPressure(g,observer,left),0,
     'old observed fire cannot become permanent target pressure');
-   observer.ai.__v181ObservedShotAt=9.9;other.x=2000;
+   observer.ai.__v181ObservedShotAt=9.9;
+   g.hasLineOfSight=()=>false;
+   assert.equal(existingShotWitnessPressure(g,observer,left),0,
+    'lost line of sight cannot authorize current shooter coordinates');
+   g.hasLineOfSight=()=>true;other.x=2000;
    assert.equal(existingShotWitnessPressure(g,observer,left),0,
     'the prototype refuses to use a hidden shooter current position');
   }finally{s.g.destroy();}
