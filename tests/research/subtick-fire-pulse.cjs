@@ -21,6 +21,11 @@ function releaseIsFresh(p, now) {
     (physicalAge === null || (physicalAge >= 0 && physicalAge <= 50)) &&
     (holdMs === null || (holdMs >= 0 && holdMs <= 50));
 }
+function ownerDocumentHidden(game) {
+  const doc=game?.__testWindow?.document ||
+    (typeof document !== 'undefined' ? document : null);
+  return !!doc?.hidden;
+}
 class SubtickFirePulse {
   constructor(game, timeline) {
     if (!game || !game.input || !timeline || timeline.input !== game.input ||
@@ -99,7 +104,7 @@ class SubtickFirePulse {
       const aimValid = down && (down.type === 'mouse' ? input.mouseActive && input.firing :
         input.aim.active && Math.hypot(input.aim.dx,input.aim.dy) >= 9);
       if (same && !down.sampled && aimValid && self.game.status === 'playing' && !self.game.paused &&
-          !input.__novaInputPaused && !(self.game.__testWindow && self.game.__testWindow.document.hidden)) {
+          !input.__novaInputPaused && !ownerDocumentHidden(self.game)) {
         self.pending = {event:e, type:down.type, id:down.id, player:down.player,queuedAt:performance.now(),
           physicalAt:physicalReleaseAt(e),
           physicalDownAt:down.physicalDownAt}; self.down = null;
@@ -130,7 +135,7 @@ class SubtickFirePulse {
       }
       const canPlay = game.status === 'playing' && game.player?.alive === true &&
         !game.paused && !input.__novaInputPaused &&
-        !(game.__testWindow && game.__testWindow.document.hidden);
+        !ownerDocumentHidden(game);
       if (!canPlay) {
         self.release();
         // Death, pause and hidden/disabled input must not orphan a held
@@ -176,4 +181,4 @@ class SubtickFirePulse {
     this.timeline.releaseAll = this.old.releaseAll;
   }
 }
-module.exports = {SubtickFirePulse};
+module.exports = {SubtickFirePulse,ownerDocumentHidden};
