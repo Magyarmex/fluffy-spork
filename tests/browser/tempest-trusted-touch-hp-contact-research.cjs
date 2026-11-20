@@ -135,8 +135,10 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
    for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     document.addEventListener(type,e=>{
      if(e.pointerType!=='touch')return;
+     const deliveredAt=performance.now();
      window.__novaTempestHp.events.push({type,trusted:e.isTrusted,
-      at:performance.now(),pointerId:e.pointerId});
+      at:deliveredAt,eventStamp:e.timeStamp,
+      deliveryLagMs:deliveredAt-e.timeStamp,pointerId:e.pointerId});
      if(!latchMode||!e.isTrusted)return;
      const g=window.__novaTempestHpGame;
      // A second thumb may press the movement stick while the first aims.
