@@ -54,9 +54,10 @@ function run(cameraAtReplay,captureAtDom=true,moveAfterRelease=false){
  }finally{owner.detach();g.destroy();}
 }
 test('DOM-time world target resists late camera movement; legacy replay still drifts',()=>{
- const stable=run(0),moved=run(100),zoomed=run({x:100,zoom:2}),
-  cursorMoved=run({x:100,zoom:2},true,true),
-  legacy=run(100,false),failed=run(100,'throw');
+ const stable=run(0),moved=run(100),zoomed=run({x:100,zoom:1.5}),
+  cursorMoved=run({x:100,zoom:1.5},true,true),
+  legacy=run(100,false),legacyZoomed=run({x:100,zoom:1.5},false),
+  failed=run(100,'throw');
  assert.equal(stable.applied,2);assert.equal(moved.applied,2);
  assert.ok(Math.abs(stable.worldX-200)<1e-8);
  assert.ok(Math.abs(moved.worldX-stable.worldX)<1e-8,
@@ -68,6 +69,8 @@ test('DOM-time world target resists late camera movement; legacy replay still dr
  assert.equal(cursorMoved.applied,3,'cursor motion must still replay as live input');
  assert.ok(Math.abs(legacy.worldX-stable.worldX-100)<1e-8,
   'negative control must still reproduce the original 100-unit drift');
+ assert.ok(Math.abs(legacyZoomed.worldX-stable.worldX)>20,
+  'zoom negative control must demonstrably diverge from the captured target');
  assert.equal(stable.durationMs,moved.durationMs);
  assert.equal(stable.projectionFailures,0);
  assert.equal(moved.projectionFailures,0);
@@ -75,7 +78,8 @@ test('DOM-time world target resists late camera movement; legacy replay still dr
  assert.ok(Math.abs(failed.worldX-legacy.worldX)<1e-8,
   'projection failure preserves legacy fallback rather than inventing a world point');
  console.log('MOUSE_LATE_REPLAY_CAMERA_RESEARCH '+JSON.stringify({
-  stable,moved,zoomed,cursorMoved,legacy,failed,projectionDrift:moved.worldX-stable.worldX,
+  stable,moved,zoomed,cursorMoved,legacy,legacyZoomed,failed,
+  projectionDrift:moved.worldX-stable.worldX,
   caveat:'research-only injected capture-time projection; constructed camera mutation, not physical Android validation'
  }));
 });
