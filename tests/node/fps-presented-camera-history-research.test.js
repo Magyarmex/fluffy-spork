@@ -87,3 +87,21 @@ test('deterministic randomized chronology oracle never projects from a future fr
   }
  }
 });
+
+test('invalid camera geometry and event coordinates never produce a projected target',()=>{
+ const h=new PresentedCameraHistory();const good=geometry(0);
+ for(const bad of [
+  {...good,zoom:0},{...good,zoom:-1},{...good,x:Infinity},
+  {...good,rect:{...good.rect,left:NaN}},
+  {...good,rect:{...good.rect,width:0}},
+  {...good,width:0},null
+ ])assert.equal(h.record(1100,bad||undefined),false);
+ assert.equal(h.frames.length,0);
+ assert.equal(h.record(1100,good),true);
+ for(const bad of [{clientX:Infinity,clientY:300},
+   {clientX:600,clientY:NaN},{clientX:NaN,clientY:300}])
+  assert.equal(h.project(bad,meta),null);
+ assert.equal(h.project(event(),{...meta,physicalAtMs:NaN}),null);
+ assert.equal(h.project(event(),{...meta,deliveryMs:NaN}),null);
+ assert.equal(h.project(event(),{...meta,physicalAtMs:1201}),null);
+});
