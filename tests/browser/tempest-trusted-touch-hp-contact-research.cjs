@@ -14,8 +14,16 @@ const {chromium}=require('playwright');
   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({timeout:45000});
   await page.evaluate(()=>{
    const Game=window.__novaMakeRequire('')('game/engine').Game;
-   const start=Game.prototype.start,fire=Game.prototype.tryFire,damage=Game.prototype.damageTank;
-   window.__novaTempestHp={births:[],hits:[],events:[],targetReady:false};
+   const start=Game.prototype.start,fire=Game.prototype.tryFire,damage=Game.prototype.damageTank,
+    update=Game.prototype.update;
+   window.__novaTempestHp={births:[],hits:[],events:[],updates:[],targetReady:false};
+   Game.prototype.update=function(...args){
+    if(this===window.__novaTempestHpGame)
+     window.__novaTempestHp.updates.push({at:performance.now(),gameTime:this.time,
+      aimActive:!!this.input?.aim?.active,firing:!!this.input?.firing,
+      aimMagnitude:Math.hypot(this.input?.aim?.dx||0,this.input?.aim?.dy||0)});
+    return update.apply(this,args);
+   };
    Game.prototype.start=function(...args){
     if(!this.__novaDecorativeWorld)window.__novaTempestHpGame=this;
     return start.apply(this,args);
@@ -135,6 +143,78 @@ const {chromium}=require('playwright');
   assert.equal(report.aimActive,false);
   assert.equal(report.firing,false);
   assert.equal(errors.length,0,'no browser page errors: '+JSON.stringify(errors));
+  // Diagnostic only: a ~20ms trusted touch is shorter than a 30Hz frame.
+  // Never require a shot on every short gesture: Chromium delivery phase,
+  // presentation cadence and OS scheduling vary. Record real event timing,
+  // physical HP contact and any post-release births without forcing a frame.
+  const shortTrials=[];
+  for(let i=0;i<8;i++){
+   const before=await page.evaluate(()=>{
+    const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
+    g.player.fireCd=0;g.player.__v17Heat=.56;
+    g.player.__v17Stability=1;g.player.__v17FiredAt=-100;
+    g.bullets=[];g.input.firing=false;
+    Object.assign(g.player,{x:0,y:0,vx:0,vy:0,angle:0});
+    Object.assign(window.__novaTempestHpTarget,
+     {x:58,y:-23,vx:0,vy:0,hp:100000});
+    if(g.hash?.clear){g.hash.clear();for(const t of g.tanks)g.hash.insert(t);}
+    return {events:r.events.length,births:r.births.length,hits:r.hits.length,
+     updates:r.updates.length};
+   });
+   const touch={...origin,id:100+i};
+   // Queue the start and move in protocol order without waiting for two
+   // separate CDP round trips; those added ~45ms before the aim deflection.
+   const startDelivery=cdp.send('Input.dispatchTouchEvent',
+    {type:'touchStart',touchPoints:[touch]});
+   const moveDelivery=cdp.send('Input.dispatchTouchEvent',{type:'touchMove',
+    touchPoints:[{...touch,x:touch.x+35,y:touch.y-20}]});
+   await Promise.all([startDelivery,moveDelivery]);
+   // Node's timer is independent of the page's throttled RAF clock.
+   await new Promise(resolve=>setTimeout(resolve,20));
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+   await page.waitForTimeout(140);
+   const trial=await page.evaluate(before=>{
+    const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
+    const events=r.events.slice(before.events),births=r.births.slice(before.births),
+     hits=r.hits.slice(before.hits),updates=r.updates.slice(before.updates);
+    const down=events.find(e=>e.type==='pointerdown');
+    const move=events.find(e=>e.type==='pointermove');
+    const up=events.find(e=>e.type==='pointerup'||e.type==='pointercancel');
+    return {trusted:events.every(e=>e.trusted),down:!!down,move:!!move,
+     up:!!up,durationMs:down&&up?up.at-down.at:null,
+     updatesDuringTouch:down&&up?updates.filter(u=>u.at>=down.at&&u.at<=up.at).length:null,
+     activeAimSamples:down&&up?updates.filter(u=>u.at>=down.at&&u.at<=up.at&&u.aimActive).length:null,
+     firingSamples:down&&up?updates.filter(u=>u.at>=down.at&&u.at<=up.at&&u.firing).length:null,
+     aimedFiringSamples:down&&up?updates.filter(u=>u.at>=down.at&&u.at<=up.at&&u.firing&&u.aimMagnitude>=9).length:null,
+     moveToReleaseMs:move&&up?up.at-move.at:null,
+     births:births.length,hits:hits.length,
+     postReleaseBirths:up?births.filter(b=>b.at>up.at).length:null,
+     aimActive:g.input.aim.active,firing:g.input.firing,
+     stickId:g.input.stickId.aim};
+   },before);
+   assert.ok(trial.trusted&&trial.down&&trial.up,
+    'short trial must deliver trusted down/release');
+   // A short move may be coalesced before release. Record that as an input
+   // delivery outcome rather than falsely requiring an aim deflection.
+   assert.equal(trial.postReleaseBirths,0,
+    'short touch must not create projectiles after release');
+   assert.equal(trial.aimActive,false,'short trial must release aim ownership');
+   assert.equal(trial.firing,false,'short trial must release firing');
+   assert.equal(trial.stickId,-1,'short trial must clear aim pointer ID');
+   trial.outcome=!trial.move?'move-not-delivered':
+    trial.aimedFiringSamples===0?'no-deflected-simulation-sample':
+    trial.births===0?'sampled-but-no-projectile':
+    trial.hits===0?'projectile-without-hp-contact':'hp-contact';
+   shortTrials.push(trial);
+  }
+  assert.equal(errors.length,0,
+   'no browser page errors during short-touch trials: '+JSON.stringify(errors));
+  console.log('NOVA_TEMPEST_TRUSTED_20MS_DIAGNOSTIC '+JSON.stringify({
+   requestedHoldMs:20,attempts:shortTrials.length,
+   shotTrials:shortTrials.filter(t=>t.births>0).length,
+   hitTrials:shortTrials.filter(t=>t.hits>0).length,
+   trials:shortTrials
+  }));
   console.log('NOVA_TEMPEST_TRUSTED_TOUCH_REAL_HP '+JSON.stringify(report));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e);process.exitCode=1;});
