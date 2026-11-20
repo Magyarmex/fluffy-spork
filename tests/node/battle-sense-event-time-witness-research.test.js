@@ -71,7 +71,7 @@ test('real composed projectile birth does not recognize a victim absent at firin
   observer.x=-100;observer.y=0;
   g.hasLineOfSight=()=>true;
   g.tanks=[observer,shooter];
-  g.__novaFairShotWitnesses=[observer];
+  g.__novaFairShotWitnesses=g.tanks;
   const before=g.bullets.length;
   g.tryFire(shooter);
   assert.ok(g.bullets.length>before,'actual shipping Game must emit a projectile');
@@ -104,7 +104,7 @@ test('real projectile birth records event-time observer-visible third party',()=
   observer.x=-100;observer.y=0;
   g.tanks=[observer,shooter,third];g.__novaFairVisibleTanks=g.tanks;
   g.areHostile=()=>true;g.areAllies=()=>false;g.hasLineOfSight=()=>true;
-  g.__novaFairShotWitnesses=[observer];
+  g.__novaFairShotWitnesses=g.tanks;
   const before=g.bullets.length;g.tryFire(shooter);
   assert.ok(g.bullets.length>before);
   assert.ok(observer.ai.__v181ObservedShotVictims.includes(third),
@@ -126,7 +126,7 @@ test('a victim hidden at firing time cannot become a retroactive witness',()=>{
   g.tanks=[observer,shooter,third];g.__novaFairVisibleTanks=g.tanks;
   g.areHostile=()=>true;g.areAllies=()=>false;
   g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===observer.x&&ay===observer.y&&bx===third.x&&by===third.y);
-  g.__novaFairShotWitnesses=[observer];
+  g.__novaFairShotWitnesses=g.tanks;
   const before=g.bullets.length;g.tryFire(shooter);
   assert.ok(g.bullets.length>before);
   assert.equal(observer.ai.__v181ObservedShotId,shooter.id,
@@ -149,7 +149,7 @@ test('a victim outside observer viewport at shot time cannot appear retroactivel
   observer.x=-100;observer.y=0;
   g.tanks=[observer,shooter,third];g.__novaFairVisibleTanks=g.tanks;
   g.areHostile=()=>true;g.areAllies=()=>false;g.hasLineOfSight=()=>true;
-  g.__novaFairShotWitnesses=[observer];
+  g.__novaFairShotWitnesses=g.tanks;
   const before=g.bullets.length;g.tryFire(shooter);
   assert.ok(g.bullets.length>before);
   assert.equal(observer.ai.__v181ObservedShotId,shooter.id);
@@ -185,7 +185,7 @@ test('two observers receive different public victim memories for the same shot',
   g.tanks=[a,b,shooter,third];g.__novaFairVisibleTanks=g.tanks;
   g.areHostile=()=>true;g.areAllies=()=>false;
   g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===b.x&&ay===b.y&&bx===third.x&&by===third.y);
-  g.__novaFairShotWitnesses=[a,b];
+  g.__novaFairShotWitnesses=g.tanks;
   const before=g.bullets.length;g.tryFire(shooter);
   assert.ok(g.bullets.length>before);
   assert.equal(a.ai.__v181ObservedShotId,shooter.id);
