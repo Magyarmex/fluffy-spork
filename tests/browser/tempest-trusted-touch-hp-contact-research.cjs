@@ -390,8 +390,12 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
    }
   }
   if(explicitMode){
-   const droneReads=await page.evaluate(()=>window.__novaTempestHp.droneReads);
-   assert.ok(droneReads.length>0,'weapon-only pilot must traverse real drone-update owner');
+   const {droneReads,latches}=await page.evaluate(()=>({
+    droneReads:window.__novaTempestHp.droneReads,
+    latches:window.__novaTempestHp.latches
+   }));
+   assert.equal(droneReads.length,latches.length,
+    'each weapon-only intent must traverse the real drone-update owner once');
    assert.ok(droneReads.every(x=>x.intent&&!x.aimActive&&!x.firing),
     'weapon-only intent must never revive the physical right stick for drones');
   }
