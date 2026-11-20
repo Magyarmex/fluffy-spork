@@ -80,11 +80,13 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
    const baseStart=Game.prototype.start;
    window.__novaFixedResearch={births:0,volleyBirthWallMs:[],updates:[],renders:[],errors:[],lifecycle:[],touchEvents:[],appliedTouchEvents:[],frames:[],poseFrames:[]};
    const profile=window.__novaFixedResearch;
-   // For the held-three-shot gate, use a real controlled 50ms RAF gap
-   // instead of repeatedly blocking the main thread and accidentally
-   // triggering the >100ms touch quarantine. Other research arms retain
-   // their original 30Hz gate schedule.
-   const gateGaps=controlledGate&&activeBurst?[50,50/3,50/3,50/3]:
+   // For the held-three-shot gate, request a real controlled ~66.7ms
+   // RAF interval. A requested 50ms interval can arrive as ~40ms after
+   // native RAF alignment, producing only two updates and a false failure.
+   // Keep the actual delivered interval <100ms (foreground stall quarantine)
+   // and require three real updates plus a projectile. Other research arms
+   // retain their original 30Hz gate schedule.
+   const gateGaps=controlledGate&&activeBurst?[200/3,50/3,50/3,50/3]:
     [250/3,50/3,50/3,50/3];
    let gateNext=null,gateIndex=0,gateToken=0;
    const gatePending=new Map();
@@ -422,15 +424,15 @@ assert.ok([2,3,4].includes(maxSteps),'research Chromium supports bounded 2/3/4 s
   assert.ok(Math.hypot(held.dx,held.dy)>5,'real analog extension must be sampled');
   if(process.env.NOVA_FIXED60_ACTIVE_BURST==='1'){
    // Exercise three-update callbacks while the real right stick is held.
-   // RAF alignment varies: a 55ms main-thread block may yield a 33ms
-   // callback rather than 50ms. Retry boundedly, but never waive the gate.
+   // RAF alignment varies: a requested 50ms interval may yield a 40ms
+   // callback and only two updates. Retry boundedly, never waive the gate.
    const heldBurstStart=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
    let shotInThree=false;
    for(let attempt=0;attempt<8&&!shotInThree;attempt++){
     const beforeFrame=await page.evaluate(()=>window.__novaFixedResearch.frames.length);
     await page.evaluate(controlled=>{
      // Arm at the next real RAF boundary. The controlled research arm
-     // delivers an actual 50ms callback; do not manufacture foreground
+     // delivers an actual bounded ~66.7ms callback; do not manufacture foreground
      // stalls that can legitimately revoke touch ownership.
      window.__novaFixedResearch.armShotOnThree=true;
      if(!controlled){const end=performance.now()+65;while(performance.now()<end){}}
