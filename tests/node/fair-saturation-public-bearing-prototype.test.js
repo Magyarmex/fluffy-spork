@@ -1356,3 +1356,50 @@ test('composed nuke pickup credits a non-firing collector on real HP damage',()=
   }finally{g.destroy();}
  });
 });
+
+
+// Battle Sense gives AI tanks the same physical pickup powerup path. An AI
+// collector can trigger a nuke without firing; owner credit still cannot
+// establish a visible direct projectile. This covers the later 49-overlay
+// updatePowerups wrapper, not merely the original player-only core method.
+test('composed AI nuke pickup uses Battle Sense collection without gunfire',()=>{
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ withSeed(1517800,()=>{
+  const g=bootGame();if(!g.player)g.redeploy();
+  const player=g.player;
+  const [owner,victim,observer]=g.tanks.filter(t=>t&&t.ai&&!t.isPlayer);
+  assert.ok(player&&owner&&victim&&observer);
+  try{
+   g.sfx.muted=true;
+   g.setClass(owner,'scout');g.setClass(victim,'scout');
+   for(const [t,x,y] of [[owner,0,0],[victim,70,0],[observer,0,90],
+                         [player,600,600]])
+    Object.assign(t,{x,y,vx:0,vy:0,hp:1000,maxHp:1000,alive:true,
+     spawnShieldT:0,shieldT:0,bulwarkT:0,invulnT:0,tauntT:0});
+   g.tanks=[player,owner,victim,observer];
+   g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
+   g.shapes=[];g.drones=[];g.bullets=[];g.__novaTerrain=[];
+   g.__novaBattlefieldIndex=null;g.tmp=[];
+   if(g.hash&&g.hash.clear)g.hash.clear();
+   for(const t of g.tanks)g.hash.insert(t);
+   g.w=800;g.h=600;g.cam.zoom=1;g.time=10;g.status='playing';
+   const original=g.damageTank;
+   let contacts=0;
+   g.damageTank=function(target,amount,srcId,...rest){
+    const before=target.hp;
+    const out=original.call(this,target,amount,srcId,...rest);
+    if(target===victim&&target.hp<before){
+     contacts++;assert.equal(srcId,owner.id,'AI nuke credits its collector');
+    }
+    return out;
+   };
+   g.powerups=[{id:987655,kind:'powerup',type:'nuke',x:0,y:0,
+    ttl:20,born:g.time}];
+   g.updatePowerups(1/60);
+   assert.ok(contacts>0,'AI pickup must cause real tank HP damage');
+   assert.equal(g.powerups.length,0,'AI collector must consume pickup');
+   assert.equal(g.bullets.length,0,'AI collector fired no projectile');
+   assert.equal(player.hp,1000,'distant player must not collect or take damage');
+  }finally{g.destroy();}
+ });
+});
