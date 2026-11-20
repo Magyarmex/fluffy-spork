@@ -606,6 +606,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
         physicalDamageEvents: 0, potentialHitWitnessPairs: 0,
         droneDamageEvents: 0, reflectionDamageEvents: 0,
         splashDamageEvents: 0, bodyDamageEvents: 0,
+        nukeDamageEvents: 0,
         nestedDamageEvents: 0, knownNonProjectileWitnessPairs: 0,
         maxPotentialHitWitnessPairs: 0,
         acceptedHitWitnessPairs: 0, hitWitnessLOSCalls: 0,
@@ -617,7 +618,9 @@ test('natural composed worlds report public-bearing sensitivity without changing
       const hadOwnDrones=Object.prototype.hasOwnProperty.call(g,'updateDrones');
       const originalBodies=g.bodyCollisions;
       const hadOwnBodies=Object.prototype.hasOwnProperty.call(g,'bodyCollisions');
-      let droneScope=0,bodyScope=0,damageDepth=0;
+      const originalPowerup=g.applyPowerup;
+      const hadOwnPowerup=Object.prototype.hasOwnProperty.call(g,'applyPowerup');
+      let droneScope=0,bodyScope=0,nukeScope=0,damageDepth=0;
       if(observe)g.updateDrones=function(...args){
         droneScope++;
         try{return originalDrones.apply(this,args);}finally{droneScope--;}
@@ -625,6 +628,12 @@ test('natural composed worlds report public-bearing sensitivity without changing
       if(observe)g.bodyCollisions=function(...args){
         bodyScope++;
         try{return originalBodies.apply(this,args);}finally{bodyScope--;}
+      };
+      if(observe)g.applyPowerup=function(t,type){
+        if(type!=='nuke')return originalPowerup.call(this,t,type);
+        nukeScope++;
+        try{return originalPowerup.call(this,t,type);}
+        finally{nukeScope--;}
       };
       if(observe)g.damageTank=function(victim,amount,srcId,...rest){
         const hp=Number(victim&&victim.hp),nested=damageDepth>0;
@@ -639,11 +648,12 @@ test('natural composed worlds report public-bearing sensitivity without changing
           // outranks the generic owner ID. Unclassified is NOT projectile.
           const nonProjectile=this.__v17ReflectingIronWill?'reflection':
             nested?'nested':this.__v172HardBlast?.active?'splash':
-            droneScope?'drone':bodyScope?'body':null;
+            droneScope?'drone':bodyScope?'body':nukeScope?'nuke':null;
           if(nonProjectile==='drone')result.droneDamageEvents++;
           if(nonProjectile==='reflection')result.reflectionDamageEvents++;
           if(nonProjectile==='splash')result.splashDamageEvents++;
           if(nonProjectile==='body')result.bodyDamageEvents++;
+          if(nonProjectile==='nuke')result.nukeDamageEvents++;
           if(nonProjectile==='nested')result.nestedDamageEvents++;
           const shooter=(this.tanks||[]).find(t=>t&&t.id===srcId);
           if(shooter&&shooter!==victim){
@@ -751,8 +761,11 @@ test('natural composed worlds report public-bearing sensitivity without changing
           else delete g.updateDrones;
           if(hadOwnBodies)g.bodyCollisions=originalBodies;
           else delete g.bodyCollisions;
+          if(hadOwnPowerup)g.applyPowerup=originalPowerup;
+          else delete g.applyPowerup;
           assert.equal(droneScope,0,'research drone scope must not leak');
           assert.equal(bodyScope,0,'research body scope must not leak');
+          assert.equal(nukeScope,0,'research nuke scope must not leak');
           assert.equal(damageDepth,0,'research damage recursion must unwind');
         }
         g.destroy();
@@ -795,6 +808,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
       reflectionDamageEvents: observed.reflectionDamageEvents,
       splashDamageEvents: observed.splashDamageEvents,
       bodyDamageEvents: observed.bodyDamageEvents,
+      nukeDamageEvents: observed.nukeDamageEvents,
       nestedDamageEvents: observed.nestedDamageEvents,
       knownNonProjectileWitnessPairs: observed.knownNonProjectileWitnessPairs,
       potentialHitWitnessPairs: observed.potentialHitWitnessPairs,
