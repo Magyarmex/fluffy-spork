@@ -36,6 +36,12 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
       args[0]=Math.min(1/30,pendingDt);
       pendingDt=Math.max(0,pendingDt-args[0]);
      }
+     if(!latchMode){
+      window.__novaTempestHp.updates.push({at:performance.now(),gameTime:this.time,
+       aimActive:!!this.input?.aim?.active,firing:!!this.input?.firing,
+       aimMagnitude:Math.hypot(this.input?.aim?.dx||0,this.input?.aim?.dy||0)});
+      return update.apply(this,args);
+     }
      if(activeTouch&&this.input?.firing&&this.input?.aim?.active&&
         Math.hypot(this.input.aim.dx,this.input.aim.dy)>=9)activeTouch.sampled=true;
      const p=pendingShot;pendingShot=null;
