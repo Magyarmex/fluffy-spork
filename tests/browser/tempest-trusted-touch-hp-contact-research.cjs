@@ -39,8 +39,9 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
      if(activeTouch&&this.input?.firing&&this.input?.aim?.active&&
         Math.hypot(this.input.aim.dx,this.input.aim.dy)>=9)activeTouch.sampled=true;
      const p=pendingShot;pendingShot=null;
-     const valid=latchMode&&p&&p.player===this.player&&this.status==='playing'&&
-      !this.paused&&!document.hidden&&this.input?.stickId?.aim===-1&&
+     const valid=latchMode&&p&&p.player===this.player&&this.player?.alive&&
+      this.status==='playing'&&!this.paused&&!this.input?.__novaInputPaused&&
+      !document.hidden&&this.input?.stickId?.aim===-1&&
       performance.now()-p.at>=0&&performance.now()-p.at<=50;
      const input=this.input,aim=input.aim;
      const prior={firing:input.firing,active:aim.active,dx:aim.dx,dy:aim.dy};
