@@ -10,7 +10,8 @@ class PresentedCameraHistory {
     this.frames=[];this.misses=0;this.stale=0;this.invalid=0;
   }
   reset(){this.frames.length=0;}
-  record(at,{x,y,zoom,width,height,rect}={}) {
+  record(at,snapshot={}) {
+    const {x,y,zoom,width,height,rect}=snapshot||{};
     if(!Number.isFinite(at)||at<=0||!Number.isFinite(x)||
        !Number.isFinite(y)||!Number.isFinite(zoom)||zoom<=0||
        !Number.isFinite(width)||width<=0||!Number.isFinite(height)||height<=0||
@@ -24,7 +25,8 @@ class PresentedCameraHistory {
     if(this.frames.length>this.capacity)this.frames.shift();
     return true;
   }
-  project(event,{timestampTrusted=false,timestampExact=false,physicalAtMs:at,deliveryMs}={}) {
+  project(event,meta={}) {
+    const {timestampTrusted=false,timestampExact=false,physicalAtMs:at,deliveryMs}=meta||{};
     if(!timestampTrusted||!timestampExact||!Number.isFinite(at)||at<=0||
        !Number.isFinite(deliveryMs)||at>deliveryMs||!event||
        !Number.isFinite(event.clientX)||!Number.isFinite(event.clientY)){
