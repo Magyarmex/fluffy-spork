@@ -12,7 +12,7 @@ test('natural composed matches bound firing-time witness scans and report incide
    try{
     g.sfx.muted=true;g.sfx.startMusic=()=>{};
     g.status='playing';g.paused=false;
-    const stats={seed,frames:0,successfulFireCalls:0,observedShotRecords:0,
+    const stats={seed,frames:0,playingFrames:0,successfulFireCalls:0,observedShotRecords:0,
      eligibleVictimMemberships:0,shotsWithAnyVictimWitness:0,
      fireLOSCalls:0,maxFireLOSCalls:0,crossfireSamples:0};
     const originalLOS=g.hasLineOfSight,originalFire=g.tryFire;
@@ -48,6 +48,7 @@ test('natural composed matches bound firing-time witness scans and report incide
     };
     for(let frame=0;frame<720;frame++){
      g.update(1/60);stats.frames++;
+     if(g.status==='playing')stats.playingFrames++;
      if(frame%30===0)for(const t of g.tanks)
       if(t&&t.ai&&t.alive!==false&&t.ai.__v181Mode==='crossfire')
        stats.crossfireSamples++;
