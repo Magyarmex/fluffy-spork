@@ -60,7 +60,9 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
       !this.input?.firing&&!this.input?.aim?.active&&
       now-p.at>=0&&now-p.at<=50&&
       Number.isFinite(p.physicalAt)&&now-p.physicalAt>=0&&
-      now-p.physicalAt<=50;
+      now-p.physicalAt<=50&&
+      Number.isFinite(p.physicalDownAt)&&now-p.physicalDownAt>=0&&
+      now-p.physicalDownAt<=50;
      const input=this.input,aim=input.aim;
      const prior={firing:input.firing,active:aim.active,dx:aim.dx,dy:aim.dy};
      if(valid){
@@ -71,7 +73,8 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
       }else{input.firing=true;aim.active=true;aim.dx=p.dx;aim.dy=p.dy;}
       window.__novaTempestHp.latches.push({at:now,releaseAt:p.at,
        mode:explicitMode?'weapon-only':'whole-update',
-       physicalReleaseAgeMs:now-p.physicalAt});
+       physicalReleaseAgeMs:now-p.physicalAt,
+       physicalPressAgeMs:now-p.physicalDownAt});
      }
      window.__novaTempestHp.updates.push({at:performance.now(),gameTime:this.time,
       aimActive:!!input?.aim?.active,firing:!!input?.firing,
@@ -126,7 +129,8 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
      // Track each physical pointer independently; only the actual Input aim
      // owner may replace/cancel an aim-shot candidate.
      if(type==='pointerdown')
-      touchOwners.set(e.pointerId,{id:e.pointerId,player:g?.player,sampled:false});
+      touchOwners.set(e.pointerId,{id:e.pointerId,player:g?.player,
+       sampled:false,physicalDownAt:e.timeStamp});
      if(type==='pointermove'&&g?.input?.stickId?.aim===e.pointerId){
       const candidate=touchOwners.get(e.pointerId);
       if(candidate&&activeTouch!==candidate){activeTouch=candidate;pendingShot=null;}
@@ -141,7 +145,8 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
        if(type==='pointerup'&&!activeTouch.sampled&&g?.input?.firing&&
           g?.input?.stickId?.aim===e.pointerId&&a?.active&&len>=9)
         pendingShot={player:activeTouch.player,dx:a.dx,dy:a.dy,
-         at:performance.now(),physicalAt:e.timeStamp};
+         at:performance.now(),physicalAt:e.timeStamp,
+         physicalDownAt:activeTouch.physicalDownAt};
        activeTouch=null;
       }
       touchOwners.delete(e.pointerId);
@@ -295,6 +300,7 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
     return {recoveredIntents:latches.length,
      recoveredLatencyMs:latches.map(l=>l.at-l.releaseAt),
      physicalReleaseAgeMs:latches.map(l=>l.physicalReleaseAgeMs),
+     physicalPressAgeMs:latches.map(l=>l.physicalPressAgeMs),
      postReleaseProjectileLatencyMs:up?births.filter(b=>b.at>up.at).map(b=>b.at-up.at):[],
      phaseSincePreviousUpdateMs:previousUpdate?move.at-previousUpdate.at:null,
      phaseUntilNextUpdateMs:nextUpdate?nextUpdate.at-move.at:null,
@@ -326,6 +332,8 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
      'a recovered shot intent must expire after 50ms');
     assert.ok(trial.physicalReleaseAgeMs.every(ms=>ms>=0&&ms<=50),
      'a trusted physically stale release cannot be recovered');
+    assert.ok(trial.physicalPressAgeMs.every(ms=>ms>=0&&ms<=50),
+     'a stalled long hold cannot masquerade as a short unsampled shot');
    }
    else assert.equal(trial.postReleaseBirths,0,
     'baseline short touch must not create projectiles after release');
