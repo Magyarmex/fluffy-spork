@@ -678,7 +678,9 @@ test('natural composed worlds report public-bearing sensitivity without changing
       const C = g.__testWindow.__novaMakeRequire('')('game/classes');
       const result = { observerSamples: 0, multiVisible: 0,
         changedSelections: 0, shotChangedSelections: 0,
-        publicBearingContacts: 0, publicShotContacts: 0, selected: 0,
+        projectileChangedSelections: 0, projectileHumanSelections: 0,
+        publicBearingContacts: 0, publicShotContacts: 0,
+        publicProjectileContacts: 0, publicProjectileChoiceLOSCalls: 0, selected: 0,
         publicChoiceLOSCalls: 0, publicDiagnosticLOSCalls: 0,
         physicalDamageEvents: 0, potentialHitWitnessPairs: 0,
         droneDamageEvents: 0, reflectionDamageEvents: 0,
@@ -791,6 +793,7 @@ test('natural composed worlds report public-bearing sensitivity without changing
             if (typeof originalLOS === 'function') {
               g.hasLineOfSight = function (...args) {
                 if (queryPhase === 'choice') result.publicChoiceLOSCalls++;
+                else if (queryPhase === 'projectile') result.publicProjectileChoiceLOSCalls++;
                 else result.publicDiagnosticLOSCalls++;
                 return originalLOS.apply(this, args);
               };
@@ -799,6 +802,9 @@ test('natural composed worlds report public-bearing sensitivity without changing
               const proposed = publicChoice(T, g, observer, C);
               const shotProposed = publicChoice(T, g, observer, C, 'shot');
               const hitProposed = publicChoice(T, g, observer, C, 'hit');
+              queryPhase = 'projectile';
+              const projectileProposed = publicChoice(T, g, observer, C, 'projectile');
+              queryPhase = 'choice';
               if (shipping && proposed) {
                 result.selected++;
                 if (shipping.id !== proposed.id) result.changedSelections++;
@@ -806,6 +812,10 @@ test('natural composed worlds report public-bearing sensitivity without changing
                   result.shotChangedSelections++;
                 if(hitProposed && shipping.id !== hitProposed.id)
                   result.hitChangedSelections++;
+                if(projectileProposed && shipping.id !== projectileProposed.id)
+                  result.projectileChangedSelections++;
+                if(projectileProposed&&projectileProposed.isPlayer)
+                  result.projectileHumanSelections++;
                 if(shipping.isPlayer)result.shippingHumanSelections++;
                 if(hitProposed&&hitProposed.isPlayer)result.hitHumanSelections++;
               }
@@ -814,6 +824,8 @@ test('natural composed worlds report public-bearing sensitivity without changing
                 result.publicBearingContacts += bearingCount(T, g, observer, target, C);
                 result.publicShotContacts += witnessedShotCount(T, g, observer, target, C);
                 result.publicHitContacts += confirmedHitCount(g, observer, target);
+                result.publicProjectileContacts +=
+                  visibleInboundProjectileCount(T,g,observer,target,C);
               }
             } finally {
               if (hadOwnLOS) g.hasLineOfSight = originalLOS;
@@ -872,9 +884,13 @@ test('natural composed worlds report public-bearing sensitivity without changing
       changedSelections: observed.changedSelections,
       shotChangedSelections: observed.shotChangedSelections,
       hitChangedSelections: observed.hitChangedSelections,
+      projectileChangedSelections: observed.projectileChangedSelections,
+      projectileHumanSelections: observed.projectileHumanSelections,
       hitHumanSelections: observed.hitHumanSelections,
       shippingHumanSelections: observed.shippingHumanSelections,
       publicHitContacts: observed.publicHitContacts,
+      publicProjectileContacts: observed.publicProjectileContacts,
+      publicProjectileChoiceLOSCalls: observed.publicProjectileChoiceLOSCalls,
       publicBearingContacts: observed.publicBearingContacts,
       publicShotContacts: observed.publicShotContacts,
       publicChoiceLOSCalls: observed.publicChoiceLOSCalls,
