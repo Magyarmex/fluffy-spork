@@ -177,3 +177,21 @@ test('Battle Sense reload-punish window rejects untrusted shot times but accepts
  assert.ok(helper.witnessedOpening(g,classes,observer,target,.2)>0,
   'real game-time-zero shot must retain its legitimate punish window');
 });
+
+test('missing or coerced shot bearing cannot invent an eastbound duel',()=>{
+ const helper=loadBattleSense();
+ const observer={...tank(1,undefined,-200,0),ai:{
+  __v181ObservedShotId:2,__v181ObservedShotAt:0,
+  __v181ObservedShotX:0,__v181ObservedShotY:0}};
+ const target=tank(2,undefined,0,0),third=tank(3,undefined,100,0);
+ const g={time:0,tanks:[observer,target,third],
+  __novaFairVisibleTanks:[observer,target,third],hasLineOfSight:()=>true};
+ for(const bad of [undefined,null,'0',NaN,Infinity]){
+  observer.ai.__v181ObservedShotAngle=bad;
+  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
+   'untrusted bearing cannot imply a shot to the east: '+String(bad));
+ }
+ observer.ai.__v181ObservedShotAngle=0;
+ assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
+  'a legitimate numeric eastbound bearing remains valid');
+});
