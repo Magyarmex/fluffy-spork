@@ -4,6 +4,8 @@
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const fs=require('node:fs'),path=require('node:path');
+// Importing the composed Game fixture must not register its unrelated audio RNG test.
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
 const root=path.resolve(__dirname,'../..');
 function tank(id,x,y,ai){return {id,x,y,alive:true,hp:100,maxHp:100,cls:'twin',ai};}
