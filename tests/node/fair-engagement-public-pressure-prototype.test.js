@@ -184,7 +184,7 @@ test('natural composed match samples public-pressure candidate incidence without
     for(let frame=0;frame<120;frame++){
      g.update(1/60);stats.frames++;
      if(frame%12!==0)continue;
-     const observers=g.tanks.filter(t=>t&&t.ai&&t.alive!==false).slice(0,5);
+     const observers=g.tanks.filter(t=>t&&t.ai&&t.alive!==false);
      for(const observer of observers)for(const target of g.tanks){
       if(!target||target===observer||target.alive===false)continue;
       if(typeof g.areAllies==='function'&&g.areAllies(observer,target))continue;
@@ -197,7 +197,6 @@ test('natural composed match samples public-pressure candidate incidence without
         distance:Math.min(stats.nearestPairDistance,distance);
       }
       if(!fair.inGameplayViewport(g,observer,target))continue;
-      if(typeof g.areAllies==='function'&&g.areAllies(observer,target))continue;
       stats.visiblePairs++;
       if(fair.saturation(g,target.id,observer.id)>0)stats.privateAssignments++;
       if(publicPressure(g,observer,target,{metrics:stats})>0)stats.proximityPositive++;
