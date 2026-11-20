@@ -101,7 +101,8 @@ function visibleInboundProjectileCount(T,g,observer,target,C=classes){
  const ext=T.viewportHalfExtents(g);
  let checkedWitness=false,shooter=null;
  for(const b of g.bullets||[]){
-  if(!b||b.dead||b.ownerId!==witnessedId||!(Number(b.ttl)>0)||
+  if(!b||b.dead||b.shell||b.beam||b.splash||
+     b.ownerId!==witnessedId||!(Number(b.ttl)>0)||
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
      !Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
      Math.abs(b.x-observer.x)>ext.x||Math.abs(b.y-observer.y)>ext.y)continue;
@@ -252,6 +253,14 @@ test('visible inbound projectile pressure requires a live public intercept lane'
  assert.equal(visibleInboundProjectileCount(T,g,observer,a),0,
   'invalid match time cannot certify recent witnessed fire');
  g.time=savedTime;
+ g.bullets[0].shell=true;
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),0,
+  'shell expiry/burst needs a different physical intercept model');
+ delete g.bullets[0].shell;
+ g.bullets[0].beam=true;
+ assert.equal(visibleInboundProjectileCount(T,g,observer,a),0,
+  'beam contact cannot be inferred from ordinary travel geometry');
+ delete g.bullets[0].beam;
  g.bullets.push({...g.bullets[0],x:50});
  assert.equal(visibleInboundProjectileCount(T,g,observer,a),1,
   'two rounds from one owner must not double-count saturation');
