@@ -202,6 +202,8 @@ const {chromium}=require('playwright');
     trial.hits===0?'projectile-without-hp-contact':'hp-contact';
    shortTrials.push(trial);
   }
+  assert.equal(errors.length,0,
+   'no browser page errors during short-touch trials: '+JSON.stringify(errors));
   console.log('NOVA_TEMPEST_TRUSTED_20MS_DIAGNOSTIC '+JSON.stringify({
    requestedHoldMs:20,attempts:shortTrials.length,
    shotTrials:shortTrials.filter(t=>t.births>0).length,
