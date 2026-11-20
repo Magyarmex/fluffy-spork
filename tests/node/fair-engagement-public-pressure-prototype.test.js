@@ -232,6 +232,8 @@ test('moving public target can cross a shot lane that static trajectory misses',
    assert.equal(movingProjectileThreat(g,observer,left,{vx:0,vy:-280}),1,
     'relative public velocity predicts the crossing within 250ms');
    left.vy=280;
+   assert.equal(movingProjectileThreat(g,observer,left,{vx:0,vy:-280}),1,
+    'unwitnessed exact target velocity change cannot affect cached public estimate');
    assert.equal(movingProjectileThreat(g,observer,left,{vx:0,vy:280}),0,
     'moving away from the lane is not the same threat');
   }finally{s.g.destroy();}
