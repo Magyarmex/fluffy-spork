@@ -77,9 +77,13 @@ class DirectShotIntent {
         if(Number.isFinite(z)&&z>0&&Number.isFinite(game.cam.x)&&
            Number.isFinite(game.cam.y)&&Number.isFinite(game.w)&&
            Number.isFinite(game.h)&&Number.isFinite(rect.left)&&
-           Number.isFinite(rect.top)){
-          const wx=game.cam.x+(x-rect.left-game.w*.5)/z;
-          const wy=game.cam.y+(y-rect.top-game.h*.5)/z;
+           Number.isFinite(rect.top)&&Number.isFinite(rect.width)&&
+           rect.width>0&&Number.isFinite(rect.height)&&rect.height>0){
+          // DOM client coordinates use the presented CSS rectangle, while
+          // Game.w/h describe canvas-space geometry. Preserve the visible
+          // target even when a CSS transform scales the canvas.
+          const wx=game.cam.x+((x-rect.left)/rect.width-.5)*game.w/z;
+          const wy=game.cam.y+((y-rect.top)/rect.height-.5)*game.h/z;
           if(Number.isFinite(wx)&&Number.isFinite(wy))world=Object.freeze({x:wx,y:wy});
         }
       }
