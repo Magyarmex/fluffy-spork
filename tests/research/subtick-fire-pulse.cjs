@@ -14,7 +14,8 @@ function releaseIsFresh(p, now) {
   const physicalAge = p.physicalAt === null ? null : now - p.physicalAt;
   const holdMs = p.physicalDownAt === null || p.physicalAt === null
     ? null : p.physicalAt - p.physicalDownAt;
-  return queuedAge >= 0 && queuedAge <= 50 &&
+  return (p.physicalDownAt === null) === (p.physicalAt === null) &&
+    queuedAge >= 0 && queuedAge <= 50 &&
     (physicalAge === null || (physicalAge >= 0 && physicalAge <= 50)) &&
     (holdMs === null || (holdMs >= 0 && holdMs <= 50));
 }
