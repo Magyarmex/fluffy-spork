@@ -2,7 +2,7 @@
 /* RESEARCH ONLY: exact shipping Game source is patched solely by the opt-in
  * test harness. The production materializer and playable input remain intact.
  * A one-tick shot intent is read by player firing, not Controller drones. */
-const {SubtickFirePulse}=require('./subtick-fire-pulse.cjs');
+const {SubtickFirePulse,ownerDocumentHidden}=require('./subtick-fire-pulse.cjs');
 function once(source,needle,replacement,label){
  const i=source.indexOf(needle);
  if(i<0||source.indexOf(needle,i+needle.length)>=0)
@@ -60,7 +60,7 @@ class ExplicitShotIntent {
      (physicalAge===null||(physicalAge>=0&&physicalAge<=50))&&
      (holdMs===null||(holdMs>=0&&holdMs<=50))&&
      game.status==='playing'&&!game.paused&&!input.__novaInputPaused&&
-     !(game.__testWindow&&game.__testWindow.document.hidden);
+     !ownerDocumentHidden(game);
    if(!canPlay){
     // A stale or revoked release is not a recovered pulse. Clear it before
     // the underlying research counter can mistake it for a fired intent.
