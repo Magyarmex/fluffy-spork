@@ -95,7 +95,7 @@ test('invalid camera geometry and event coordinates never produce a projected ta
   {...good,rect:{...good.rect,left:NaN}},
   {...good,rect:{...good.rect,width:0}},
   {...good,width:0},null
- ])assert.equal(h.record(1100,bad||undefined),false);
+ ])assert.equal(h.record(1100,bad),false);
  assert.equal(h.frames.length,0);
  assert.equal(h.record(1100,good),true);
  for(const bad of [{clientX:Infinity,clientY:300},
@@ -103,6 +103,7 @@ test('invalid camera geometry and event coordinates never produce a projected ta
   assert.equal(h.project(bad,meta),null);
  assert.equal(h.project(event(),{...meta,physicalAtMs:NaN}),null);
  assert.equal(h.project(event(),{...meta,deliveryMs:NaN}),null);
+ assert.equal(h.project(event(),null),null);
  assert.equal(h.project(event(),{...meta,physicalAtMs:1201}),null);
 });
 
