@@ -27,6 +27,8 @@ test('opt-in fixed60 factory preserves CSS-scaled canvas center world target',()
  // Input detach/reattach may replace fixture canvas geometry during pilot setup.
  // Install the presented-rect override at the actual DOM capture boundary.
  i.canvas.getBoundingClientRect=()=>({left:0,top:0,width:400,height:300});
+ assert.equal(i.canvas.getBoundingClientRect().width,400,
+  'the event-time presented canvas must actually be CSS-scaled');
  const event=(type,stamp,buttons)=>({type,timeStamp:stamp,
   pointerType:'mouse',pointerId:1,button:0,buttons,
   clientX:200,clientY:150,target:{closest:()=>null}});
