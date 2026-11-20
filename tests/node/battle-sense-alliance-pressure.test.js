@@ -4,11 +4,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function loadBattleSense({spawnShot = false, moveAfterShot = false} = {}) {
+function loadBattleSense({spawnShot = false, moveAfterShot = false, rotateAfterShot = false} = {}) {
   function Game() {}
   Game.prototype.tryFire = function (shooter) {
     if (spawnShot) this.bullets.push({x:shooter.x,y:shooter.y});
     if (moveAfterShot) { shooter.x += 90; shooter.y -= 60; }
+    if (rotateAfterShot) shooter.angle += Math.PI / 2;
   };
   Game.prototype.updatePowerups = function () {};
   const modules = {
@@ -194,4 +195,26 @@ test('missing or coerced shot bearing cannot invent an eastbound duel',()=>{
  observer.ai.__v181ObservedShotAngle=0;
  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
   'a legitimate numeric eastbound bearing remains valid');
+});
+
+test('Battle Sense witnesses the firing-time bearing, not a post-shot hull rotation',()=>{
+ const helper=loadBattleSense({spawnShot:true,rotateAfterShot:true});
+ const g=new helper.Game();
+ const shooter={...tank(1,undefined,0,0),angle:0};
+ const observer={...tank(2,undefined,100,0),ai:{}};
+ Object.assign(g,{bullets:[],tanks:[shooter,observer],time:10,hasLineOfSight:()=>true});
+ g.tryFire(shooter);
+ assert.equal(g.bullets.length,1,'the witness must correspond to a real projectile');
+ assert.equal(shooter.angle,Math.PI/2,'weapon fixture rotates hull synchronously after firing');
+ assert.equal(observer.ai.__v181ObservedShotAngle,0,
+  'observed shot retains its original eastbound direction');
+ assert.equal(observer.ai.__v181ObservedShotX,0);
+ assert.equal(observer.ai.__v181ObservedShotY,0);
+ const noShot=loadBattleSense({rotateAfterShot:true});
+ const empty=new noShot.Game();
+ const unseen={...tank(3,undefined,100,0),ai:{}};
+ Object.assign(empty,{bullets:[],tanks:[shooter,unseen],time:11,hasLineOfSight:()=>true});
+ empty.tryFire(shooter);
+ assert.equal(unseen.ai.__v181ObservedShotAngle,undefined,
+  'rotation without projectile birth must not create a witnessed shot');
 });
