@@ -289,7 +289,8 @@ function existingShotWitnessPressure(g,observer,target,{maxAge=1.25,cone=.95}={}
     !fair.inGameplayViewport(g,observer,shooter)||
     !fair.inGameplayViewport(g,observer,target)||
     (typeof g.hasLineOfSight==='function'&&
-     !g.hasLineOfSight(observer.x,observer.y,shooter.x,shooter.y,3)))return 0;
+     (!g.hasLineOfSight(observer.x,observer.y,shooter.x,shooter.y,3)||
+      !g.hasLineOfSight(shooter.x,shooter.y,target.x,target.y,3))))return 0;
  const angle=Math.atan2(target.y-shooter.y,target.x-shooter.x);
  return Math.cos(angle-a.__v181ObservedShotAngle)>=cone?1:0;
 }
@@ -316,6 +317,10 @@ test('existing observer-owned Battle Sense shot witness can inform public pressu
    g.hasLineOfSight=()=>false;
    assert.equal(existingShotWitnessPressure(g,observer,left),0,
     'lost line of sight cannot authorize current shooter coordinates');
+   g.hasLineOfSight=(ax,ay,bx,by)=>!(ax===other.x&&ay===other.y&&
+    bx===left.x&&by===left.y);
+   assert.equal(existingShotWitnessPressure(g,observer,left),0,
+    'shot-to-target cover blocks ordinary direct-pressure inference');
    g.hasLineOfSight=()=>true;other.x=2000;
    assert.equal(existingShotWitnessPressure(g,observer,left),0,
     'the prototype refuses to use a hidden shooter current position');
