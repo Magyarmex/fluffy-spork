@@ -32,8 +32,8 @@ function witnessedOpening(g,classes,t,target,now){if(!target||!visible(g,t,targe
  * Another bot's private targetId is not public information. */
 function witnessedDuel(g,observer,target,third){
  var a=observer&&observer.ai,now=Number(g&&g.time)||0;
- var at=Number(a&&a.__v181ObservedShotAt);
- if(!a||a.__v181ObservedShotAt==null||!Number.isFinite(at)||now-at<0||now-at>1.25)return false;
+ var at=a&&a.__v181ObservedShotAt;
+ if(!a||!Number.isFinite(at)||now-at<0||now-at>1.25)return false;
  var shooter=a.__v181ObservedShotId===target.id?target:
    a.__v181ObservedShotId===third.id?third:null;
  if(!shooter)return false;
