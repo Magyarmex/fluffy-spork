@@ -1,7 +1,9 @@
 'use strict';
 // Research-only projectile provenance prototype. NOT wired into gameplay.
 // Compare against event-time hull-cone candidate logic before changing AI.
-function projectileCandidate(game,shooter,victim,startIndex=0){
+// options.terrain=false is a deliberately geometry-only B arm: it does not
+// establish physical reachability through cover. Default C arm queries terrain.
+function projectileCandidate(game,shooter,victim,startIndex=0,options={}){
  if(!game||!shooter||!victim||!Array.isArray(game.bullets)||
     !Number.isFinite(victim.x)||!Number.isFinite(victim.y))
   return {known:false,possible:false,reason:'invalid'};
@@ -39,7 +41,7 @@ function projectileCandidate(game,shooter,victim,startIndex=0){
   const entry=Math.max(0,Math.min(maxTravel,
     projection-Math.sqrt(Math.max(0,hitRadius*hitRadius-lateral2))));
   if(!Number.isFinite(entry)){unsupported++;continue;}
-  if(typeof game.firstTerrainHit==='function'){
+  if(options.terrain!==false&&typeof game.firstTerrainHit==='function'){
    terrainChecks++;
    let hit;
    try{
