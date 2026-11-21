@@ -403,8 +403,11 @@ test('dead or non-finite observers cannot certify public crowd pressure',()=>{
       assert.equal(physicalCrowd(s.g,s.observer,s.center),1);
       s.observer.hp=0;
       assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
-      s.observer.hp=100;s.observer.x=NaN;
-      assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
+      s.observer.hp=100;
+      const priorX=s.observer.x;
+      s.observer.x=NaN;
+      try {assert.equal(physicalCrowd(s.g,s.observer,s.center),0);}
+      finally {s.observer.x=priorX;}
     } finally {s.g.destroy();}
   });
 });
