@@ -36,6 +36,48 @@ async function run(browser,label,viewport){
       type,id:e.pointerId,trusted:e.isTrusted,x:e.clientX,y:e.clientY
      });
     },{capture:true});
+   // Install before deploy so diagnosing a race does not shift the tap timing.
+   window.__novaUpgradeClickTrace=[];
+   window.__novaUpgradeRenderTrace=[];
+   window.__novaUpgradeRenderSampler=null;
+   const sampleUpgrade=()=>{
+    const g=window.__novaTouchGame;
+    const labels=[...document.querySelectorAll('button[data-ui]')]
+     .map(b=>(b.textContent||'').trim())
+     .filter(v=>/MINIMIZE|UPGRADE READY/.test(v));
+    window.__novaUpgradeRenderTrace.push({
+     at:performance.now(),labels,points:g?.statPoints,
+     pendingOffer:!!g?.pendingOffer,status:g?.status
+    });
+    if(window.__novaUpgradeRenderTrace.length>=90){
+     clearInterval(window.__novaUpgradeRenderSampler);
+     window.__novaUpgradeRenderSampler=null;
+    }
+   };
+   document.addEventListener('click',e=>{
+    const button=e.target?.closest?.('button[data-ui]');
+    if(!button)return;
+    const label=(button.textContent||'').trim();
+    if(!/MINIMIZE|UPGRADE READY/.test(label))return;
+    const g=window.__novaTouchGame;
+    if(window.__novaUpgradeClickTrace.length<40)
+     window.__novaUpgradeClickTrace.push({
+      label,trusted:e.isTrusted,detail:e.detail,at:performance.now(),
+      points:g?.statPoints,level:g?.player?.level,
+      pendingOffer:!!g?.pendingOffer,paused:g?.paused
+     });
+    if(label==='MINIMIZE' && !window.__novaUpgradeRenderSampler &&
+       window.__novaUpgradeRenderTrace.length===0){
+     sampleUpgrade();
+     window.__novaUpgradeRenderSampler=setInterval(sampleUpgrade,125);
+    }else if(label.includes('UPGRADE READY') &&
+             window.__novaUpgradeRenderSampler){
+     // The chip was found and tapped again: stop sampling before the
+     // subsequent stat-spend regression, without a Playwright round trip.
+     clearInterval(window.__novaUpgradeRenderSampler);
+     window.__novaUpgradeRenderSampler=null;
+    }
+   },true);
   });
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   const canvas=page.locator('canvas.absolute.inset-0');
@@ -45,6 +87,10 @@ async function run(browser,label,viewport){
   // A real finger cannot reach the canvas until the veil finishes leaving.
   await page.locator('.nv-loading').waitFor({state:'hidden',timeout:20000});
   await page.evaluate(()=>{const g=window.__novaTouchGame;g.input.autofire=false;g.player.spawnShieldT=20;});
+  // Measure the suspected prelude-XP confound instead of changing gameplay
+  // setup to assume it: default autofire requires an actual aim vector.
+  assert.equal(await page.evaluate(()=>window.__novaTouchGame.statPoints),0,
+   label+': pre-grant upgrade points must be zero (check startup input/XP)');
   // Regression #615: earn a REAL level point before the first joystick touch.
   // A pending upgrade must never trap either stick, even after the dwell expires.
   await page.evaluate(()=>{
@@ -52,6 +98,8 @@ async function run(browser,label,viewport){
    const types=window.__novaMakeRequire('')('game/types');
    g.gainXP(g.player,types.xpForLevel(g.player.level));
   });
+  assert.equal(await page.evaluate(()=>window.__novaTouchGame.statPoints),1,
+   label+': controlled first level grants exactly one upgrade point');
   const upgradeChip=page.getByRole('button',{name:/UPGRADE READY/i});
   await upgradeChip.waitFor({state:'visible',timeout:10000});
   const rect=await canvas.boundingBox();
@@ -65,6 +113,8 @@ async function run(browser,label,viewport){
   const minimize=page.getByRole('button',{name:'MINIMIZE'});
   await minimize.waitFor({state:'visible',timeout:10000});
   assert.ok((await stickClear()).every(v=>v.canvas),label+': even deliberately opened upgrade tray must not cover either stick');
+  // Pre-deploy diagnostics avoid an extra browser round trip in the narrow
+  // MINIMIZE timing window.
   await minimize.tap();
   try{
    await upgradeChip.waitFor({state:'visible',timeout:10000});
@@ -86,7 +136,9 @@ async function run(browser,label,viewport){
       pendingOffer:g?.pendingOffer==null?null:String(g.pendingOffer.tier||g.pendingOffer),playerAlive:g?.player?.alive,
       input:g?.input&&{moveActive:g.input.move?.active,
        aimActive:g.input.aim?.active,firing:g.input.firing},
-      buttons,upgradeTray:!!document.querySelector('[data-nova-upgrade-tray]')};
+      buttons,upgradeTray:!!document.querySelector('[data-nova-upgrade-tray]'),
+      upgradeClickTrace:window.__novaUpgradeClickTrace||[],
+      upgradeRenderTrace:window.__novaUpgradeRenderTrace||[]};
     });
    }catch(diagnosticError){state={diagnosticError:String(diagnosticError)};}
    try{
