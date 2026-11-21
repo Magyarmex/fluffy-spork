@@ -33,12 +33,18 @@ function reachabilityMiss(bullet,victim,options={}){
  const initialSpeed=Math.hypot(victim.vx,victim.vy);
  if(!Number.isFinite(projection)||!Number.isFinite(initialSpeed))
   return {known:false,reason:'geometry'};
+ // Variable-step mode uses the frame-independent convex velocity bound:
+ // every legal moveTank update preserves |v|<=max(|v0|,speedLimit), so
+ // displacement over any interval is at most that speed times elapsed time.
+ // It is less selective but remains valid across 30/60/120Hz and jitter.
  // An exact scalar upper bound for the discrete Game.moveTank recurrence.
  // Grouping adjacent frames into a segment and using its END displacement
  // for the entire projectile segment can only make certification stricter.
  // Eight groups usually preserve much of the 60-frame research signal while
  // requiring only eight geometric distance checks. No terrain rays.
  function maxDisplacement(n){
+  if(options.variableStep===true)
+   return Math.max(initialSpeed,speedLimit)*Math.min(bullet.ttl,n*dt);
   if(f===0)return initialSpeed*dt*n;
   const decay=1-f;
   return dt*(speedLimit*n+
