@@ -27,6 +27,8 @@ function projectileCandidate(game,shooter,victim,startIndex=0){
   const dx=victim.x-b.x,dy=victim.y-b.y;
   const maxTravel=speed*b.ttl;
   const projection=dx*ux+dy*uy;
+  if(!Number.isFinite(dx)||!Number.isFinite(dy)||
+     !Number.isFinite(projection)){unsupported++;continue;}
   const along=Math.max(0,Math.min(maxTravel,projection));
   const miss=Math.hypot(dx-ux*along,dy-uy*along);
   const hitRadius=hull+radius;
