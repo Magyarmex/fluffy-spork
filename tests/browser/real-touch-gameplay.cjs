@@ -93,8 +93,7 @@ async function run(browser,label,viewport){
     fs.mkdirSync(path.join('artifacts','browser'),{recursive:true});
     await page.screenshot({path:path.join('artifacts','browser',label+'-upgrade-reopen-failure.png')});
    }catch(_){}
-   error.message+=' | post-MINIMIZE state='+JSON.stringify(state);
-   throw error;
+   throw new Error(label+': second upgrade chip absent after MINIMIZE; state='+JSON.stringify(state),{cause:error});
   }
   await upgradeChip.tap();
   await minimize.waitFor({state:'visible',timeout:10000});
