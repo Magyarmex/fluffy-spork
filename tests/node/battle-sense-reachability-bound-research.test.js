@@ -107,3 +107,37 @@ test('research reachability: 512 seeded changing-direction inputs cannot beat th
  assert.ok(certified>0);
  assert.ok(contacts>0);
 });
+
+test('research reachability: frame-independent bound survives 30/60/120Hz and jitter',()=>{
+ let seed=0x3012060;
+ function rand(){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return (seed>>>0)/4294967296;}
+ let certified=0,contacts=0;
+ for(const hz of [30,60,120,'jitter']){
+  for(let i=0;i<256;i++){
+   const speed=[120,200,350,500][i%4],ttl=[.8,1,.8,.6][i%4];
+   const b=bullet(speed,ttl);
+   const v={...victim(15+rand()*205,-100+rand()*200),
+    vx:(rand()-.5)*S,vy:(rand()-.5)*S};
+   const certificate=reachabilityMiss(b,v,
+    {speedLimit:S,hullRadius:R,segments:8,variableStep:true});
+   if(certificate.known)certified++;
+   let x=v.x,y=v.y,vx=v.vx,vy=v.vy,t=0;
+   while(t<ttl-1e-10){
+    const dt=Math.min(ttl-t,hz==='jitter'?(1/120+rand()/40):1/hz);
+    const angle=rand()*Math.PI*2,power=rand()*S;
+    const f=Math.min(1,dt*9);
+    vx+=(Math.cos(angle)*power-vx)*f;
+    vy+=(Math.sin(angle)*power-vy)*f;
+    x+=vx*dt;y+=vy*dt;t+=dt;
+    if(Math.hypot(x-b.vx*t,y-b.vy*t)<=R){
+     contacts++;
+     assert.equal(certificate.known,false,
+      'variable-step certificate cannot reject legal movement '+hz+'/'+i);
+     break;
+    }
+   }
+  }
+ }
+ assert.ok(certified>0);
+ assert.ok(contacts>0);
+});
