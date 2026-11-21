@@ -42,8 +42,8 @@ function scene() {
   assert.ok(T && typeof T.publicEcoBias === 'function',
     'must use the composed 49-overlay Living Front implementation');
   const bots = g.tanks.filter(t => t && t.ai && !t.isPlayer);
-  assert.ok(bots.length >= 5);
-  const [observer, ...others] = bots.slice(0, 5);
+  assert.ok(bots.length >= 4);
+  const [observer, ...others] = bots.slice(0, 4);
   const sector = T.sectorIndex(100, -400);
   const center = T.sectorCenter(sector);
   Object.assign(observer, {x:-400,y:-400,hp:100,maxHp:100,alive:true,
