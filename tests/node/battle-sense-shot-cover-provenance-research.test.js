@@ -56,7 +56,7 @@ test('research characterization: real Battlefield wall blocks shot lane but not 
  try{
   const shooter=g.player,observer=g.tanks.find(t=>t!==shooter&&t.ai);
   assert.ok(shooter&&observer);
-  const victim=unit(9003,100,0,{});
+  const victim=unit(9003,100,0,{});victim.kind='tank';
   g.time=10;g.status='playing';g.paused=false;
   shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
   observer.x=0;observer.y=100;
@@ -87,8 +87,9 @@ test('research characterization: real Battlefield wall blocks shot lane but not 
   // Isolate the physical contact from unrelated spawned shapes and bots.
   g.shapes=[];g.drones=[];g.powerups=[];
   if(g.hash?.clear){g.hash.clear();for(const t of g.tanks)g.hash.insert(t);}
-  const born=g.bullets.slice(before);
+  const born=g.bullets.slice(before),hpBefore=victim.hp;
   g.updateBullets(.2);
+  assert.equal(victim.hp,hpBefore,'the real permanent wall must prevent victim HP contact');
   assert.ok(born.every(b=>b.dead||!g.bullets.includes(b)||b.x<=wall.x-wall.w/2+2),
    'permanent Battlefield wall must stop the actual swept projectile before the victim');
   wall.solid=false;
