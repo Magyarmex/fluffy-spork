@@ -92,3 +92,34 @@ test('research characterization: real Battlefield wall blocks shot lane but not 
    'KNOWN CANDIDATE DEFECT: a historically obstructed shot creates later crossfire');
  }finally{g.destroy();}
 });
+
+test('research characterization: shotgun hull cone can witness a lane with no pellet',()=>{
+ const g=bootGame();
+ try{
+  const shooter=g.player,observer=g.tanks.find(t=>t!==shooter&&t.ai);
+  assert.ok(shooter&&observer);
+  g.setClass(shooter,'shotgun');
+  const victim=unit(9003,100,55,{});
+  g.time=10;g.status='playing';g.paused=false;
+  shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
+  observer.x=0;observer.y=100;
+  g.tanks=[observer,shooter,victim];
+  g.__novaFairVisibleTanks=g.tanks;
+  g.__novaFairShotWitnesses=g.tanks;
+  g.areHostile=()=>true;g.areAllies=()=>false;
+  g.hasLineOfSight=()=>true;
+  const before=g.bullets.length;
+  g.tryFire(shooter);
+  const pellets=g.bullets.slice(before).filter(b=>b&&
+   Number.isFinite(b.vx)&&Number.isFinite(b.vy)&&Math.hypot(b.vx,b.vy)>1);
+  assert.ok(pellets.length>=3,'real shotgun must emit a multi-pellet volley');
+  const toward=Math.atan2(victim.y-shooter.y,victim.x-shooter.x);
+  const nearest=Math.min(...pellets.map(b=>
+   Math.abs(Math.atan2(Math.sin(Math.atan2(b.vy,b.vx)-toward),
+                      Math.cos(Math.atan2(b.vy,b.vx)-toward)))));
+  assert.ok(nearest>.15,
+   'fixture must place the victim outside every real pellet direction');
+  assert.equal(observer.ai.__v181ObservedShotVictims?.has(victim),true,
+   'KNOWN CANDIDATE DEFECT: a hull-cone candidate lacks projectile-bearing provenance');
+ }finally{g.destroy();}
+});
