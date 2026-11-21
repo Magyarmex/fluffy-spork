@@ -338,7 +338,7 @@ run('non-finite sample time revokes prior sightings rather than preserving recen
 run('bounded history survives long continuous public observation without copying',102917,(s,t)=>{
   const hz=60,seconds=3;
   for (let i=0;i<=hz*seconds;i++) {
-    s.rival.x=-100+i*2;
+    s.rival.x=-100+i*.5; // 30u/s, remains inside the 800px witness viewport
     t.sample(s.g,s.observer,[s.rival],10+i/hz);
   }
   assert.equal(t.size(),1,'one continuous observed rival remains bounded');
