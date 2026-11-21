@@ -13,6 +13,11 @@ test('research: a birth-time stationary miss can become a real Game projectile h
   assert.ok(shooter&&victim);
   g.sfx.muted=true;g.status='playing';g.paused=false;g.time=10;
   g.setClass(shooter,'scout');
+  g.setClass(victim,'scout');
+  victim.stats.speed=0;victim.hasteT=0;victim.stampedeT=0;
+  victim.perk=null;victim.gene=null;
+  const legalSpeed=g.tankSpeed(victim);
+  assert.equal(legalSpeed,124,'use a legal unbuffed Scout movement command');
   shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
   victim.x=200;victim.y=42;victim.vx=0;victim.vy=0;
   victim.alive=true;victim.spawnShieldT=0;victim.shieldT=0;
@@ -31,7 +36,7 @@ test('research: a birth-time stationary miss can become a real Game projectile h
   let contactFrame=-1;
   for(let i=0;i<60;i++){
    // Game's actual easing/acceleration owner, not an instantaneous teleport.
-   g.moveTank(victim,0,-124,1/60);
+   g.moveTank(victim,0,-legalSpeed,1/60);
    if(g.hash?.clear){g.hash.clear();for(const t of g.tanks)g.hash.insert(t);}
    g.updateBullets(1/60);
    g.time+=1/60;
