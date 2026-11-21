@@ -352,3 +352,19 @@ test('research public crowd requires Fair Engagement viewport authority',()=>{
     } finally {s.g.destroy();}
   });
 });
+
+test('research public crowd cannot inspect a terrain-occluded visible rival',()=>{
+  withSeed(1517813,()=>{
+    const s=scene();
+    try {
+      s.g.w=2400;s.g.h=1200;s.g.cam={zoom:1};
+      const hidden={id:99102,x:s.center.x,y:s.center.y,
+        get ai(){throw Error('occluded AI must not be inspected');},
+        get hp(){throw Error('occluded HP must not be inspected');}};
+      s.g.tanks.push(hidden);
+      s.g.hasLineOfSight=()=>false;
+      try {assert.equal(physicalCrowd(s.g,s.observer,s.center),0);}
+      finally {s.g.tanks.pop();}
+    } finally {s.g.destroy();}
+  });
+});
