@@ -45,6 +45,42 @@ async function run(browser,label,viewport){
       type,id:e.pointerId,trusted:e.isTrusted,x:e.clientX,y:e.clientY
      });
     },{capture:true});
+   // Install before deploy so diagnosing a race does not shift the tap timing.
+   window.__novaUpgradeClickTrace=[];
+   window.__novaUpgradeRenderTrace=[];
+   window.__novaUpgradeRenderSampler=null;
+   const sampleUpgrade=()=>{
+    const g=window.__novaTouchGame;
+    const labels=[...document.querySelectorAll('button[data-ui]')]
+     .map(b=>(b.textContent||'').trim())
+     .filter(v=>/MINIMIZE|UPGRADE READY/.test(v));
+    window.__novaUpgradeRenderTrace.push({
+     at:performance.now(),labels,points:g?.statPoints,
+     pendingOffer:!!g?.pendingOffer,status:g?.status
+    });
+    if(window.__novaUpgradeRenderTrace.length>=90){
+     clearInterval(window.__novaUpgradeRenderSampler);
+     window.__novaUpgradeRenderSampler=null;
+    }
+   };
+   document.addEventListener('click',e=>{
+    const button=e.target?.closest?.('button[data-ui]');
+    if(!button)return;
+    const label=(button.textContent||'').trim();
+    if(!/MINIMIZE|UPGRADE READY/.test(label))return;
+    const g=window.__novaTouchGame;
+    if(window.__novaUpgradeClickTrace.length<40)
+     window.__novaUpgradeClickTrace.push({
+      label,trusted:e.isTrusted,detail:e.detail,at:performance.now(),
+      points:g?.statPoints,level:g?.player?.level,
+      pendingOffer:!!g?.pendingOffer,paused:g?.paused
+     });
+    if(label==='MINIMIZE' && !window.__novaUpgradeRenderSampler &&
+       window.__novaUpgradeRenderTrace.length===0){
+     sampleUpgrade();
+     window.__novaUpgradeRenderSampler=setInterval(sampleUpgrade,125);
+    }
+   },true);
   });
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   const canvas=page.locator('canvas.absolute.inset-0');
@@ -78,43 +114,8 @@ async function run(browser,label,viewport){
   const minimize=page.getByRole('button',{name:'MINIMIZE'});
   await minimize.waitFor({state:'visible',timeout:10000});
   assert.ok((await stickClear()).every(v=>v.canvas),label+': even deliberately opened upgrade tray must not cover either stick');
-  // Record the provenance of actual MINIMIZE clicks. The shipping
-  // evolution-grace overlay also calls button.click() on a 40 ms timer;
-  // that programmatic click is untrusted, unlike a real Playwright tap.
-  // Do not change any UI state or relax the existing strict regression.
-  await page.evaluate(()=>{
-   window.__novaUpgradeClickTrace=[];
-   window.__novaUpgradeTraceListener=e=>{
-    const button=e.target?.closest?.('button[data-ui]');
-    if(!button)return;
-    const label=(button.textContent||'').trim();
-    if(!/MINIMIZE|UPGRADE READY/.test(label))return;
-    const g=window.__novaTouchGame;
-    window.__novaUpgradeClickTrace.push({
-     label, trusted:e.isTrusted,detail:e.detail,at:performance.now(),
-     points:g?.statPoints,level:g?.player?.level,
-     pendingOffer:!!g?.pendingOffer,paused:g?.paused
-    });
-   };
-   document.addEventListener('click',window.__novaUpgradeTraceListener,true);
-   // A bounded 125 ms timeline distinguishes a chip that never rendered
-   // from one briefly rendered then collapsed/removed by a later update.
-   window.__novaUpgradeRenderTrace=[];
-   const sample=()=>{
-    const g=window.__novaTouchGame;
-    const labels=[...document.querySelectorAll('button[data-ui]')]
-     .map(b=>(b.textContent||'').trim())
-     .filter(v=>/MINIMIZE|UPGRADE READY/.test(v));
-    window.__novaUpgradeRenderTrace.push({
-     at:performance.now(),labels,points:g?.statPoints,
-     pendingOffer:!!g?.pendingOffer,status:g?.status
-    });
-    if(window.__novaUpgradeRenderTrace.length>=90)
-     clearInterval(window.__novaUpgradeRenderSampler);
-   };
-   sample();
-   window.__novaUpgradeRenderSampler=setInterval(sample,125);
-  });
+  // Pre-deploy diagnostics avoid an extra browser round trip in the narrow
+  // MINIMIZE timing window.
   await minimize.tap();
   try{
    await upgradeChip.waitFor({state:'visible',timeout:10000});
@@ -147,14 +148,6 @@ async function run(browser,label,viewport){
    }catch(_){}
    throw new Error(label+': second upgrade chip absent after MINIMIZE; state='+JSON.stringify(state),{cause:error});
   }
-  await page.evaluate(()=>{
-   clearInterval(window.__novaUpgradeRenderSampler);
-   window.__novaUpgradeRenderSampler=null;
-   if(window.__novaUpgradeTraceListener){
-    document.removeEventListener('click',window.__novaUpgradeTraceListener,true);
-    window.__novaUpgradeTraceListener=null;
-   }
-  });
   await upgradeChip.tap();
   await minimize.waitFor({state:'visible',timeout:10000});
   const beforeStat=await page.evaluate(()=>window.__novaTouchGame.statPoints);
