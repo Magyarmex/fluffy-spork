@@ -331,3 +331,72 @@ run('non-finite sample time revokes prior sightings rather than preserving recen
   t.sample(s.g,s.observer,[s.rival],NaN);
   assert.equal(t.countToward(s.destination,10.3),0);
 });
+
+/* Controlled public BLOOM in the real 49-overlay Game, with actual AI,
+ * projectiles, ecology and terrain. Sampling must never perturb gameplay.
+ * This is a read-only causal pilot, NOT an estimate of natural BLOOM rate. */
+function publicBloomPilot(seed,observe) {
+  return withSeed(seed,draws=>{
+    const g=bootGame();
+    let result;
+    try {
+      if(!g.player)g.redeploy();
+      assert.equal(g.status,'playing');
+      const T=g.__testWindow.__NOVA_LIVING_FRONT_TEST__;
+      const sector=5,center=T.sectorCenter(sector);
+      const bots=g.tanks.filter(q=>q&&q.ai&&!q.isPlayer);
+      assert.ok(bots.length>=2);
+      const observer=bots[0],tracker=observedApproach();
+      g.__lfState.directorEnabled=true;
+      g.__lfState.signal={type:'BLOOM',sector,x:center.x,y:center.y,
+        started:g.time,until:g.time+4};
+      let sightings=0,approachFrames=0,privateCommitFrames=0,rays=0;
+      const los=g.hasLineOfSight;
+      if(observe)g.hasLineOfSight=function(...args){
+        rays++;return los.apply(this,args);
+      };
+      for(let i=0;i<120;i++){
+        if(g.status!=='playing')break;
+        g.update(1/60);
+        if(observe&&i%3===2){
+          const rivals=g.tanks.filter(q=>q&&q.ai&&q!==observer);
+          const before=draws();
+          tracker.sample(g,observer,rivals,g.time);
+          const count=tracker.countToward(center,g.time);
+          assert.equal(draws(),before,'read-only witness must not consume game RNG');
+          assert.ok(tracker.size()<=16);
+          if(tracker.size())sightings++;
+          if(count)approachFrames++;
+          if(rivals.some(q=>q.ai.__lfEcoKey==='BLOOM:'+sector))
+            privateCommitFrames++;
+        }
+      }
+      const world={
+        time:g.time,status:g.status,player:g.player&&[g.player.id,g.player.x,g.player.y,g.player.hp],
+        tanks:g.tanks.map(q=>[q.id,q.x,q.y,q.hp,q.alive,q.ai&&q.ai.__lfEcoKey]),
+        shapes:g.shapes.map(q=>[q.id,q.x,q.y,q.hp,q.alive]),
+        bullets:g.bullets.map(q=>[q.id,q.x,q.y,q.ttl,q.dead]),
+        ecology:g.__lfState.stats
+      };
+      result={world:JSON.stringify(world),draws:draws(),sightings,
+        approachFrames,privateCommitFrames,rays};
+    } finally {g.destroy();}
+    return result;
+  });
+}
+test('observed approach instrumentation preserves controlled full-game ecology causality',()=>{
+  for(const seed of [1517820,1517821]){
+    const control=publicBloomPilot(seed,false);
+    const witnessed=publicBloomPilot(seed,true);
+    assert.equal(witnessed.world,control.world,
+      'visibility sampling must not alter real 49-overlay physical state');
+    assert.equal(witnessed.draws,control.draws,
+      'visibility sampling must not alter gameplay random sequence');
+    console.log('NOVA_LF_PUBLIC_OBSERVATION_CAUSAL '+JSON.stringify({
+      seed,sightings:witnessed.sightings,
+      approachFrames:witnessed.approachFrames,
+      privateCommitFrames:witnessed.privateCommitFrames,
+      terrainRays:witnessed.rays,worldUnchanged:true
+    }));
+  }
+});
