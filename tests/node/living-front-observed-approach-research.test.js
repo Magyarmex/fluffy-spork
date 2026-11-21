@@ -38,7 +38,7 @@ function observedApproach() {
       const dt=previous ? now-previous.at : 0;
       const travel=previous ? Math.hypot(q.x-previous.x,q.y-previous.y) : 0;
       const continuous=old && old.body===q && dt>0 && dt<=.6 &&
-        travel<=400*dt+1; // teleport / respawn / long observation gap
+        travel<=650*dt+1; // conservative core boosted-speed ceiling; overlays need audit
       const history=continuous?old.history.slice(-31):[];
       history.push({at:now,x:q.x,y:q.y});
       records.delete(q.id);
@@ -68,7 +68,7 @@ function observedApproach() {
         const sx=destination.x-a.x,sy=destination.y-a.y;
         const segmentRange=Math.hypot(sx,sy);
         const alignment=(vx*sx+vy*sy)/(speed*segmentRange);
-        if (!(speed>=25 && speed<=401) ||
+        if (!(speed>=25 && speed<=651) ||
             !Number.isFinite(alignment) || alignment<.8) break;
         alignedSeconds+=dt;segments++;
       }
