@@ -257,3 +257,25 @@ test('covered or offscreen health is not read while a visible target remains sel
   const g=game(800,600,1);g.tanks=[observer,hidden,visible];
   assert.equal(T.chooseTarget(g,C,observer,observer.ai,g.time).id,visible.id);
 });
+
+test('Battle Sense tactical contacts cannot inspect offscreen rival health', () => {
+  const {window,load}=boot(),ai=load('game/ai');
+  window.__NOVA_BATTLE_SENSE__={};
+  const owner=tank(1,0,0,{ai:{state:'hunt',targetId:-1,__v181Think:0}});
+  const visible=tank(2,100,0),hidden=tank(3,1400,0);
+  Object.defineProperty(hidden,'hp',{get(){throw Error('offscreen tactical contact health');}});
+  const g=game(800,600,1);g.tanks=[owner,visible,hidden];
+  assert.doesNotThrow(()=>ai.updateAI(owner,g,1/60));
+  assert.equal(owner.ai.__v1112TargetId,visible.id);
+});
+
+test('Controller cached target checks public sight before private health', () => {
+  const {load}=boot(),Game=load('game/engine').Game;
+  const g=Object.assign(new Game(),game(800,600,1));
+  const owner=tank(1,0,0,{cls:'carrier',ai:{state:'hunt',targetId:2,__v1112TargetId:2}});
+  const hidden=tank(2,1400,0),visible=tank(3,100,0);
+  Object.defineProperty(hidden,'hp',{get(){throw Error('offscreen Controller target health');}});
+  g.tanks=[owner,hidden,visible];
+  assert.doesNotThrow(()=>g.updateDrones(1/60));
+  assert.equal(owner.__novaLiveVectorAI.targetId,visible.id);
+});
