@@ -235,3 +235,68 @@ test('research matched-world control: false witness changes composed AI strategi
   'identical seeded world without false witness must not choose crossfire');
  console.log('NOVA_FALSE_WITNESS_MOVE_RESEARCH '+JSON.stringify({falseWitness,noWitness}));
 });
+
+test('research A/B/C matched-world: projectile lane removes cone errors but only terrain arm rejects covered shot',()=>{
+ function arm(mode){
+  return withSeed(1517800,()=>{
+   const g=bootGame();
+   try{
+    const shooter=g.player;
+    const [observer,victim]=g.tanks.filter(t=>t!==shooter&&t.ai).slice(0,2);
+    assert.ok(shooter&&observer&&victim);
+    g.status='playing';g.paused=false;g.time=10;
+    shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
+    observer.x=-100;observer.y=100;
+    victim.x=100;victim.y=0;
+    g.tanks=[observer,shooter,victim];
+    g.__novaFairVisibleTanks=g.tanks;
+    g.__novaFairShotWitnesses=g.tanks;
+    g.areHostile=()=>true;g.areAllies=()=>false;
+    g.powerups=[];g.shapes=[];g.drones=[];
+    const wall={id:-9801,kind:'terrain',shape:'rect',type:'wall',
+     x:50,y:0,w:20,h:36,solid:true,destructible:false,hp:0};
+    g.__novaTerrain=[wall];
+    delete g.__novaBattlefieldIndex;
+    delete g.__novaPerfTerrainIndex;
+    assert.equal(g.hasLineOfSight(observer.x,observer.y,shooter.x,shooter.y,2),true);
+    assert.equal(g.hasLineOfSight(observer.x,observer.y,victim.x,victim.y,2),true);
+    const before=g.bullets.length;
+    g.tryFire(shooter);
+    assert.ok(g.bullets.length>before);
+    const cone=observer.ai.__v181ObservedShotVictims?.has(victim)===true;
+    const lane=projectileCandidate(g,shooter,victim,before,{terrain:false});
+    const physical=projectileCandidate(g,shooter,victim,before);
+    assert.equal(cone,true);
+    assert.equal(lane.known,true);
+    assert.equal(lane.possible,true);
+    assert.equal(lane.terrainChecks,0);
+    assert.equal(physical.known,true);
+    assert.equal(physical.possible,false);
+    // Historical cover disappears; only the event-time evidence differs.
+    wall.solid=false;
+    g.time=10.5;
+    const a=observer.ai;
+    a.__v1112TargetId=shooter.id;
+    a.__v1112NextThink=10.6;
+    a.__v180TargetId=shooter.id;
+    a.__v181ObservedShotId=shooter.id;
+    a.__v181ObservedShotAt=10;
+    a.__v181ObservedShotAngle=0;
+    a.__v181ObservedShotX=0;
+    a.__v181ObservedShotY=0;
+    const qualifies=mode==='A'?cone:mode==='B'?lane.possible:physical.possible;
+    a.__v181ObservedShotVictims=qualifies?new WeakSet([victim]):null;
+    const crossfire=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__
+     .thirdPartyVector(g,observer,shooter,{}).weight;
+    return {mode,qualifies,crossfire,terrainChecks:mode==='C'?physical.terrainChecks:0};
+   }finally{g.destroy();}
+  });
+ }
+ const A=arm('A'),B=arm('B'),C=arm('C');
+ assert.equal(A.crossfire,.62,'cone falsely certifies a covered firing event');
+ assert.equal(B.crossfire,.62,'geometry-only arm still cannot see permanent cover');
+ assert.equal(C.crossfire,0,'physical event-time gate rejects covered shot');
+ assert.equal(B.terrainChecks,0,'cheap lane arm adds no terrain queries');
+ assert.equal(C.terrainChecks,1);
+ console.log('NOVA_CROSSFIRE_ABC_COVER_RESEARCH '+JSON.stringify({A,B,C}));
+});
