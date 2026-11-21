@@ -63,6 +63,8 @@ async function run(browser,label,viewport){
    const types=window.__novaMakeRequire('')('game/types');
    g.gainXP(g.player,types.xpForLevel(g.player.level));
   });
+  assert.equal(await page.evaluate(()=>window.__novaTouchGame.statPoints),1,
+   label+': controlled first level grants exactly one upgrade point');
   const upgradeChip=page.getByRole('button',{name:/UPGRADE READY/i});
   await upgradeChip.waitFor({state:'visible',timeout:10000});
   const rect=await canvas.boundingBox();
