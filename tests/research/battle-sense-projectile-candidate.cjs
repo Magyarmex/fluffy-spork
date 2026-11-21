@@ -73,7 +73,12 @@ function projectileCandidate(game,shooter,victim,startIndex=0,options={}){
   }
   return {known:true,possible:true,checked,terrainChecks,unsupported};
  }
- return {known:checked>0&&unsupported===0&&!movingVictim&&!invalidMotion,possible:false,
+ // An instantaneous zero velocity does not prove a tank will remain stationary:
+ // the next player/AI command can accelerate it into the projectile lane.
+ // Conservative research comparisons must not certify a negative merely
+ // because a target was momentarily at rest at projectile birth.
+ const futureMotionUnknown=options.conservativeMotion===true;
+ return {known:checked>0&&unsupported===0&&!movingVictim&&!invalidMotion&&!futureMotionUnknown,possible:false,
   checked,terrainChecks,unsupported,movingVictim};
 }
 module.exports={projectileCandidate};
