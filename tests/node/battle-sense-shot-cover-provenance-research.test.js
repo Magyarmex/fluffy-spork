@@ -100,6 +100,20 @@ test('research characterization: real Battlefield wall blocks shot lane but not 
   assert.equal(g.__testWindow.__NOVA_BATTLE_SENSE_TEST__
    .thirdPartyVector(g,observer,shooter,{}).weight,.62,
    'KNOWN CANDIDATE DEFECT: a historically obstructed shot creates later crossfire');
+  // Positive physical control: with the wall gone, the same real weapon
+  // corridor must reach the real tank. Otherwise the blocked arm is vacuous.
+  shooter.fireCd=0;victim.spawnShieldT=0;
+  g.bullets=[];
+  if(g.hash?.clear){g.hash.clear();for(const t of g.tanks)g.hash.insert(t);}
+  g.tryFire(shooter);
+  const clearShot=g.bullets.find(b=>b.ownerId===shooter.id&&b.vx>1);
+  assert.ok(clearShot,'unblocked control must emit a forward projectile');
+  const travel=(victim.x-clearShot.x)/clearShot.vx;
+  assert.ok(travel>0&&travel<clearShot.ttl,
+   'unblocked control must reach victim within the real projectile lifetime');
+  g.updateBullets(travel);
+  assert.ok(clearShot.hits>0,
+   'real unblocked projectile must register physical contact with victim');
  }finally{g.destroy();}
 });
 
