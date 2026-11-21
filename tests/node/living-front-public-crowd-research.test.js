@@ -8,30 +8,33 @@ const { bootGame, withSeed } = require('../research/audio-rng-causal-pilot.cjs')
 
 function physicalCrowd(g, observer, destination, options = {}) {
   if (!g || !observer || !destination ||
-      !Number.isFinite(destination.x) || !Number.isFinite(destination.y)) return 0;
+      !Number.isFinite(destination.x) || !Number.isFinite(destination.y) ||
+      typeof g.hasLineOfSight !== 'function') return 0;
   const radius = options.radius ?? 300;
   const maxCount = options.maxCount ?? 4;
   const F = g.__testFair;
-  const zoom = Math.max(.1, Number(g.cam && g.cam.zoom) || 1);
-  const halfX = (Number(g.w) || 800) / (2 * zoom);
-  const halfY = (Number(g.h) || 600) / (2 * zoom);
+  // Fair Engagement's tank predicate reads target health before geometry.
+  // Use its exported point-only extents to avoid inspecting unseen rivals.
+  const ext = F && typeof F.viewportHalfExtents === 'function'
+    ? F.viewportHalfExtents(g) : null;
+  if (!ext || !(ext.x > 0) || !(ext.y > 0)) return 0;
   let count = 0;
   for (const q of g.tanks || []) {
-    if (!q || q === observer || q.id === observer.id || !q.ai ||
-        !(q.hp > 0) || q.alive === false || q.spawnShieldT > 0 ||
+    if (!q || q === observer || q.id === observer.id ||
         !Number.isFinite(q.x) || !Number.isFinite(q.y)) continue;
     // The candidate deliberately does not inspect __lfEcoKey, private target
     // IDs, unseen world sectors, or the target's actual planned destination.
-    const seen = F && typeof F.inGameplayViewport === 'function'
-      ? F.inGameplayViewport(g, observer, q)
-      : Math.abs(q.x - observer.x) <= halfX &&
-        Math.abs(q.y - observer.y) <= halfY;
+    const seen = Math.abs(q.x-observer.x) <= ext.x &&
+      Math.abs(q.y-observer.y) <= ext.y;
     if (!seen) continue;
     // Cheap public geometry first: do not spend a terrain ray on a visible
     // bot that is nowhere near the public opportunity.
     if (Math.hypot(q.x - destination.x, q.y - destination.y) > radius) continue;
-    if (g.hasLineOfSight &&
-        !g.hasLineOfSight(observer.x, observer.y, q.x, q.y, 2)) continue;
+    if (!g.hasLineOfSight(observer.x, observer.y, q.x, q.y, 2)) continue;
+    // Only publicly witnessed candidates may expose live status. Never
+    // query hidden health, spawn state or AI assignment through a crowd scan.
+    if (!q.ai || !(q.hp > 0) || q.alive === false || q.spawnShieldT > 0)
+      continue;
     count++;
     if (count >= maxCount) break;
   }
@@ -307,5 +310,63 @@ test('composed remembered BLOOM private-intent counterfactual remains observable
       // A corrected shipping planner may legitimately retain memory mode.
       assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
     } finally {LF.query=originalQuery;s.g.destroy();}
+  });
+});
+
+test('research public crowd cannot read offscreen private health or AI',()=>{
+  withSeed(1517810,()=>{
+    const s=scene();
+    try {
+      const hidden={id:99101,x:3000,y:3000,
+        get ai(){throw Error('hidden AI must not be inspected');},
+        get hp(){throw Error('hidden HP must not be inspected');}};
+      s.g.tanks.push(hidden);
+      assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
+      s.g.tanks.pop(); // Do not expose the artificial poison object to teardown.
+    } finally {s.g.destroy();}
+  });
+});
+
+test('research public crowd fails closed without authoritative terrain LOS',()=>{
+  withSeed(1517811,()=>{
+    const s=scene();
+    try {
+      s.g.w=2400;s.g.h=1200;s.g.cam={zoom:1};
+      s.others[0].x=s.center.x;s.others[0].y=s.center.y;
+      assert.equal(physicalCrowd(s.g,s.observer,s.center),1);
+      s.g.hasLineOfSight=null;
+      assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
+    } finally {s.g.destroy();}
+  });
+});
+
+test('research public crowd requires Fair Engagement viewport authority',()=>{
+  withSeed(1517812,()=>{
+    const s=scene();
+    try {
+      s.g.w=2400;s.g.h=1200;s.g.cam={zoom:1};
+      s.others[0].x=s.center.x;s.others[0].y=s.center.y;
+      assert.equal(physicalCrowd(s.g,s.observer,s.center),1);
+      // The composed Game exposes this test authority as read-only.
+      // Mask it on an isolated shallow view instead of mutating the Game.
+      const missingFair={...s.g,__testFair:null};
+      assert.equal(physicalCrowd(missingFair,s.observer,s.center),0);
+    } finally {s.g.destroy();}
+  });
+});
+
+test('research public crowd cannot inspect a terrain-occluded visible rival',()=>{
+  withSeed(1517813,()=>{
+    const s=scene();
+    try {
+      s.g.w=2400;s.g.h=1200;s.g.cam={zoom:1};
+      const hidden={id:99102,x:s.center.x,y:s.center.y,
+        get ai(){throw Error('occluded AI must not be inspected');},
+        get hp(){throw Error('occluded HP must not be inspected');}};
+      s.g.tanks.push(hidden);
+      s.g.hasLineOfSight=()=>false;
+      try {assert.equal(physicalCrowd(s.g,s.observer,s.center),0);}
+      finally {s.g.tanks.pop();}
+    } finally {s.g.destroy();}
   });
 });
