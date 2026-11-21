@@ -157,3 +157,12 @@ test('research projectile provenance: dead bullets do not certify a fresh threat
  assert.equal(live.possible,true);
  assert.equal(live.known,true);
 });
+
+test('research projectile provenance: coercible strings and booleans are not velocities',()=>{
+ for(const patch of [{vx:'100'},{vy:'0'},{vx:true},{vy:false}]){
+  const r=evaluate(patch);
+  assert.equal(r.known,false,JSON.stringify(patch));
+  assert.equal(r.possible,false,JSON.stringify(patch));
+  assert.equal(r.unsupported,1,JSON.stringify(patch));
+ }
+});
