@@ -18,7 +18,7 @@ function scene(){
   __v181ObservedShotAngle:0,__v181ObservedShotX:0,__v181ObservedShotY:0});
  const target=tank(9002,0,0,{});
  const third=tank(9003,0,100,{});
- observer.ai.__v181ObservedShotVictims=[];
+ observer.ai.__v181ObservedShotVictims=new WeakSet();
  g.time=10.5;
  g.tanks=[observer,target,third];
  g.__novaFairVisibleTanks=g.tanks;
@@ -45,7 +45,7 @@ test('composed Battle Sense: victim departure preserves genuine witnessed firing
  const w=scene();
  try{
   w.third.x=100;w.third.y=0;
-  w.observer.ai.__v181ObservedShotVictims=[w.third];
+  w.observer.ai.__v181ObservedShotVictims=new WeakSet([w.third]);
   assert.equal(w.weight(),.62,'eastbound shot was toward firing-time third party');
   w.third.x=0;w.third.y=100;
   assert.equal(w.weight(),.62,
@@ -164,7 +164,7 @@ test('cached candidate never bypasses trusted shot origin and bearing',()=>{
  const w=scene();
  try{
   w.third.x=100;w.third.y=0;
-  w.observer.ai.__v181ObservedShotVictims=[w.third];
+  w.observer.ai.__v181ObservedShotVictims=new WeakSet([w.third]);
   assert.equal(w.weight(),.62);
   w.observer.ai.__v181ObservedShotAngle=NaN;
   assert.equal(w.weight(),0,'invalid historical bearing cannot authenticate cached duel');
@@ -177,14 +177,14 @@ test('missing or malformed historical victim memory fails closed rather than tra
  const w=scene();
  try{
   w.third.x=100;w.third.y=0;
-  for(const legacy of [undefined,{},'legacy',42,{has(){return true;}},new Set([w.third])]){
+  for(const legacy of [undefined,{},'legacy',42,{has(){return true;}},new Set([w.third]),[w.third]]){
    w.observer.ai.__v181ObservedShotVictims=legacy;
    assert.equal(w.weight(),0,'untrusted legacy witness memory must not infer a new duel');
    w.third.x=0;w.third.y=100;
    assert.equal(w.weight(),0,'later movement must not change the fail-closed result');
    w.third.x=100;w.third.y=0;
   }
-  w.observer.ai.__v181ObservedShotVictims=[w.third];
+  w.observer.ai.__v181ObservedShotVictims=new WeakSet([w.third]);
   assert.equal(w.weight(),.62,'valid event-time candidate remains effective');
  }finally{w.g.destroy();}
 });
@@ -215,7 +215,7 @@ test('dead victim and replacement with reused ID cannot inherit a shot witness',
  const w=scene();
  try{
   w.third.x=100;w.third.y=0;
-  w.observer.ai.__v181ObservedShotVictims=[w.third];
+  w.observer.ai.__v181ObservedShotVictims=new WeakSet([w.third]);
   assert.equal(w.weight(),.62);
   w.third.alive=false;
   assert.equal(w.weight(),0,'dead victim cannot remain an active crossfire contact');
