@@ -55,8 +55,9 @@ test('research characterization: real Battlefield wall blocks shot lane but not 
  const g=bootGame();
  try{
   const shooter=g.player,observer=g.tanks.find(t=>t!==shooter&&t.ai);
-  assert.ok(shooter&&observer);
-  const victim=unit(9003,100,0,{});victim.kind='tank';
+  const victim=g.tanks.find(t=>t!==shooter&&t!==observer&&t.ai);
+  assert.ok(shooter&&observer&&victim,'use real composed tank objects for physical contact');
+  victim.x=100;victim.y=0;
   g.time=10;g.status='playing';g.paused=false;
   shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
   observer.x=0;observer.y=100;
