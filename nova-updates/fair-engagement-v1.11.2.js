@@ -41,8 +41,11 @@ function viewportHalfExtents(g){
   return{x:Math.max(0,Number(g&&g.w)||0)/(2*z),y:Math.max(0,Number(g&&g.h)||0)/(2*z),zoom:z};
 }
 function viewportContains(observer,target,e){
-  return !!observer&&!!target&&observer.id!==target.id&&alive(target)&&
-    Math.abs(target.x-observer.x)<=e.x&&Math.abs(target.y-observer.y)<=e.y;
+  /* Point-only geometry must precede live health. Offscreen tanks are not
+   * public health telemetry merely because an AI scan has their object. */
+  return !!observer&&!!target&&observer.id!==target.id&&
+    Math.abs(target.x-observer.x)<=e.x&&Math.abs(target.y-observer.y)<=e.y&&
+    alive(target);
 }
 /* Shared point-only viewport contract for projectiles: bullet and tank IDs occupy different namespaces, so a tank-identity predicate must not decide projectile visibility. */
 function inGameplayWorldPoint(g,observer,x,y){
@@ -51,7 +54,7 @@ function inGameplayWorldPoint(g,observer,x,y){
  return Math.abs(x-observer.x)<=e.x&&Math.abs(y-observer.y)<=e.y;
 }
 function inGameplayViewport(g,observer,target){
-  if(!g||!observer||!target||observer.id===target.id||!alive(target))return false;
+  if(!g||!observer||!target||observer.id===target.id)return false;
   return viewportContains(observer,target,viewportHalfExtents(g));
 }
 /* A single threat scan sees one camera frame. Share its extents across all
