@@ -52,16 +52,28 @@ test('research reachability: seeded four-command physical witness never contradi
    const v={...victim(15+rand()*205,-100+rand()*200),
     vx:(rand()-.5)*S,vy:(rand()-.5)*S};
    const r=reachabilityMiss(b,v,{speedLimit:S,hullRadius:R});
+   const coarse=reachabilityMiss(b,v,{speedLimit:S,hullRadius:R,segments:8});
    if(r.known)certified++;
+   if(coarse.known)assert.equal(r.known,true,
+    'coarse bound must never certify more than full frame-by-frame bound');
    for(const [ux,uy] of [[0,-S],[0,S],[S,0],[-S,0]]){
     if(actualContact(b,v,ux,uy)){
      contacts++;
      assert.equal(r.known,false,
       'certificate may not reject a physically simulated command at speed '+speed+' case '+i);
+     assert.equal(coarse.known,false,
+      'coarse certificate may not reject a physical command at speed '+speed+' case '+i);
     }
    }
   }
  }
  assert.ok(certified>0,'synthetic test must exercise a nonempty certificate set');
  assert.ok(contacts>0,'synthetic test must exercise real reachable contacts');
+});
+
+test('research reachability: invalid coarse window counts fail closed',()=>{
+ const b=bullet(200),v=victim(100,50);
+ for(const segments of [0,-1,1.5,Infinity,1000]){
+  assert.equal(reachabilityMiss(b,v,{speedLimit:S,hullRadius:R,segments}).known,false);
+ }
 });
