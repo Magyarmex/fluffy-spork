@@ -15,7 +15,8 @@ function projectileCandidate(game,shooter,victim,startIndex=0){
   if(b.shell||b.splash||b.cluster){unsupported++;continue;}
   const speed=Math.hypot(b.vx,b.vy);
   const radius=Number(b.r??0);
-  if(!(speed>1)||!Number.isFinite(speed)||
+  if(!Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
+     !(speed>1)||!Number.isFinite(speed)||
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
      !Number.isFinite(b.ttl)||b.ttl<=0||
      !Number.isFinite(radius)||radius<0||
