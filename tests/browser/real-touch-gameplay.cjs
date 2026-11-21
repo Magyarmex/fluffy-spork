@@ -98,8 +98,31 @@ async function run(browser,label,viewport){
   await upgradeChip.tap();
   await minimize.waitFor({state:'visible',timeout:10000});
   const beforeStat=await page.evaluate(()=>window.__novaTouchGame.statPoints);
-  await page.locator('[data-nova-upgrade-tray] .stat-btn').first().tap();
-  assert.equal(await page.evaluate(()=>window.__novaTouchGame.statPoints),beforeStat-1,label+': touch upgrade spends exactly one earned point');
+  const firstStat=page.locator('[data-nova-upgrade-tray] .stat-btn').first();
+  const beforeUpgrade=await page.evaluate(()=>{
+   const g=window.__novaTouchGame;
+   return {paused:g.paused,statPoints:g.statPoints,level:g.player?.level,
+    damage:g.player?.stats?.damage,pendingOffer:g.pendingOffer};
+  });
+  await firstStat.tap();
+  const afterStat=await page.evaluate(()=>window.__novaTouchGame.statPoints);
+  if(afterStat!==beforeStat-1){
+   const afterUpgrade=await page.evaluate(()=>{
+    const g=window.__novaTouchGame;
+    const el=document.querySelector('[data-nova-upgrade-tray] .stat-btn');
+    return {paused:g.paused,statPoints:g.statPoints,level:g.player?.level,
+     damage:g.player?.stats?.damage,pendingOffer:g.pendingOffer,
+     firstButton:el?.outerHTML.slice(0,400),
+     activeElement:document.activeElement?.outerHTML.slice(0,250)};
+   });
+   try{
+    fs.mkdirSync(path.join('artifacts','browser'),{recursive:true});
+    await page.screenshot({path:path.join('artifacts','browser',label+'-upgrade-spend-failure.png')});
+   }catch(_){}
+   assert.fail(label+': touch upgrade spends exactly one earned point; before='+
+    JSON.stringify(beforeUpgrade)+' after='+JSON.stringify(afterUpgrade));
+  }
+  assert.equal(afterStat,beforeStat-1,label+': touch upgrade spends exactly one earned point');
   await page.evaluate(()=>{
    const g=window.__novaTouchGame;
    const types=window.__novaMakeRequire('')('game/types');
