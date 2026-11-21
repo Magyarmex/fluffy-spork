@@ -563,8 +563,8 @@ function fairEcoTarget(g,t,target){
  var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__,ext=F&&
    typeof F.viewportHalfExtents==='function'?F.viewportHalfExtents(g):null;
  /* Only public geometry may be inspected before establishing sight.
-  * Fair Engagement's tank predicate reads health first, so using it here
-  * would expose a hidden held target's current life state. */
+  * Keep this explicit even when the shared Fair Engagement predicate
+  * also checks geometry first: hidden status is not sight evidence. */
  var z=Number(g.cam&&g.cam.zoom)||1;
  var hx=ext?ext.x:(g.w||800)/(2*z),hy=ext?ext.y:(g.h||600)/(2*z);
  var inFrame=Number.isFinite(hx)&&Number.isFinite(hy)&&hx>0&&hy>0&&

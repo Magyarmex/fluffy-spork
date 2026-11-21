@@ -468,3 +468,24 @@ test('shipping ecology still yields to a genuinely visible close hostile',()=>{
     }
   });
 });
+
+test('Fair Engagement viewport never reads offscreen hidden health',()=>{
+  withSeed(1517819,()=>{
+    const s=scene(),F=s.g.__testFair;
+    try {
+      const hidden={id:99119,x:3000,y:3000,
+        get hp(){throw Error('offscreen viewport leaked health');},
+        get alive(){throw Error('offscreen viewport leaked life');}};
+      assert.equal(F.inGameplayViewport(s.g,s.observer,hidden),false);
+      const sameId={id:s.observer.id,x:s.observer.x,y:s.observer.y,
+        get hp(){throw Error('same-ID viewport leaked health');}};
+      assert.equal(F.inGameplayViewport(s.g,s.observer,sameId),false);
+      const q=s.others[0];
+      Object.assign(q,{x:s.observer.x+80,y:s.observer.y,hp:100,
+        alive:true,spawnShieldT:0});
+      assert.equal(F.inGameplayViewport(s.g,s.observer,q),true);
+      q.hp=0;
+      assert.equal(F.inGameplayViewport(s.g,s.observer,q),false);
+    } finally {s.g.destroy();}
+  });
+});
