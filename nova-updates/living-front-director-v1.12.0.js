@@ -557,17 +557,30 @@ function routeCost(g,t,x,y,direct,bearing,classes){
  * a legitimate active Sniper Observer. A stale target id is not live radar. */
 var ECO_SNIPER_CLASSES={marksman:1,railgun:1,ghost:1,singularity:1,prism:1,specter:1,assassin:1};
 function fairEcoTarget(g,t,target){
- if(!target||!alive(target)||target.spawnShieldT>0)return false;
+ if(!target||!g||!t||target.id===t.id||
+    !Number.isFinite(t.x)||!Number.isFinite(t.y)||
+    !Number.isFinite(target.x)||!Number.isFinite(target.y))return false;
+ var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__,ext=F&&
+   typeof F.viewportHalfExtents==='function'?F.viewportHalfExtents(g):null;
+ /* Only public geometry may be inspected before establishing sight.
+  * Fair Engagement's tank predicate reads health first, so using it here
+  * would expose a hidden held target's current life state. */
+ var z=Number(g.cam&&g.cam.zoom)||1;
+ var hx=ext?ext.x:(g.w||800)/(2*z),hy=ext?ext.y:(g.h||600)/(2*z);
+ var inFrame=Number.isFinite(hx)&&Number.isFinite(hy)&&hx>0&&hy>0&&
+   Math.abs(target.x-t.x)<=hx&&Math.abs(target.y-t.y)<=hy;
+ var seen=inFrame&&(!g.hasLineOfSight||
+   g.hasLineOfSight(t.x,t.y,target.x,target.y,2));
+ /* Sniper Observer relay is an explicit remote-visibility exception.
+  * A stored target ID alone never authorizes private health/hostility reads. */
+ var live=window.__NOVA_SPOTTER_LIVE_RELAY__;
+ var relay=!seen&&!!ECO_SNIPER_CLASSES[t.cls]&&
+   typeof live==='function'&&!!live(g,t,target);
+ if(!seen&&!relay)return false;
+ if(!alive(target)||target.spawnShieldT>0)return false;
  if(typeof g.areAllies==='function'&&g.areAllies(t,target))return false;
  if(typeof g.areHostile==='function'&&!g.areHostile(t,target))return false;
- var F=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
- var seen=F&&F.inGameplayViewport?F.inGameplayViewport(g,t,target):
-  (function(){var z=(g.cam&&g.cam.zoom)||1,hx=(g.w||800)/(2*z),hy=(g.h||600)/(2*z);return Math.abs(target.x-t.x)<=hx&&Math.abs(target.y-t.y)<=hy;})();
- /* The public ecology planner runs against current battlefield state: a
-  * previous-frame Observer ID must not suppress an otherwise valid rotation. */
- var live=window.__NOVA_SPOTTER_LIVE_RELAY__;
- var relay=!!ECO_SNIPER_CLASSES[t.cls]&&typeof live==='function'&&live(g,t,target);
- /* A held target within viewport but behind terrain is not current sight. Do not read its live hidden position to suppress ecology; a legitimate active Observer relay remains valid. */return !!(seen&&(!g.hasLineOfSight||g.hasLineOfSight(t.x,t.y,target.x,target.y,2)))||relay;
+ return true;
 }
 /* Observation-only migration AI gate audit. These are DECISION SAMPLES, not
  * independent rivals, interceptions, player outcomes or hidden ecology.

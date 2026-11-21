@@ -411,3 +411,60 @@ test('dead or non-finite observers cannot certify public crowd pressure',()=>{
     } finally {s.g.destroy();}
   });
 });
+
+test('shipping ecology never reads a held offscreen target private status',()=>{
+  withSeed(1517816,()=>{
+    const s=scene(),originalGet=s.g.getTank;
+    const hidden={id:99116,x:3000,y:3000,
+      get hp(){throw Error('offscreen held target health leak');},
+      get spawnShieldT(){throw Error('offscreen held target shield leak');},
+      get ai(){throw Error('offscreen held target AI leak');}};
+    try {
+      const baseline=s.T.publicEcoBias(s.g,s.observer,{},{});
+      s.observer.ai.__v1112TargetId=hidden.id;
+      s.g.getTank=id=>id===hidden.id?hidden:originalGet.call(s.g,id);
+      const result=s.T.publicEcoBias(s.g,s.observer,{},{});
+      assert.equal(result.mode,baseline.mode);
+      assert.equal(result.key,baseline.key);
+    } finally {s.g.getTank=originalGet;s.g.destroy();}
+  });
+});
+
+test('shipping ecology does not read terrain-occluded held target status',()=>{
+  withSeed(1517817,()=>{
+    const s=scene(),originalGet=s.g.getTank,originalLos=s.g.hasLineOfSight;
+    const hidden={id:99117,x:s.observer.x+80,y:s.observer.y,
+      get hp(){throw Error('occluded held target health leak');},
+      get spawnShieldT(){throw Error('occluded held target shield leak');}};
+    try {
+      s.observer.ai.__v1112TargetId=hidden.id;
+      s.g.getTank=id=>id===hidden.id?hidden:originalGet.call(s.g,id);
+      s.g.hasLineOfSight=()=>false;
+      assert.doesNotThrow(()=>s.T.publicEcoBias(s.g,s.observer,{},{}));
+    } finally {
+      s.g.getTank=originalGet;s.g.hasLineOfSight=originalLos;s.g.destroy();
+    }
+  });
+});
+
+test('shipping ecology still yields to a genuinely visible close hostile',()=>{
+  withSeed(1517818,()=>{
+    const s=scene(),originalGet=s.g.getTank;
+    const originalHostile=s.g.areHostile,originalAllies=s.g.areAllies;
+    try {
+      const baseline=s.T.publicEcoBias(s.g,s.observer,{},{});
+      assert.equal(baseline.mode,'signal');
+      const target=s.others[0];
+      Object.assign(target,{x:s.observer.x+100,y:s.observer.y,hp:100,
+        alive:true,spawnShieldT:0});
+      s.g.getTank=id=>id===target.id?target:originalGet.call(s.g,id);
+      s.g.areHostile=()=>true;s.g.areAllies=()=>false;
+      s.observer.ai.__v1112TargetId=target.id;
+      const result=s.T.publicEcoBias(s.g,s.observer,{},{});
+      assert.equal(result.mode,'none','visible close combat must veto ecology');
+    } finally {
+      s.g.getTank=originalGet;s.g.areHostile=originalHostile;
+      s.g.areAllies=originalAllies;s.g.destroy();
+    }
+  });
+});
