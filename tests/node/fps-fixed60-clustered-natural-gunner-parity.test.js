@@ -28,21 +28,34 @@ function run(cls,seed,clustered){
     const timeline=new ChronologicalInput(g.input);
     owner=new FixedStepRafOwner(g,timeline,{timeline,startMs:1000},{
      now:()=>now,request:fn=>(callback=fn,1),
-     cancel:()=>{callback=null},render:()=>{},maxSteps:2
+     cancel:()=>{callback=null},render:()=>{},maxSteps:clustered===true?2:4
     });
     owner.start();
    }
    g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=-15;
    g.input.firing=true;g.input.autofire=false;
    if(clustered){
-    let subticks=0;
-    for(let frame=0;frame<TICKS;frame++){
-     subticks+=[4,1,1][frame%3];
-     now=1000+subticks*1000/120;
-     const fn=callback;assert.equal(typeof fn,'function');
-     callback=null;fn(now);
+    if(clustered===true){
+     let subticks=0;
+     for(let frame=0;frame<TICKS;frame++){
+      subticks+=[4,1,1][frame%3];
+      now=1000+subticks*1000/120;
+      const fn=callback;assert.equal(typeof fn,'function');
+      callback=null;fn(now);
+     }
+     assert.equal(subticks,TICKS*2);
+    }else{
+     assert.ok(['uniform20','bursty20'].includes(clustered));
+     const gaps=clustered==='uniform20'?Array(40).fill(50):
+      Array.from({length:20},()=>[95,5]).flat();
+     let elapsed=0;
+     for(const gap of gaps){
+      elapsed+=gap;now=1000+elapsed;
+      const fn=callback;assert.equal(typeof fn,'function');
+      callback=null;fn(now);
+     }
+     assert.equal(elapsed,2000,'same two seconds of wall time');
     }
-    assert.equal(subticks,TICKS*2);
     assert.equal(owner.ticks,TICKS);
     assert.equal(owner.droppedMs,0);
     assert.equal(owner.droppedFrames,0);
@@ -66,5 +79,19 @@ test('natural 49-overlay Gunner worlds retain physics and RNG under clustered me
    const reference=run(cls,seed,false);
    const clustered=run(cls,seed,true);
    assert.deepEqual(clustered,reference,cls+' seed='+seed);
+  }
+});
+
+
+// The same real 49-overlay natural ecology and hostile AI should advance
+// identically at 20Hz presentation when the bounded whole-Game owner can
+// afford the necessary three/four canonical updates. Not a phone CPU gate.
+test('natural Gunner worlds preserve complete AI/ecology RNG at uniform and bursty 20Hz',()=>{
+ for(const cls of ['minigun','needlestorm'])
+  for(const seed of [1517800,1517802]){
+   const reference=run(cls,seed,false);
+   for(const mode of ['uniform20','bursty20'])
+    assert.deepEqual(run(cls,seed,mode),reference,
+     cls+' seed='+seed+' mode='+mode);
   }
 });
