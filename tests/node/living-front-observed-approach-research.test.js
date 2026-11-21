@@ -3,8 +3,8 @@
 // Never use a rival's private __lfEcoKey or destination assignment.
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { bootGame, withSeed } = require('../research/audio-rng-causal-pilot.cjs');
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL = '1';
+const { bootGame, withSeed } = require('../research/audio-rng-causal-pilot.cjs');
 
 function observedApproach() {
   const records = new Map();
