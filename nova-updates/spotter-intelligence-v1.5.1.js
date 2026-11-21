@@ -55,10 +55,12 @@ function knownContact(g,owner,d){
  * This is a pure query: the later drone scan owns memory retirement. */
 function liveRelay(g,owner,target){
  if(!g||!owner||!target||!sniper(owner)||owner.alive===false||
-    (owner.hp!=null&&!(owner.hp>0))||target.alive===false||
-    (target.hp!=null&&!(target.hp>0))||!Array.isArray(g.drones)||
+    (owner.hp!=null&&!(owner.hp>0))||
+    /* Remote health belongs only to the actual, still-live observed contact. */
     owner.__novaSpotterContactId!==target.id||
     !(Number(owner.__novaSpotterContactUntil)>Number(g.time||0))||
+    target.alive===false||(target.hp!=null&&!(target.hp>0))||
+    !Array.isArray(g.drones)||
     Number(owner.__novaSpotterDownUntil)>Number(g.time||0))return false;
  var id=owner.__novaSpotterDroneId;
  if(id==null||id<0)return false;
