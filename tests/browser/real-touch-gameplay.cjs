@@ -66,7 +66,36 @@ async function run(browser,label,viewport){
   await minimize.waitFor({state:'visible',timeout:10000});
   assert.ok((await stickClear()).every(v=>v.canvas),label+': even deliberately opened upgrade tray must not cover either stick');
   await minimize.tap();
-  await upgradeChip.waitFor({state:'visible',timeout:10000});
+  try{
+   await upgradeChip.waitFor({state:'visible',timeout:10000});
+  }catch(error){
+   // Preserve the strict touch regression gate. On an intermittent failure,
+   // capture the actual UI/game state rather than guessing whether XP,
+   // evolution, input ownership or a delayed tray collapse caused it.
+   let state;
+   try{
+    state=await page.evaluate(()=>{
+     const g=window.__novaTouchGame;
+     const buttons=[...document.querySelectorAll('button[data-ui]')]
+      .filter(b=>/UPGRADE READY|MINIMIZE|UPGRADES/.test(b.textContent||''))
+      .map(b=>({text:(b.textContent||'').trim().slice(0,80),
+       visible:!!(b.getClientRects().length&&getComputedStyle(b).visibility!=='hidden'),
+       disabled:b.disabled,html:b.outerHTML.slice(0,240)}));
+     return {status:g?.status,paused:g?.paused,time:g?.time,
+      statPoints:g?.statPoints,level:g?.player?.level,
+      pendingOffer:g?.pendingOffer,playerAlive:g?.player?.alive,
+      input:g?.input&&{moveActive:g.input.move?.active,
+       aimActive:g.input.aim?.active,firing:g.input.firing},
+      buttons,upgradeTray:!!document.querySelector('[data-nova-upgrade-tray]')};
+    });
+   }catch(diagnosticError){state={diagnosticError:String(diagnosticError)};}
+   try{
+    fs.mkdirSync(path.join('artifacts','browser'),{recursive:true});
+    await page.screenshot({path:path.join('artifacts','browser',label+'-upgrade-reopen-failure.png')});
+   }catch(_){}
+   error.message+=' | post-MINIMIZE state='+JSON.stringify(state);
+   throw error;
+  }
   await upgradeChip.tap();
   await minimize.waitFor({state:'visible',timeout:10000});
   const beforeStat=await page.evaluate(()=>window.__novaTouchGame.statPoints);
