@@ -44,3 +44,19 @@ test('research: conservative mode cannot certify a cover-blocked miss as future-
  assert.equal(result.futureMotionUnknown,false,
   'a blocked lane is unknown for cover, not a stationary geometric miss');
 });
+
+test('research: uncertainty attribution distinguishes cover-only from mixed miss volleys',()=>{
+ const {game,shooter,victim}=world();
+ victim.y=0;
+ game.firstTerrainHit=()=>({solid:{destructible:false}});
+ const coverOnly=projectileCandidate(game,shooter,victim,0,{conservativeMotion:true});
+ assert.equal(coverOnly.known,false,'conservative mode retains possible future steering');
+ assert.equal(coverOnly.futureMotionUnknown,false,
+  'cover-only evidence must not be miscounted as an initially missed lane');
+ game.bullets.push({ownerId:1,x:0,y:70,vx:200,vy:0,ttl:1,r:2});
+ const mixed=projectileCandidate(game,shooter,victim,0,{conservativeMotion:true});
+ assert.equal(mixed.known,false);
+ assert.equal(mixed.possible,false);
+ assert.equal(mixed.futureMotionUnknown,true,
+  'a second off-axis pellet can become a threat after target acceleration');
+});
