@@ -31,12 +31,13 @@ function projectileCandidate(game,shooter,victim,startIndex=0){
   if(miss>hull+radius)continue;
   if(typeof game.firstTerrainHit==='function'){
    terrainChecks++;
-   if(game.firstTerrainHit(b.x,b.y,b.x+ux*along,b.y+uy*along,
-      radius*.45)){
+   const hit=game.firstTerrainHit(b.x,b.y,b.x+ux*along,b.y+uy*along,
+      radius*.45);
+   if(hit){
     // The shipping Battlefield can let penetrating rounds breach cover.
-    // Without resolving the real impact, a blocked penetrating lane is
-    // unknown, not proof that this victim could never be reached.
-    if(Number.isFinite(b.pen)&&b.pen>0)unsupported++;
+    // A confirmed permanent wall cannot be breached; destructible or
+    // unclassified obstructions need actual impact resolution.
+    if(b.pen>0&&(!hit.solid||hit.solid.destructible!==false))unsupported++;
     continue;
    }
   }
