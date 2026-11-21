@@ -20,6 +20,8 @@ test('research: conservative projectile miss does not certify a momentarily stat
  assert.equal(conservative.possible,false);
  assert.equal(conservative.known,false,'the victim can accelerate into the lane after firing');
  assert.equal(conservative.checked,1);
+ assert.equal(conservative.futureMotionUnknown,true,
+  'research census must attribute this uncertainty to possible future acceleration');
 });
 
 test('research: conservative mode retains a clear physical hit candidate',()=>{
@@ -28,6 +30,8 @@ test('research: conservative mode retains a clear physical hit candidate',()=>{
  const result=projectileCandidate(game,shooter,victim,0,{terrain:false,conservativeMotion:true});
  assert.equal(result.known,true);
  assert.equal(result.possible,true);
+ assert.equal(result.futureMotionUnknown,undefined,
+  'a positive physical lane must not be counted as an unknown miss');
 });
 
 test('research: conservative mode cannot certify a cover-blocked miss as future-safe',()=>{
@@ -37,4 +41,6 @@ test('research: conservative mode cannot certify a cover-blocked miss as future-
  const result=projectileCandidate(game,shooter,victim,0,{conservativeMotion:true});
  assert.equal(result.possible,false);
  assert.equal(result.known,false);
+ assert.equal(result.futureMotionUnknown,false,
+  'a blocked lane is unknown for cover, not a stationary geometric miss');
 });
