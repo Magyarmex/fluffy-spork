@@ -12,6 +12,7 @@ test('natural composed matches bound firing-time witness scans and report incide
    try{
     g.sfx.muted=true;g.sfx.startMusic=()=>{};
     g.status='playing';g.paused=false;
+    const classes=g.__testWindow.__novaMakeRequire('')('game/classes').CLASSES;
     const stats={seed,frames:0,playingFrames:0,successfulFireCalls:0,observedShotRecords:0,
      eligibleVictimMemberships:0,shotsWithAnyVictimWitness:0,
      projectileAlignedMemberships:0,projectileBlockedMemberships:0,
@@ -64,7 +65,10 @@ test('natural composed matches bound firing-time witness scans and report incide
          const along=dx*ux+dy*uy;
          const maxTravel=speed*Math.max(0,b.ttl||0);
          const lateral=Math.abs(dx*uy-dy*ux);
-         if(!(along>=0&&along<=maxTravel&&lateral<=20+(b.r||0)))continue;
+         // Match the composed core updateBullets tank-contact radius, not a
+         // fixed 20-unit approximation that misclassifies larger hulls.
+         const hitRadius=(b.r||0)+(classes[victim.cls]?.size||15)+3;
+         if(!(along>=0&&along<=maxTravel&&lateral<=hitRadius))continue;
          aligned=true;
          const hit=typeof this.firstTerrainHit==='function'?
           this.firstTerrainHit(b.x,b.y,b.x+ux*along,b.y+uy*along,
