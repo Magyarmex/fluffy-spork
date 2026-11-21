@@ -2,7 +2,8 @@
 // Research-only projectile provenance prototype. NOT wired into gameplay.
 // Compare against event-time hull-cone candidate logic before changing AI.
 function projectileCandidate(game,shooter,victim,startIndex=0){
- if(!game||!shooter||!victim||!Array.isArray(game.bullets))
+ if(!game||!shooter||!victim||!Array.isArray(game.bullets)||
+    !Number.isFinite(victim.x)||!Number.isFinite(victim.y))
   return {known:false,possible:false,reason:'invalid'};
  const defs=game.__testWindow?.__novaMakeRequire?.('')('game/classes')?.CLASSES;
  const size=Number(defs?.[victim.cls]?.size);
@@ -13,19 +14,23 @@ function projectileCandidate(game,shooter,victim,startIndex=0){
   if(!b||b.ownerId!==shooter.id)continue;
   if(b.shell||b.splash||b.cluster){unsupported++;continue;}
   const speed=Math.hypot(b.vx,b.vy);
-  if(!(speed>1)||!Number.isFinite(b.x)||!Number.isFinite(b.y)||
-     !Number.isFinite(b.ttl)||b.ttl<=0){unsupported++;continue;}
+  const radius=Number(b.r??0);
+  if(!(speed>1)||!Number.isFinite(speed)||
+     !Number.isFinite(b.x)||!Number.isFinite(b.y)||
+     !Number.isFinite(b.ttl)||b.ttl<=0||
+     !Number.isFinite(radius)||radius<0||
+     !Number.isFinite(speed*b.ttl)){unsupported++;continue;}
   checked++;
   const ux=b.vx/speed,uy=b.vy/speed;
   const dx=victim.x-b.x,dy=victim.y-b.y;
   const maxTravel=speed*b.ttl;
   const along=Math.max(0,Math.min(maxTravel,dx*ux+dy*uy));
   const miss=Math.hypot(dx-ux*along,dy-uy*along);
-  if(miss>hull+(Number(b.r)||0))continue;
+  if(miss>hull+radius)continue;
   if(typeof game.firstTerrainHit==='function'){
    terrainChecks++;
    if(game.firstTerrainHit(b.x,b.y,b.x+ux*along,b.y+uy*along,
-      Math.max(0,(Number(b.r)||0)*.45)))continue;
+      radius*.45))continue;
   }
   return {known:true,possible:true,checked,terrainChecks,unsupported};
  }
