@@ -247,3 +247,37 @@ test('public crowd performs terrain rays only for visible near-destination candi
     } finally {s.g.destroy();}
   });
 });
+
+test('composed LOCAL farming can also be vetoed by offscreen private AI keys',()=>{
+  withSeed(1517808,()=>{
+    const s=scene(),LF=s.g.__testLivingFront;
+    const originalQuery=LF.query;
+    try {
+      s.g.__lfState.signal=null;
+      s.g.__lfState.bloomMemory=null;
+      const shapes=Array.from({length:4},(_,i)=>({
+        id:900+i,kind:'shape',type:'hexagon',hp:100,alive:true,
+        x:-250+i*3,y:-400+i*2
+      }));
+      // Controlled visible neutral concentration, with the real composed
+      // strategy function and real Fair Engagement visibility predicate.
+      LF.query=()=>shapes;
+      const defs={hexagon:{xp:200}};
+      const localSector=s.T.sectorIndex(
+        shapes.reduce((a,q)=>a+q.x,0)/shapes.length,
+        shapes.reduce((a,q)=>a+q.y,0)/shapes.length);
+      const before=s.T.publicEcoBias(s.g,s.observer,defs,{});
+      assert.equal(before.mode,'local');
+      assert.equal(before.key,'LOCAL:'+localSector);
+      const publicSnapshot=JSON.stringify(shapes.map(q=>[q.id,q.x,q.y,q.hp]));
+      s.others.forEach(q=>q.ai.__lfEcoKey='LOCAL:'+localSector);
+      const after=s.T.publicEcoBias(s.g,s.observer,defs,{});
+      assert.equal(after.mode,'none',
+        'three offscreen private LOCAL keys can veto a visible farm');
+      assert.equal(JSON.stringify(shapes.map(q=>[q.id,q.x,q.y,q.hp])),
+        publicSnapshot,'visible local farm changed during hidden counterfactual');
+      assert.equal(physicalCrowd(s.g,s.observer,{x:-245,y:-397}),0,
+        'public physical crowd cannot see those remote private assignments');
+    } finally {LF.query=originalQuery;s.g.destroy();}
+  });
+});
