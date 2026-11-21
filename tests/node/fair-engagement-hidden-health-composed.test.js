@@ -16,7 +16,7 @@ test('composed Fair Engagement scoring cannot read an offscreen tank HP',()=>wit
     observer.x=0;observer.y=0;
     // No legal candidate: do not trigger the separately tracked #1025
     // private-assignment saturation scan while testing sight-first scoring.
-    for(const q of bots.slice(1)){q.x=1900;q.y=0;}
+    for(const q of g.tanks){if(q!==observer){q.x=1900;q.y=0;}}
     g.w=800;g.h=600;g.cam.zoom=1;
     oldHp=Object.getOwnPropertyDescriptor(target,'hp');
     Object.defineProperty(target,'hp',{configurable:true,
