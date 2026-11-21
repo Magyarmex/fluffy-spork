@@ -23,7 +23,10 @@ async function run(browser,label,viewport){
      // The real touch test intentionally disables autofire. Do so before
      // the FIRST playable update, not after the loading veil, so incidental
      // early kills cannot bank extra points and invalidate tray assertions.
-     if(this.input)this.input.autofire=false;
+     if(!this.__novaTouchAutofireInitialized){
+      if(this.input)this.input.autofire=false;
+      this.__novaTouchAutofireInitialized=true;
+     }
     }
     return oldUpdate.apply(this,arguments);
    };
