@@ -21,7 +21,8 @@ function observedApproach() {
       if (!q || q===observer || !Number.isSafeInteger(q.id)) continue;
       if (!(q.hp>0) || q.alive===false || q.spawnShieldT>0) {
         // Only a currently observable death is public evidence.
-        if (F.inGameplayViewport(g,observer,q) &&
+        if (Number.isFinite(q.x) && Number.isFinite(q.y) &&
+            F.inGameplayWorldPoint(g,observer,q.x,q.y) &&
             (!g.hasLineOfSight ||
              g.hasLineOfSight(observer.x,observer.y,q.x,q.y,2)))
           records.delete(q.id);
@@ -100,6 +101,9 @@ run('two aligned movement intervals establish public evidence independent of hid
   assert.equal(t.countToward(s.destination,10.3),1);
   s.rival.hp=0;s.rival.alive=false; // hidden later death must not be queried
   assert.equal(t.countToward(s.destination,10.3),1);
+  t.sample(s.g,s.observer,[s.rival],10.35);
+  assert.equal(t.countToward(s.destination,10.35),0,
+    'a genuinely witnessed death clears the public movement memory');
   assert.equal(t.countToward(s.destination,11.56),0);
 });
 
