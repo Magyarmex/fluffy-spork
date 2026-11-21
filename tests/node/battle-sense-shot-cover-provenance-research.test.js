@@ -153,6 +153,11 @@ test('research characterization: shotgun hull cone can witness a lane with no pe
                       Math.cos(Math.atan2(b.vy,b.vx)-toward)))));
   assert.ok(nearest>.15,
    'fixture must place the victim outside every real pellet direction');
+  const pelletProvenance=projectileCandidate(g,shooter,victim,before);
+  assert.equal(pelletProvenance.known,true,
+   'real composed Shotgunner pellet geometry should be classifiable');
+  assert.equal(pelletProvenance.possible,false,
+   'pellet-lane oracle must reject the broad hull-cone false candidate');
   assert.equal(observer.ai.__v181ObservedShotVictims?.has(victim),true,
    'KNOWN CANDIDATE DEFECT: a hull-cone candidate lacks projectile-bearing provenance');
  }finally{g.destroy();}
