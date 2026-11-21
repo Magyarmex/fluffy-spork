@@ -34,7 +34,7 @@ test('research projectile provenance: cover blocks a geometrically aligned shot'
  let calls=0;
  const blocked=projectileCandidate({
   bullets:[{ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3}],
-  firstTerrainHit(x1,y1,x2,y2,r){calls++;assert.equal(x1,0);assert.equal(y1,0);assert.ok(x2>0&&x2<=100);assert.equal(y2,0);assert.ok(r>=0);return {x:40,y:0};}
+  firstTerrainHit(x1,y1,x2,y2,r){calls++;assert.equal(x1,0);assert.equal(y1,0);assert.ok(x2>0&&x2<=100);assert.equal(y2,0);assert.ok(r>=0);return {solid:{destructible:false},x:40,y:0};}
  },shooter,victim);
  assert.equal(blocked.known,true);assert.equal(blocked.possible,false);
  assert.equal(blocked.terrainChecks,1);assert.equal(calls,1);
@@ -116,7 +116,7 @@ test('research projectile provenance: cover plus penetration is unknown until re
  assert.equal(clear.known,true);
  assert.equal(clear.possible,true);
  const spent=projectileCandidate({
-  bullets:[{...bullet,pen:0}],firstTerrainHit(){return {solid:true};}
+  bullets:[{...bullet,pen:0}],firstTerrainHit(){return {solid:{destructible:false}};}
  },shooter,victim);
  assert.equal(spent.known,true);
  assert.equal(spent.possible,false);
@@ -288,26 +288,23 @@ test('research A/B/C: penetrating destructible cover is unknown, not a certified
  assert.equal(C.terrainChecks,1);
 });
 
-test('research projectile provenance: only launch penetration >=2 can leave destructible cover unresolved',()=>{
+test('research projectile provenance: destructible cover remains unknown without volley chronology',()=>{
  const cover={solid:{destructible:true,hp:1}};
- for(const pen of [0,1]){
+ for(const pen of [0,1,2,3]){
   const r=projectileCandidate({
    bullets:[{ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3,pen}],
    firstTerrainHit(){return cover;}
   },shooter,victim);
-  assert.equal(r.known,true,'pen='+pen+' cannot survive Battlefield breach');
-  assert.equal(r.possible,false);
-  assert.equal(r.unsupported,0);
- }
- for(const pen of [2,3]){
-  const r=projectileCandidate({
-   bullets:[{ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3,pen}],
-   firstTerrainHit(){return cover;}
-  },shooter,victim);
-  assert.equal(r.known,false,'pen='+pen+' may survive a successful cover break');
+  assert.equal(r.known,false,'cover may break for a later projectile; pen='+pen);
   assert.equal(r.possible,false);
   assert.equal(r.unsupported,1);
  }
+ const permanent=projectileCandidate({
+  bullets:[{ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3,pen:3}],
+  firstTerrainHit(){return {solid:{destructible:false}};}
+ },shooter,victim);
+ assert.equal(permanent.known,true,'permanent wall is a certified veto');
+ assert.equal(permanent.possible,false);
  const malformed=projectileCandidate({
   bullets:[{ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3,pen:0}],
   firstTerrainHit(){return {x:40,y:0};}
