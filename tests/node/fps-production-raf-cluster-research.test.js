@@ -1,0 +1,219 @@
+'use strict';
+// Research-first desired invariant: the materialized shipping RAF must not
+// discard active-game time under sub-100ms clustered 30Hz presentation.
+// This file is intentionally known-red until the canonical scheduler changes.
+// It is NOT a license to ship the conditional carry-cap prototype without
+// composed-game, input, Android and browser latency gates.
+const test=require('node:test'),assert=require('node:assert/strict');
+const fs=require('node:fs'),path=require('node:path');
+const html=fs.readFileSync(path.resolve(__dirname,'../../index.html'),'utf8');
+const a=html.indexOf('    start() {',html.indexOf('window.__defineModule("game/engine"'));
+const b=html.indexOf('    destroy() {',a);
+assert.ok(a>=0&&b>a,'real materialized Game.start owner exists');
+const shipping=html.slice(a,b).trim();
+const oldCap='Math.min(1 / 30, excess)';
+const hasOldCap=shipping.includes(oldCap);
+const prototype=hasOldCap?shipping.replace(oldCap,
+ 'Math.min(elapsed <= 0.1 ? 2 / 30 : 1 / 30, excess)'):null;
+function run(body,gaps,seconds=10,workMs=0,trackInput=false){
+ let now=0,work=0,raf=null,sim=0,updates=0,draws=0,maxSteps=0,steps=0,maxLag=0,triggerTime=null,firstInputUpdate=null;
+ const start=new Function('performance','requestAnimationFrame','render_1',
+  'return ({'+body+'}).start')({now:()=>now+work},fn=>{raf=fn;return 1;},
+  {render(){draws++;maxSteps=Math.max(maxSteps,steps);steps=0;maxLag=Math.max(maxLag,now/1000-sim);}});
+ const g={paused:false,__novaDestroyed:false,mmTimer:.08,firing:false,
+  sfx:{startMusic(){}},update(dt){
+   assert.ok(dt>=0&&dt<=1/30+1e-10,'each update must stay physically bounded');
+   sim+=dt;updates++;steps++;work+=workMs;
+   if(g.firing&&firstInputUpdate===null)firstInputUpdate=sim;
+  },drawMinimap(){}};
+ start.call(g);
+ let i=0;while(now<seconds*1000-1e-7){
+  now+=Math.min(gaps[i++%gaps.length],seconds*1000-now);
+  if(trackInput&&triggerTime===null&&now/1000-sim>0.15){
+   triggerTime=now/1000;g.firing=true;
+  }
+  const cb=raf;raf=null;assert.equal(typeof cb,'function');cb(now);
+ }
+ return {sim,updates,draws,maxSteps,maxLag,triggerTime,firstInputUpdate};
+}
+const approx=(a,b)=>assert.ok(Math.abs(a-b)<1e-6,`${a} != ${b}`);
+const moderate=[55,55,1000/15-55,1000/15-55];
+const harsh=[85,40,5,1000/7.5-130];
+test('uniform 20/30/60Hz shipping RAF remains canonical',()=>{
+ for(const hz of [20,30,60]){const r=run(shipping,[1000/hz]);
+  approx(r.sim,10);assert.ok(r.maxSteps<=2);}
+});
+test('desired: 55/55/11.67/11.67ms 30Hz must not silently lose 7.5% world time',()=>{
+ const r=run(shipping,moderate);approx(r.sim,10);
+});
+test('desired: 85/40/5/3.33ms 30Hz must not silently lose 18.75% world time',()=>{
+ const r=run(shipping,harsh);approx(r.sim,10);
+});
+// Strong adversarial counterexample: mean 30Hz and every gap <100ms, but
+// the simple 2/30 carry-cap prototype also loses time cumulatively here.
+const eightGap=[14.207085933918753,12.760071936027344,4.133955086476322,
+ 50.264174640298336,96.0277607031713,83.86484405207489,
+ 4.301894803222718,1.1068795114770285];
+test('desired: eight-gap sub-100ms mean-30Hz must not discard active world time',()=>{
+ const r=run(shipping,eightGap,60);approx(r.sim,60);
+});
+// Every gap is below the shipping 83.33ms catch-up gate. The defect is
+// therefore not merely a threshold mismatch between 83ms and 100ms.
+const belowCatchupGate=[5.941416705947619,23.41420116160293,
+ 10.312324158230117,55.478651640124,80.274986251358,
+ 78.51104381735914,2.4928051806983254,10.24123775134658];
+test('desired: sub-83ms eight-gap mean-30Hz must preserve 60s world time',()=>{
+ const r=run(shipping,belowCatchupGate,60);approx(r.sim,60);
+});
+// Mean 60Hz is not a sufficient guarantee when frames arrive unevenly.
+const irregularMean60=[7.462545447209942,91.1690205691155,
+ 10.223294786501562,3.0005384001705946,2.9156630931681042,
+ 5.552244930873242,9.82486238212232,3.1851637241720603];
+test('desired: irregular mean-60Hz must not discard active game time',()=>{
+ const r=run(shipping,irregularMean60,10);approx(r.sim,10);
+});
+if(hasOldCap)test('falsifier: merely doubling carry cap still loses time on eight-gap 30Hz',()=>{
+ const r=run(prototype,eightGap,60);
+ assert.ok(r.sim<50,'the conditional cap is not a universal chronology fix');
+});
+if(hasOldCap)test('research-only conditional cap restores clustered chronology in zero-cost owner',()=>{
+ for(const gaps of [moderate,harsh,[1000/30],[1000/60],[50]]){
+  const r=run(prototype,gaps);approx(r.sim,10);
+  assert.ok(r.maxSteps<=2);
+ }
+});
+if(hasOldCap)test('conditional cap does not repay long >100ms foreground stalls',()=>{
+ const gaps=[120,1000/60,1000/60,1000/60];
+ const a=run(shipping,gaps),b=run(prototype,gaps);
+ approx(a.sim,b.sim);assert.ok(a.sim<8);
+});
+if(hasOldCap)test('optional second update remains CPU-bounded under 22ms synthetic work',()=>{
+ for(const gaps of [moderate,harsh,[50]]){
+  const a=run(shipping,gaps,10,22),b=run(prototype,gaps,10,22);
+  assert.equal(a.maxSteps,1);assert.equal(b.maxSteps,1);
+  assert.ok(b.sim>=a.sim-1e-8);
+ }
+});
+
+// Permanent safety gates must survive the eventual scheduler correction.
+test('shipping scheduler never repays a long >100ms foreground stall',()=>{
+ const r=run(shipping,[120,1000/60,1000/60,1000/60]);
+ assert.ok(r.sim<8,'do not replay suspended wall time as live combat');
+ assert.ok(r.maxSteps<=2);
+});
+test('shipping scheduler keeps optional CPU-heavy catch-up bounded',()=>{
+ for(const gaps of [moderate,harsh,[50]]){
+  const r=run(shipping,gaps,10,22);assert.equal(r.maxSteps,1);
+ }
+});
+
+// Adversarial tradeoff: an oversized carry bucket can avoid dropping time
+// only by retaining an older-than-100ms simulation debt. Without an explicit
+// input-history policy this must NOT be mistaken for a safe production fix.
+// The candidate is a research-only source transform; shipping is unchanged.
+if(hasOldCap)test('falsifier: 250ms carry repairs eight-gap time only by retaining >100ms debt',()=>{
+ const wide=shipping.replace(oldCap,'Math.min(elapsed <= 0.1 ? 1 / 4 : 1 / 30, excess)');
+ assert.notEqual(wide,shipping,'research candidate must actually replace shipping carry cap');
+ const original=run(shipping,eightGap,60);
+ const candidate=run(wide,eightGap,60);
+ assert.ok(original.sim<40,'original eight-gap deficit must remain reproduced');
+ assert.ok(candidate.sim>59.9,'wide debt bucket should repay the tested active schedule');
+ assert.ok(candidate.maxSteps<=2,'the candidate still has a per-frame work bound');
+ assert.ok(candidate.maxLag>0.1,'candidate carries more than 100ms of stale world time');
+ // The bound is a separate, deliberately visible risk: current input is
+ // sampled during catch-up, not replayed from a timestamped event history.
+ // Do not infer that a >100ms backlog is safe for touch or Controller orders.
+});
+
+if(hasOldCap)test('falsifier: wide carry can apply a newly delivered input >100ms into the simulated past',()=>{
+ const wide=shipping.replace(oldCap,'Math.min(elapsed <= 0.1 ? 1 / 4 : 1 / 30, excess)');
+ const r=run(wide,eightGap,60,0,true);
+ assert.ok(r.triggerTime!==null&&r.firstInputUpdate!==null,'input must be delivered and sampled');
+ assert.ok(r.triggerTime-r.firstInputUpdate>0.1,
+  'current input state is sampled by an update representing >100ms-old world time');
+ // This is a scheduler/input-policy counterexample, not a simulated shot
+ // or proof that real players experience a specific delay.
+});
+
+if(hasOldCap)test('research: sub-100ms two-step gate plus 100ms debt reduces wide-cap staleness',()=>{
+ const oldGate='elapsed <= 1 / 12';
+ assert.ok(shipping.includes(oldGate),'exact shipping catch-up gate must be present');
+ const candidate=shipping.replace(oldCap,
+  'Math.min(elapsed < 0.1 ? 0.1 : 1 / 30, excess)')
+  .replace(oldGate,'elapsed < 0.1');
+ for(const gaps of [moderate,harsh,eightGap,belowCatchupGate,irregularMean60]){
+  const r=run(candidate,gaps,60);
+  assert.ok(r.sim>59.9,'bounded active schedule must retain world time');
+  assert.ok(r.maxSteps<=2,'no more than two collision updates per RAF');
+ }
+ const eight=run(candidate,eightGap,60);
+ assert.ok(eight.maxLag<0.08,
+  'named eight-gap candidate should keep rendered world lag under 80ms');
+ const longStall=[120,1000/60,1000/60,1000/60];
+ approx(run(candidate,longStall).sim,run(shipping,longStall).sim);
+ // This is only a zero-cost research candidate. The changed 83-100ms
+ // catch-up threshold, CPU pressure and input event chronology require
+ // composed-game and physical-device acceptance before any shipping use.
+});
+
+if(hasOldCap)test('falsifier: bounded 100ms pilot still loses time when catch-up CPU is unavailable',()=>{
+ const oldGate='elapsed <= 1 / 12';
+ const candidate=shipping.replace(oldCap,
+  'Math.min(elapsed < 0.1 ? 0.1 : 1 / 30, excess)')
+  .replace(oldGate,'elapsed < 0.1');
+ const moderateWork=run(candidate,eightGap,60,9);
+ assert.ok(moderateWork.maxLag>0.08,
+  'two 9ms updates consume the existing 18ms catch-up work threshold');
+ const heavyWork=run(candidate,eightGap,60,22);
+ assert.ok(heavyWork.sim<58,
+  'no safe two-step capacity means time preservation cannot be promised');
+ assert.equal(heavyWork.maxSteps,1,
+  'the existing CPU-work gate must still reject expensive second updates');
+});
+
+if(hasOldCap)test('falsifier: four consecutive 95ms frames defeat the bounded 100ms pilot',()=>{
+ // 4*95 + 8*2.5 = 400ms across 12 frames: exactly mean 30Hz.
+ // Every individual frame is below the 100ms foreground-stall boundary.
+ const burst=[95,95,95,95,...Array(8).fill(2.5)];
+ const oldGate='elapsed <= 1 / 12';
+ const bounded=shipping.replace(oldCap,
+  'Math.min(elapsed < 0.1 ? 0.1 : 1 / 30, excess)')
+  .replace(oldGate,'elapsed < 0.1');
+ const wide=shipping.replace(oldCap,
+  'Math.min(elapsed < 0.1 ? 1 / 4 : 1 / 30, excess)');
+ const b=run(bounded,burst,60),w=run(wide,burst,60);
+ assert.ok(b.sim<55,'100ms carry still loses >=5s of active time in 60s');
+ assert.ok(w.sim>59.9,'250ms carry can repay this synthetic active schedule');
+ assert.ok(w.maxLag>0.2,'wide carry does so with >200ms render-time world lag');
+ assert.ok(b.maxSteps<=2&&w.maxSteps<=2);
+ // A universal solution requires explicit input chronology and a bounded
+ // CPU/backlog policy; neither larger cap is a shippable general cure.
+});
+
+if(hasOldCap)test('research: cap-after-second restores moderate chronology without extra updates',()=>{
+ // Keep exactly the shipping second-step eligibility and CPU-work gates.
+ // Only move the 33.33ms carry clamp AFTER the already-bounded second step.
+ const pause='            if (this.paused)\n                carry = 0;';
+ assert.ok(shipping.includes(pause),'canonical pause/carry reset must exist');
+ const afterSecond=shipping.replace(
+  'carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;',
+  'carry = excess > 1e-9 ? excess : 0;')
+  .replace(pause,'            carry = Math.min(1 / 30, carry);\n'+pause);
+ assert.notEqual(afterSecond,shipping);
+ for(const gaps of [[1000/60],[1000/30],moderate,harsh,
+   eightGap,belowCatchupGate,irregularMean60,[120,1000/60,1000/60,1000/60]]){
+  const baseline=run(shipping,gaps,60),pilot=run(afterSecond,gaps,60);
+  assert.equal(pilot.updates,baseline.updates,
+   'cap reordering must not increase Game.update call count');
+  assert.ok(pilot.sim>=baseline.sim-1e-7,
+   'do not lose additional world time under the same presentation schedule');
+  assert.ok(pilot.maxSteps<=2);
+ }
+ approx(run(afterSecond,moderate,60).sim,60);
+ assert.ok(run(afterSecond,harsh,60).sim>51,
+  'partial improvement without changing the 83ms catch-up gate');
+ approx(run(afterSecond,[120,1000/60,1000/60,1000/60]).sim,
+  run(shipping,[120,1000/60,1000/60,1000/60]).sim);
+ // This is a narrow research prototype, not production acceptance:
+ // real Game.update state/RNG, input latency, browser CPU and Android remain.
+});
