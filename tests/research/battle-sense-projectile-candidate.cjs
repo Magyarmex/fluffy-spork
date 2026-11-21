@@ -19,6 +19,7 @@ function projectileCandidate(game,shooter,victim,startIndex=0){
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
      !Number.isFinite(b.ttl)||b.ttl<=0||
      !Number.isFinite(radius)||radius<0||
+     (b.pen!=null&&(!Number.isFinite(b.pen)||b.pen<0))||
      !Number.isFinite(speed*b.ttl)){unsupported++;continue;}
   checked++;
   const ux=b.vx/speed,uy=b.vy/speed;
