@@ -8,7 +8,8 @@ const { bootGame, withSeed } = require('../research/audio-rng-causal-pilot.cjs')
 
 function physicalCrowd(g, observer, destination, options = {}) {
   if (!g || !observer || !destination ||
-      !Number.isFinite(destination.x) || !Number.isFinite(destination.y)) return 0;
+      !Number.isFinite(destination.x) || !Number.isFinite(destination.y) ||
+      typeof g.hasLineOfSight !== 'function') return 0;
   const radius = options.radius ?? 300;
   const maxCount = options.maxCount ?? 4;
   const F = g.__testFair;
@@ -17,8 +18,7 @@ function physicalCrowd(g, observer, destination, options = {}) {
   const halfY = (Number(g.h) || 600) / (2 * zoom);
   let count = 0;
   for (const q of g.tanks || []) {
-    if (!q || q === observer || q.id === observer.id || !q.ai ||
-        !(q.hp > 0) || q.alive === false || q.spawnShieldT > 0 ||
+    if (!q || q === observer || q.id === observer.id ||
         !Number.isFinite(q.x) || !Number.isFinite(q.y)) continue;
     // The candidate deliberately does not inspect __lfEcoKey, private target
     // IDs, unseen world sectors, or the target's actual planned destination.
@@ -30,8 +30,11 @@ function physicalCrowd(g, observer, destination, options = {}) {
     // Cheap public geometry first: do not spend a terrain ray on a visible
     // bot that is nowhere near the public opportunity.
     if (Math.hypot(q.x - destination.x, q.y - destination.y) > radius) continue;
-    if (g.hasLineOfSight &&
-        !g.hasLineOfSight(observer.x, observer.y, q.x, q.y, 2)) continue;
+    if (!g.hasLineOfSight(observer.x, observer.y, q.x, q.y, 2)) continue;
+    // Only publicly witnessed candidates may expose live status. Never
+    // query hidden health, spawn state or AI assignment through a crowd scan.
+    if (!q.ai || !(q.hp > 0) || q.alive === false || q.spawnShieldT > 0)
+      continue;
     count++;
     if (count >= maxCount) break;
   }
@@ -307,5 +310,31 @@ test('composed remembered BLOOM private-intent counterfactual remains observable
       // A corrected shipping planner may legitimately retain memory mode.
       assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
     } finally {LF.query=originalQuery;s.g.destroy();}
+  });
+});
+
+test('research public crowd cannot read offscreen private health or AI',()=>{
+  withSeed(1517810,()=>{
+    const s=scene();
+    try {
+      const hidden={id:99101,x:3000,y:3000,
+        get ai(){throw Error('hidden AI must not be inspected');},
+        get hp(){throw Error('hidden HP must not be inspected');}};
+      s.g.tanks.push(hidden);
+      assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
+    } finally {s.g.destroy();}
+  });
+});
+
+test('research public crowd fails closed without authoritative terrain LOS',()=>{
+  withSeed(1517811,()=>{
+    const s=scene();
+    try {
+      s.g.w=2400;s.g.h=1200;s.g.cam={zoom:1};
+      s.others[0].x=s.center.x;s.others[0].y=s.center.y;
+      assert.equal(physicalCrowd(s.g,s.observer,s.center),1);
+      s.g.hasLineOfSight=null;
+      assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
+    } finally {s.g.destroy();}
   });
 });
