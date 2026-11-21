@@ -66,6 +66,12 @@ function gameplayViewportFilter(g,observer){
 }
 function hasSpotterRelay(g,classes,observer,target){
   if(!g||!observer||!target||!isSniper(classes,observer))return false;
+  /* The canonical Spotter relay checks target.hp before its stored-contact ID.
+   * A remote candidate not actually tracked by this observer must never reach
+   * that query. ID/expiry only prefilter; live cone, drone and terrain remain
+   * authoritative in the Spotter owner below. */
+  var now=Number(g.time),until=Number(observer.__novaSpotterContactUntil);
+  if(observer.__novaSpotterContactId!==target.id||!Number.isFinite(now)||!(until>now))return false;
   /* A stored ID is not live sight: AI runs before the drone scan and can
    * otherwise consume the previous frame's remote coordinates. The Spotter
    * owner checks the actual active Observer, current cone and terrain LoS. */
@@ -112,7 +118,7 @@ function saturationSnapshot(g,selfId){
   return counts;
 }
 function scoreTarget(g,classes,observer,a,target,now,satCache){
-  if(!alive(target)||!hostile(g,observer,target)||target.spawnShieldT>0||!canPerceive(g,classes,observer,target))return-Infinity;
+  if(!canPerceive(g,classes,observer,target)||!alive(target)||!hostile(g,observer,target)||target.spawnShieldT>0)return-Infinity;
   var dist=Math.hypot(target.x-observer.x,target.y-observer.y),near=1/(1+dist/720);
   var hp=clamp(Number(target.hp)/Math.max(1,Number(target.maxHp)||Number(target.hp)||1),0,1);
   var score=near*1.16+(1-hp)*.48+targetDanger(classes,target)*.30;
@@ -140,7 +146,7 @@ function replanDelay(t){return (t&&t.ai&&t.ai.isElite?ELITE_REPLAN:NORMAL_REPLAN
 function fairTarget(g,classes,t,now){
   var a=t.ai||{},previousId=a.__v1112TargetId;
   var cur=previousId>=0&&g.getTank?g.getTank(previousId):null;
-  var valid=cur&&alive(cur)&&hostile(g,t,cur)&&canPerceive(g,classes,t,cur)&&!(cur.spawnShieldT>0);
+  var valid=cur&&canPerceive(g,classes,t,cur)&&alive(cur)&&hostile(g,t,cur)&&!(cur.spawnShieldT>0);
   /* An empty target slot is not permission to rescan every tank every frame.
    * When nobody is perceptible, keep the normal bounded reaction cadence.
    * A formerly valid target that dies, hides or gains spawn protection must
@@ -245,7 +251,7 @@ wrap('game/ai',function(ai,require){
       if(!target)contacts.__novaNoCombatTarget=true;
       for(var ci=0;ci<all.length;ci++){
         var cq=all[ci];
-        if(cq&&cq.id!==t.id&&alive(cq)&&canPerceive(g,classes,t,cq))
+        if(cq&&cq.id!==t.id&&canPerceive(g,classes,t,cq)&&alive(cq))
           contacts.push(cq);
       }
       g.__novaFairVisibleTanks=contacts;
@@ -370,7 +376,7 @@ wrap('game/engine',function(engine,require){
     var id=owner&&owner.ai&&owner.ai.__v1112TargetId;
     var t=id>=0&&g.getTank?g.getTank(id):null;
     /* The fast cached Controller slot must enforce the same spawn-shield gate as scoreTarget. */
-    return t&&alive(t)&&hostile(g,owner,t)&&!(t.spawnShieldT>0)&&canPerceive(g,classes,owner,t)?t:null;
+    return t&&canPerceive(g,classes,owner,t)&&alive(t)&&hostile(g,owner,t)&&!(t.spawnShieldT>0)?t:null;
   }
   function syncControllerPlans(g){
     var now=Number(g.time)||0,ts=g.tanks||[];
