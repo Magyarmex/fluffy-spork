@@ -63,8 +63,10 @@ function observedApproach() {
         if (!(dt>0 && dt<=.6)) break;
         const vx=(b.x-a.x)/dt,vy=(b.y-a.y)/dt;
         const speed=Math.hypot(vx,vy);
-        if (!(speed>=25 && speed<=401) ||
-            (vx*dx+vy*dy)/(speed*dist)<.8) break;
+        const sx=destination.x-a.x,sy=destination.y-a.y;
+        const segmentRange=Math.hypot(sx,sy);
+        if (!(speed>=25 && speed<=401) || !(segmentRange>0) ||
+            (vx*sx+vy*sy)/(speed*segmentRange)<.8) break;
         alignedSeconds+=dt;segments++;
       }
       if (segments>=2 && alignedSeconds+1e-9>=.25) count++;
