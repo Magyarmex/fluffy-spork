@@ -230,3 +230,31 @@ test('research projectile provenance: finite endpoints with overflowing deltas s
  assert.equal(r.possible,false);
  assert.equal(r.unsupported,1);
 });
+
+test('research projectile provenance: a failed terrain query cannot certify clear crossfire',()=>{
+ const bullet={ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3};
+ const unknown=projectileCandidate({
+  bullets:[bullet],
+  firstTerrainHit(){throw new Error('terrain index unavailable');}
+ },shooter,victim);
+ assert.equal(unknown.possible,false);
+ assert.equal(unknown.known,false);
+ assert.equal(unknown.checked,1);
+ assert.equal(unknown.terrainChecks,1);
+ assert.equal(unknown.unsupported,1);
+});
+test('research projectile provenance: a later clear pellet survives an earlier terrain query failure',()=>{
+ let calls=0;
+ const result=projectileCandidate({
+  bullets:[
+   {ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3},
+   {ownerId:7,x:0,y:8,vx:100,vy:0,ttl:2,r:3}
+  ],
+  firstTerrainHit(){if(++calls===1)throw new Error('transient terrain failure');return null;}
+ },shooter,victim);
+ assert.equal(result.known,true);
+ assert.equal(result.possible,true);
+ assert.equal(result.checked,2);
+ assert.equal(result.terrainChecks,2);
+ assert.equal(result.unsupported,1);
+});
