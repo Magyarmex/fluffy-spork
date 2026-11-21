@@ -66,3 +66,31 @@ test('research projectile provenance: explosive and malformed lanes remain expli
   assert.equal(r.unsupported,1,JSON.stringify(patch));
  }
 });
+
+test('research projectile provenance: a clear pellet can certify even when a sibling misses',()=>{
+ const result=projectileCandidate({
+  bullets:[
+   {ownerId:7,x:0,y:0,vx:100,vy:70,ttl:2,r:3},
+   {ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3}
+  ],
+  firstTerrainHit(){return null;}
+ },shooter,victim);
+ assert.equal(result.known,true);
+ assert.equal(result.possible,true);
+ assert.equal(result.checked,2);
+ assert.equal(result.terrainChecks,1);
+});
+test('research projectile provenance: a blocked first pellet cannot suppress a later clear pellet',()=>{
+ let queries=0;
+ const result=projectileCandidate({
+  bullets:[
+   {ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3},
+   {ownerId:7,x:0,y:8,vx:100,vy:0,ttl:2,r:3}
+  ],
+  firstTerrainHit(){return ++queries===1?{solid:true}:null;}
+ },shooter,victim);
+ assert.equal(result.known,true);
+ assert.equal(result.possible,true);
+ assert.equal(result.checked,2);
+ assert.equal(result.terrainChecks,2);
+});
