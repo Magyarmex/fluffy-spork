@@ -274,3 +274,16 @@ test('research A/B/C: geometry-only projectile arm does not spend terrain rays o
  assert.equal(physical.terrainChecks,1);
  assert.equal(rays,1);
 });
+
+test('research A/B/C: penetrating destructible cover is unknown, not a certified miss',()=>{
+ const b={ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3,pen:2};
+ const g={bullets:[b],firstTerrainHit(){return {solid:{destructible:true,hp:10}};}};
+ const B=projectileCandidate(g,shooter,victim,0,{terrain:false});
+ const C=projectileCandidate(g,shooter,victim);
+ assert.equal(B.possible,true,'B sees a projectile lane but makes no cover claim');
+ assert.equal(B.terrainChecks,0);
+ assert.equal(C.possible,false);
+ assert.equal(C.known,false,'C cannot declare a miss without penetration resolution');
+ assert.equal(C.unsupported,1);
+ assert.equal(C.terrainChecks,1);
+});
