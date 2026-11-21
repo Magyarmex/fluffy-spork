@@ -312,3 +312,25 @@ test('research projectile provenance: destructible cover remains unknown without
  assert.equal(malformed.known,false,'terrain hit without solid identity cannot certify a veto');
  assert.equal(malformed.unsupported,1);
 });
+
+// A projectile that misses the current hull can still meet a moving target.
+// This oracle is intentionally not a full future movement or impact simulator.
+test('research projectile provenance: moving victims are not certified misses from a static snapshot',()=>{
+ const bullet={ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3};
+ const game={bullets:[bullet]};
+ const moving={x:100,y:50,vx:0,vy:-50};
+ const atBirth=projectileCandidate(game,shooter,moving);
+ assert.equal(atBirth.possible,false,'the hull starts outside the emitted lane');
+ assert.equal(atBirth.known,false,'future motion can enter that lane');
+ assert.equal(atBirth.movingVictim,true);
+ // Independent relative-motion witness: after one second both centers meet.
+ const t=1;
+ assert.equal(bullet.x+bullet.vx*t,moving.x+moving.vx*t);
+ assert.equal(bullet.y+bullet.vy*t,moving.y+moving.vy*t);
+ const still=projectileCandidate(game,shooter,{...moving,vx:0,vy:0});
+ assert.equal(still.known,true);
+ assert.equal(still.possible,false);
+ const clear=projectileCandidate(game,shooter,{x:100,y:0,vx:0,vy:50});
+ assert.equal(clear.possible,true,'a present clear lane remains possible, not guaranteed');
+ assert.equal(clear.known,true);
+});
