@@ -47,3 +47,28 @@ test('research: replacing a witnessed shooter with the same ID retains a stale c
    'KNOWN PROTOTYPE DEFECT: ID reuse impersonates a witnessed shooter');
  }finally{g.destroy();}
 });
+
+test('research: a replacement shooter also inherits an observed reload-punish window',()=>{
+ const g=bootGame();
+ try{
+  const shooter=g.player,observer=g.tanks.find(t=>t!==shooter&&t.ai);
+  assert.ok(shooter&&observer);
+  g.hasLineOfSight=()=>true;
+  g.time=10.2;
+  shooter.x=0;shooter.y=0;shooter.cls='twin';
+  observer.x=-100;observer.y=0;
+  observer.ai.__v181ObservedShotId=shooter.id;
+  observer.ai.__v181ObservedShotAt=10;
+  const classes={CLASSES:{twin:{bullet:{reload:1.2}}}};
+  const sense=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__;
+  assert.ok(sense.witnessedOpening(g,classes,observer,shooter,10.2)>0,
+   'control: the original shooter exposes a legitimate recent reload opening');
+  const replacement={...shooter,id:shooter.id,alive:true};
+  assert.notEqual(replacement,shooter);
+  assert.ok(sense.witnessedOpening(g,classes,observer,replacement,10.2)>0,
+   'KNOWN DEFECT: new shooter object inherits the old shooter reload window');
+  assert.equal(sense.witnessedOpening(g,classes,observer,
+   {...replacement,id:shooter.id+50000},10.2),0,
+   'negative control: different ID cannot inherit the observed opening');
+ }finally{g.destroy();}
+});
