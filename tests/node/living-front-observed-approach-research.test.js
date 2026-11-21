@@ -15,8 +15,8 @@ function observedApproach() {
     // Never transfer one observer's private sightings to its replacement.
     owner=observer;
     lastTime=now;
-    if (!g || !observer || !Number.isFinite(observer.x) ||
-        !Number.isFinite(observer.y)) return;
+    if (!g || !observer || typeof g.hasLineOfSight!=='function' ||
+        !Number.isFinite(observer.x) || !Number.isFinite(observer.y)) return;
     const F=g.__testFair;
     if (!F || typeof F.inGameplayViewport!=='function') return;
     const ext=F.viewportHalfExtents && F.viewportHalfExtents(g);
@@ -28,8 +28,7 @@ function observedApproach() {
       // Geometry first. Never inspect offscreen health, shield or private AI.
       if (Math.abs(q.x-observer.x)>ext.x ||
           Math.abs(q.y-observer.y)>ext.y) continue;
-      if (g.hasLineOfSight &&
-          !g.hasLineOfSight(observer.x,observer.y,q.x,q.y,2)) continue;
+      if (!g.hasLineOfSight(observer.x,observer.y,q.x,q.y,2)) continue;
       if (!(q.hp>0) || q.alive===false || q.spawnShieldT>0) {
         records.delete(q.id); // Only a witnessed death/shield is evidence.
         continue;
@@ -195,4 +194,12 @@ run('replacement observer never inherits prior-life sightings',102909,(s,t)=>{
   t.sample(s.g,replacement,[],10.35);
   assert.equal(t.size(),0);
   assert.equal(t.countToward(s.destination,10.35),0);
+});
+
+run('missing terrain visibility authority cannot certify a sighting',102910,(s,t)=>{
+  delete s.g.hasLineOfSight;
+  t.sample(s.g,s.observer,[s.rival],10);
+  s.rival.x=-85;t.sample(s.g,s.observer,[s.rival],10.15);
+  s.rival.x=-70;t.sample(s.g,s.observer,[s.rival],10.3);
+  assert.equal(t.countToward(s.destination,10.3),0);
 });
