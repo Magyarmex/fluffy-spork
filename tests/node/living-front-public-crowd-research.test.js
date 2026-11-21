@@ -137,3 +137,52 @@ test('research candidate cannot infer remote coordinated rotations',()=>{
     } finally {s.g.destroy();}
   });
 });
+
+/* Alternative B: deterministic public-signal dispersion. No bot scans, no
+ * private plans, no global random draws. This is an explicit research foil,
+ * not a proposed balance change: hash gating can feel arbitrary to players. */
+function publicSignalLane(id, sector, announcedAt) {
+  if (!Number.isSafeInteger(id) || !Number.isInteger(sector) ||
+      sector < 0 || sector >= 16 || !Number.isFinite(announcedAt)) return null;
+  const epoch = Math.trunc(announcedAt * 1000);
+  if (!Number.isSafeInteger(epoch)) return null;
+  let x = Math.imul(id ^ Math.imul(sector + 1, 0x9e3779b1) ^ epoch,
+    0x85ebca6b);
+  x ^= x >>> 13;
+  x = Math.imul(x, 0xc2b2ae35);
+  x ^= x >>> 16;
+  return (x >>> 0) / 4294967296;
+}
+
+test('public signal dispersion is stable and independent of hidden AI plans',()=>{
+  withSeed(1517804,()=>{
+    const s=scene();
+    try {
+      const before=s.g.tanks.map(q=>publicSignalLane(q.id,s.sector,
+        s.g.__lfState.signal.started));
+      s.others.forEach((q,i)=>{
+        q.ai.__lfEcoKey=i%2?'BLOOM:'+s.sector:'none';
+        q.ai.__v1112TargetId=9999-i;
+      });
+      const after=s.g.tanks.map(q=>publicSignalLane(q.id,s.sector,
+        s.g.__lfState.signal.started));
+      assert.deepEqual(after,before);
+      assert.ok(before.every(x=>x>=0&&x<1));
+      assert.equal(publicSignalLane(NaN,s.sector,9),null);
+      assert.equal(publicSignalLane(1,17,9),null);
+      assert.equal(publicSignalLane(1,s.sector,Infinity),null);
+    } finally {s.g.destroy();}
+  });
+});
+
+test('public signal dispersion spreads a cohort without extra random draws',()=>{
+  const cohort=Array.from({length:64},(_,i)=>publicSignalLane(i+1,5,9));
+  const lower=cohort.filter(v=>v<.33).length;
+  const upper=cohort.filter(v=>v>.66).length;
+  assert.ok(lower>=8&&upper>=8,
+    'public-signal hash must not collapse a 64-bot cohort into one lane');
+  assert.notDeepEqual(
+    Array.from({length:64},(_,i)=>publicSignalLane(i+1,5,9)),
+    Array.from({length:64},(_,i)=>publicSignalLane(i+1,6,9)),
+    'a new public destination may create a different dispersion');
+});
