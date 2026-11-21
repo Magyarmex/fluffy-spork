@@ -201,3 +201,23 @@ test('research projectile provenance: translation and rotation preserve eligibil
   assert.equal(rotated,original,'rotation '+i);
  }
 });
+
+test('research projectile provenance: wall behind first tank contact is not a blocker',()=>{
+ const bullet={ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3};
+ let endpoint=null;
+ const game={bullets:[bullet],firstTerrainHit(_ax,_ay,bx){
+  endpoint=bx;
+  return bx>=90?{solid:{destructible:false}}:null;
+ }};
+ const r=projectileCandidate(game,shooter,victim);
+ assert.equal(r.known,true);
+ assert.equal(r.possible,true);
+ assert.ok(endpoint>0&&endpoint<90,'terrain ray must stop before far-side wall');
+ assert.ok(Math.abs(endpoint-(100-21))<1e-8,
+  'first possible hull contact is center minus hull and projectile radii');
+ const blocked=projectileCandidate({
+  bullets:[bullet],firstTerrainHit(_ax,_ay,bx){return bx>=50?{solid:{destructible:false}}:null;}
+ },shooter,victim);
+ assert.equal(blocked.known,true);
+ assert.equal(blocked.possible,false,'wall before first contact still blocks');
+});
