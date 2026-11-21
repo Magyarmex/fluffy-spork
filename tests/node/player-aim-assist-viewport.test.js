@@ -199,3 +199,15 @@ test('keyboard movement aim fallback uses the same conservative cone',()=>{
  assert.ok(Math.abs(g.player.angle-Math.atan2(20,240))<1e-10,
   'movement fallback should rescue the sole aligned target');
 });
+
+test('offscreen rivals cannot expose private HP or shield during player aim assist',()=>{
+ const Game=boot(),g=new Game();g.w=320;g.h=568;
+ const hidden=tank(2,900,0),visible=tank(3,100,30);
+ for(const key of ['hp','spawnShieldT','team']){
+  Object.defineProperty(hidden,key,{get(){throw Error('offscreen '+key+' read');}});
+ }
+ g.tanks.push(hidden,visible);
+ assert.equal(g.nearestTank(0,0,480,1),visible);
+ assert.doesNotThrow(()=>g.update(),
+  'shipping player aim update must not inspect hidden tank status');
+});
