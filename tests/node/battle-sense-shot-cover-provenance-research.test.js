@@ -4,7 +4,7 @@
 // Never merge as gameplay acceptance goldens; invert when projectile-path provenance is implemented.
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const test=require('node:test'),assert=require('node:assert/strict');
-const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
 function unit(id,x,y,ai){return {id,x,y,alive:true,hp:100,maxHp:100,cls:'twin',ai};}
 function fireScenario(blockShotLane){
  const g=bootGame();
@@ -162,43 +162,44 @@ test('research characterization: dense witnessed volleys expose quadratic LOS gr
  }finally{g.destroy();}
 });
 
-test('research causal control: false event-time witness changes composed AI strategic mode',()=>{
- const g=bootGame();
- try{
-  const shooter=g.player;
-  const [observer,third]=g.tanks.filter(t=>t!==shooter&&t.ai).slice(0,2);
-  assert.ok(shooter&&observer&&third);
-  g.status='playing';g.paused=false;g.time=10.5;
-  shooter.x=0;shooter.y=0;shooter.cls='twin';shooter.spawnShieldT=0;
-  observer.x=-200;observer.y=0;observer.hp=observer.maxHp;
-  third.x=100;third.y=0;
-  g.tanks=[observer,shooter,third];
-  g.__novaFairVisibleTanks=g.tanks;
-  g.areHostile=()=>true;g.areAllies=()=>false;
-  g.hasLineOfSight=()=>true;
-  g.powerups=[];g.shapes=[];g.drones=[];
-  const ai=g.__testWindow.__novaMakeRequire('')('game/ai');
-  assert.equal(typeof ai.updateAI,'function');
-  const a=observer.ai;
-  const plan=(victims)=>{
-   a.__v1112TargetId=shooter.id;
-   a.__v1112NextThink=10.6; // keep the same fair, visible target for this causal contrast
-   a.__v180TargetId=shooter.id;
-   a.__v181ObservedShotId=shooter.id;
-   a.__v181ObservedShotAt=10;
-   a.__v181ObservedShotAngle=0;
-   a.__v181ObservedShotX=0;
-   a.__v181ObservedShotY=0;
-   a.__v181ObservedShotVictims=victims;
-   a.__v181Think=0;
-   ai.updateAI(observer,g,1/60);
-   return a.__v181Mode;
-  };
-  const falseWitnessMode=plan(new WeakSet([third]));
-  const noWitnessMode=plan(null);
-  assert.equal(falseWitnessMode,'crossfire',
-   'KNOWN CANDIDATE DEFECT: false witness reaches the actual AI planning owner');
-  assert.notEqual(noWitnessMode,'crossfire',
-   'removing only the witness must eliminate the crossfire strategic mode');
- }finally{g.destroy();}
+test('research matched-world control: false witness changes composed AI strategic mode',()=>{
+ function run(withWitness){
+  return withSeed(1517800,()=>{
+   const g=bootGame();
+   try{
+    const shooter=g.player;
+    const [observer,third]=g.tanks.filter(t=>t!==shooter&&t.ai).slice(0,2);
+    assert.ok(shooter&&observer&&third);
+    g.status='playing';g.paused=false;g.time=10.5;
+    shooter.x=0;shooter.y=0;shooter.cls='twin';shooter.spawnShieldT=0;
+    observer.x=-200;observer.y=0;observer.hp=observer.maxHp;
+    third.x=100;third.y=0;
+    g.tanks=[observer,shooter,third];
+    g.__novaFairVisibleTanks=g.tanks;
+    g.areHostile=()=>true;g.areAllies=()=>false;
+    g.hasLineOfSight=()=>true;
+    g.powerups=[];g.shapes=[];g.drones=[];
+    const ai=g.__testWindow.__novaMakeRequire('')('game/ai');
+    assert.equal(typeof ai.updateAI,'function');
+    const a=observer.ai;
+    a.__v1112TargetId=shooter.id;
+    a.__v1112NextThink=10.6; // hold one fair, visible target
+    a.__v180TargetId=shooter.id;
+    a.__v181ObservedShotId=shooter.id;
+    a.__v181ObservedShotAt=10;
+    a.__v181ObservedShotAngle=0;
+    a.__v181ObservedShotX=0;
+    a.__v181ObservedShotY=0;
+    a.__v181ObservedShotVictims=withWitness?new WeakSet([third]):null;
+    a.__v181Think=0;
+    ai.updateAI(observer,g,1/60);
+    return a.__v181Mode;
+   }finally{g.destroy();}
+  });
+ }
+ const falseWitnessMode=run(true),noWitnessMode=run(false);
+ assert.equal(falseWitnessMode,'crossfire',
+  'KNOWN CANDIDATE DEFECT: false witness reaches the actual AI planning owner');
+ assert.notEqual(noWitnessMode,'crossfire',
+  'identical seeded world without false witness must not choose crossfire');
 });
