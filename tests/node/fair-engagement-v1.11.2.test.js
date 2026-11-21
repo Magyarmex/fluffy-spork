@@ -282,7 +282,7 @@ test('Controller cached target checks public sight before private health', () =>
 
 test('legal live Sniper Observer relay still permits remote target scoring', () => {
   const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__,C=classes();
-  const sniper=tank(1,0,0,{cls:'marksman'}),remote=tank(2,1200,0);
+  const sniper=tank(1,0,0,{cls:'marksman',__novaSpotterContactId:2,__novaSpotterContactUntil:2}),remote=tank(2,1200,0);
   const g=game(800,600,1);g.tanks=[sniper,remote];
   let reads=0;
   Object.defineProperty(remote,'hp',{get(){reads++;return 75;}});
@@ -293,4 +293,20 @@ test('legal live Sniper Observer relay still permits remote target scoring', () 
   reads=0;
   assert.equal(T.scoreTarget(g,C,sniper,sniper.ai,remote,g.time),-Infinity);
   assert.equal(reads,0,'revoked relay must not retain remote health access');
+});
+
+test('untracked or expired Sniper relay never invokes a remote health-reading owner', () => {
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__,C=classes();
+  const sniper=tank(1,0,0,{cls:'marksman',__novaSpotterContactId:99,__novaSpotterContactUntil:10});
+  const remote=tank(2,1200,0);
+  Object.defineProperty(remote,'hp',{get(){throw Error('unwitnessed remote HP');}});
+  const g=game(800,600,1);g.tanks=[sniper,remote];
+  let calls=0;
+  window.__NOVA_SPOTTER_LIVE_RELAY__=()=>{calls++;throw Error('unwitnessed relay called');};
+  assert.equal(T.scoreTarget(g,C,sniper,sniper.ai,remote,g.time),-Infinity);
+  assert.equal(calls,0);
+  sniper.__novaSpotterContactId=remote.id;
+  sniper.__novaSpotterContactUntil=g.time;
+  assert.equal(T.scoreTarget(g,C,sniper,sniper.ai,remote,g.time),-Infinity);
+  assert.equal(calls,0,'expired contact is not live remote authority');
 });
