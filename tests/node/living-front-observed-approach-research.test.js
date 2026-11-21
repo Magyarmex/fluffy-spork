@@ -27,8 +27,16 @@ function observedApproach() {
           !Number.isFinite(q.x) || !Number.isFinite(q.y)) continue;
       // Geometry first. Never inspect offscreen health, shield or private AI.
       if (Math.abs(q.x-observer.x)>ext.x ||
-          Math.abs(q.y-observer.y)>ext.y) continue;
-      if (!g.hasLineOfSight(observer.x,observer.y,q.x,q.y,2)) continue;
+          Math.abs(q.y-observer.y)>ext.y) {
+        // Losing public sight breaks the witnessed motion chain. A later
+        // reappearance cannot certify a route taken behind cover.
+        records.delete(q.id);
+        continue;
+      }
+      if (!g.hasLineOfSight(observer.x,observer.y,q.x,q.y,2)) {
+        records.delete(q.id);
+        continue;
+      }
       if (!(q.hp>0) || q.alive===false || q.spawnShieldT>0) {
         records.delete(q.id); // Only a witnessed death/shield is evidence.
         continue;
@@ -202,4 +210,34 @@ run('missing terrain visibility authority cannot certify a sighting',102910,(s,t
   s.rival.x=-85;t.sample(s.g,s.observer,[s.rival],10.15);
   s.rival.x=-70;t.sample(s.g,s.observer,[s.rival],10.3);
   assert.equal(t.countToward(s.destination,10.3),0);
+});
+
+run('an occluded interval breaks witnessed movement continuity until two fresh segments',102911,(s,t)=>{
+  t.sample(s.g,s.observer,[s.rival],10);
+  s.rival.x=-85;t.sample(s.g,s.observer,[s.rival],10.15);
+  s.rival.x=-70;t.sample(s.g,s.observer,[s.rival],10.3);
+  assert.equal(t.countToward(s.destination,10.3),1);
+  s.g.hasLineOfSight=()=>false;
+  s.rival.x=-55;t.sample(s.g,s.observer,[s.rival],10.45);
+  assert.equal(t.countToward(s.destination,10.45),0,
+    'a hidden interval must invalidate previously certified approach');
+  s.g.hasLineOfSight=()=>true;
+  s.rival.x=-40;t.sample(s.g,s.observer,[s.rival],10.6);
+  assert.equal(t.countToward(s.destination,10.6),0,
+    'reappearance is a new observation, not a witnessed travel segment');
+  s.rival.x=-25;t.sample(s.g,s.observer,[s.rival],10.75);
+  assert.equal(t.countToward(s.destination,10.75),0);
+  s.rival.x=-10;t.sample(s.g,s.observer,[s.rival],10.9);
+  assert.equal(t.countToward(s.destination,10.9),1);
+});
+
+run('leaving the viewport also breaks the witnessed motion chain',102912,(s,t)=>{
+  t.sample(s.g,s.observer,[s.rival],10);
+  s.rival.x=-85;t.sample(s.g,s.observer,[s.rival],10.15);
+  s.rival.x=-70;t.sample(s.g,s.observer,[s.rival],10.3);
+  assert.equal(t.countToward(s.destination,10.3),1);
+  s.rival.x=1800;t.sample(s.g,s.observer,[s.rival],10.45);
+  assert.equal(t.countToward(s.destination,10.45),0);
+  s.rival.x=-40;t.sample(s.g,s.observer,[s.rival],10.6);
+  assert.equal(t.countToward(s.destination,10.6),0);
 });
