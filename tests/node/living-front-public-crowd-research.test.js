@@ -293,7 +293,7 @@ test('composed remembered BLOOM private-intent counterfactual remains observable
       s.g.time=11;
       s.g.__lfState.signal=null;
       s.g.__lfState.bloomMemory={
-        sector:s.sector,announcedAt:9,until:35,initialValue:500
+        sector:s.sector,announcedAt:9,until:33,initialValue:500
       };
       const baseline=s.T.publicEcoBias(s.g,s.observer,{},{});
       assert.equal(baseline.mode,'memory',
