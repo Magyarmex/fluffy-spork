@@ -34,7 +34,8 @@ function observedApproach() {
       return;
     }
     const ext=F.viewportHalfExtents && F.viewportHalfExtents(g);
-    if (!ext || !(ext.x>0) || !(ext.y>0)) {
+    if (!ext || !Number.isFinite(ext.x) || !Number.isFinite(ext.y) ||
+        !(ext.x>0) || !(ext.y>0)) {
       records.clear();
       return;
     }
@@ -295,6 +296,13 @@ run('loss of viewport or terrain authority revokes previously valid evidence',10
   }};
   t.sample(badViewport,s.observer,[s.rival],12.35);
   assert.equal(t.countToward(s.destination,12.35),0);
+  establish(13);
+  const infiniteViewport={...s.g,__testFair:{
+    ...s.g.__testFair,viewportHalfExtents:()=>({x:Infinity,y:300})
+  }};
+  t.sample(infiniteViewport,s.observer,[s.rival],13.35);
+  assert.equal(t.countToward(s.destination,13.35),0,
+    'unbounded viewport cannot become a source of omniscient sightings');
 });
 
 run('invalid observer coordinates revoke previously valid movement evidence',102915,(s,t)=>{
