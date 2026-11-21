@@ -15,7 +15,13 @@ function observedApproach() {
     // Never transfer one observer's private sightings to its replacement.
     owner=observer;
     lastTime=now;
-    if (!g || !observer || typeof g.hasLineOfSight!=='function' ||
+    // The same tank object can be recycled after death; a dead observer
+    // must not carry sightings into a later life.
+    if (!observer || !(observer.hp>0) || observer.alive===false) {
+      records.clear();
+      return;
+    }
+    if (!g || typeof g.hasLineOfSight!=='function' ||
         !Number.isFinite(observer.x) || !Number.isFinite(observer.y)) return;
     const F=g.__testFair;
     if (!F || typeof F.inGameplayViewport!=='function') return;
@@ -240,4 +246,18 @@ run('leaving the viewport also breaks the witnessed motion chain',102912,(s,t)=>
   assert.equal(t.countToward(s.destination,10.45),0);
   s.rival.x=-40;t.sample(s.g,s.observer,[s.rival],10.6);
   assert.equal(t.countToward(s.destination,10.6),0);
+});
+
+run('observer death clears sightings even if the same tank object respawns',102913,(s,t)=>{
+  t.sample(s.g,s.observer,[s.rival],10);
+  s.rival.x=-85;t.sample(s.g,s.observer,[s.rival],10.15);
+  s.rival.x=-70;t.sample(s.g,s.observer,[s.rival],10.3);
+  assert.equal(t.countToward(s.destination,10.3),1);
+  s.observer.hp=0;s.observer.alive=false;
+  t.sample(s.g,s.observer,[s.rival],10.35);
+  assert.equal(t.size(),0);
+  s.observer.hp=100;s.observer.alive=true;
+  s.rival.x=-55;t.sample(s.g,s.observer,[s.rival],10.5);
+  assert.equal(t.countToward(s.destination,10.5),0,
+    'a new life must accumulate its own public evidence');
 });
