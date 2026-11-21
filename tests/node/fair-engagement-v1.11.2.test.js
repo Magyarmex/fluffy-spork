@@ -236,3 +236,24 @@ test('Fair Engagement Controller replan respects an existing think interval',()=
   assert.equal(owner.__novaLiveVectorAI.targetId,nearer.id,
     'after the scheduled think, the fair target must update');
 });
+
+test('offscreen target health is never consulted by scoreTarget or a held-target replan', () => {
+  const {window,load}=boot();
+  const T=window.__NOVA_FAIR_ENGAGEMENT_TEST__,C=classes();
+  const observer=tank(1,0,0,{ai:{state:'hunt',targetId:2,__v1112TargetId:2,__v1112NextThink:10}});
+  const hidden=tank(2,1500,0);
+  Object.defineProperty(hidden,'hp',{get(){throw Error('hidden health accessed');}});
+  const g=game(800,600,1);g.tanks=[observer,hidden];g.time=1;
+  assert.equal(T.scoreTarget(g,C,observer,observer.ai,hidden,g.time),-Infinity);
+  const ai=load('game/ai');
+  assert.doesNotThrow(()=>ai.updateAI(observer,g,1/60));
+  assert.equal(observer.ai.__v1112TargetId,-1);
+});
+
+test('covered or offscreen health is not read while a visible target remains selectable', () => {
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__,C=classes();
+  const observer=tank(1,0,0),visible=tank(3,100,0),hidden=tank(2,1500,0);
+  Object.defineProperty(hidden,'hp',{get(){throw Error('offscreen health accessed');}});
+  const g=game(800,600,1);g.tanks=[observer,hidden,visible];
+  assert.equal(T.chooseTarget(g,C,observer,observer.ai,g.time).id,visible.id);
+});
