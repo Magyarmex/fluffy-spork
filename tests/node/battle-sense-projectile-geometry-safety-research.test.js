@@ -59,7 +59,7 @@ test('research projectile provenance: finite misses, insufficient range, and for
  assert.equal(spread.checked,2);
 });
 test('research projectile provenance: explosive and malformed lanes remain explicitly unknown',()=>{
- for(const patch of [{shell:true},{splash:30},{cluster:true},{vx:0,vy:0}]){
+ for(const patch of [{shell:true},{splash:30},{cluster:true},{beam:true},{vx:0,vy:0}]){
   const r=evaluate(patch);
   assert.equal(r.known,false,JSON.stringify(patch));
   assert.equal(r.possible,false,JSON.stringify(patch));
