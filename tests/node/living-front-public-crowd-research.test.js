@@ -27,9 +27,11 @@ function physicalCrowd(g, observer, destination, options = {}) {
       : Math.abs(q.x - observer.x) <= halfX &&
         Math.abs(q.y - observer.y) <= halfY;
     if (!seen) continue;
+    // Cheap public geometry first: do not spend a terrain ray on a visible
+    // bot that is nowhere near the public opportunity.
+    if (Math.hypot(q.x - destination.x, q.y - destination.y) > radius) continue;
     if (g.hasLineOfSight &&
         !g.hasLineOfSight(observer.x, observer.y, q.x, q.y, 2)) continue;
-    if (Math.hypot(q.x - destination.x, q.y - destination.y) > radius) continue;
     count++;
     if (count >= maxCount) break;
   }
@@ -223,6 +225,21 @@ test('public-signal admission is unchanged by hidden rivals private ecology keys
       const after=publicOpportunityAdmitted(.68,route,s.observer.id,
         s.sector,s.g.__lfState.signal.started);
       assert.equal(after,before);
+    } finally {s.g.destroy();}
+  });
+});
+
+test('public crowd performs terrain rays only for visible near-destination candidates',()=>{
+  withSeed(1517806,()=>{
+    const s=scene();
+    try {
+      s.g.w=2400;s.g.h=1200;s.g.cam={zoom:1};
+      const near=s.others[0],far=s.others[1];
+      near.x=s.center.x;near.y=s.center.y;
+      far.x=s.observer.x+40;far.y=s.observer.y+40;
+      let rays=0;s.g.hasLineOfSight=()=>{rays++;return true;};
+      assert.equal(physicalCrowd(s.g,s.observer,s.center),1);
+      assert.equal(rays,1,'only one visible destination occupant merits terrain LoS');
     } finally {s.g.destroy();}
   });
 });
