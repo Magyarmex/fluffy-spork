@@ -350,20 +350,21 @@ function publicBloomPilot(seed,observe) {
       g.__lfState.directorEnabled=true;
       g.__lfState.signal={type:'BLOOM',sector,x:center.x,y:center.y,
         started:g.time,until:g.time+4};
-      let sightings=0,approachFrames=0,privateCommitFrames=0,rays=0,sampling=false;
+      let sightings=0,approachFrames=0,privateCommitFrames=0,rays=0;
       const los=g.hasLineOfSight;
-      if(observe)g.hasLineOfSight=function(...args){
-        if(sampling)rays++;return los.apply(this,args);
-      };
+      const ownLos=Object.prototype.hasOwnProperty.call(g,'hasLineOfSight');
       for(let i=0;i<120;i++){
         if(g.status!=='playing')break;
         g.update(1/60);
         if(observe&&i%3===2){
           const rivals=g.tanks.filter(q=>q&&q.ai&&q!==observer);
           const before=draws();
-          sampling=true;
+          g.hasLineOfSight=function(...args){rays++;return los.apply(this,args);};
           try {tracker.sample(g,observer,rivals,g.time);}
-          finally {sampling=false;}
+          finally {
+            if(ownLos)g.hasLineOfSight=los;
+            else delete g.hasLineOfSight;
+          }
           const count=tracker.countToward(center,g.time);
           assert.equal(draws(),before,'read-only witness must not consume game RNG');
           assert.ok(tracker.size()<=16);
