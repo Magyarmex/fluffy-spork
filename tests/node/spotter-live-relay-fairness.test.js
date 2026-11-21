@@ -139,3 +139,23 @@ test('real Spotter relay never reads HP of an untracked or expired remote candid
   assert.equal(live(w.g,w.owner,w.target),false,
     'expired memory cannot authorize health inspection');
 });
+
+test('Spotter cannot inspect remote HP after live drone or terrain witness disappears', () => {
+  for(const fault of ['missing-drone','covered','dead-drone']){
+    const w=world();acquire(w);
+    const live=w.g.constructor.__novaLiveRelay;
+    if(fault==='missing-drone')w.g.drones=[];
+    if(fault==='covered')w.g.blocked=true;
+    if(fault==='dead-drone')w.drone.hp=0;
+    Object.defineProperty(w.target,'hp',{get(){throw Error('unwitnessed remote health');}});
+    assert.equal(live(w.g,w.owner,w.target),false,fault);
+  }
+});
+
+test('live Observer still permits health verification after real sight', () => {
+  const w=world();acquire(w);
+  let reads=0;
+  Object.defineProperty(w.target,'hp',{get(){reads++;return 100;}});
+  assert.equal(w.g.constructor.__novaLiveRelay(w.g,w.owner,w.target),true);
+  assert.ok(reads>0,'a witnessed target may expose its current health');
+});
