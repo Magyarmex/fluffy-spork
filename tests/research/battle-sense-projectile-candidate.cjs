@@ -10,7 +10,7 @@ function projectileCandidate(game,shooter,victim,startIndex=0,options={}){
  const defs=game.__testWindow?.__novaMakeRequire?.('')('game/classes')?.CLASSES;
  const size=Number(defs?.[victim.cls]?.size);
  const hull=size>0&&Number.isFinite(size)?size+3:18;
- let checked=0,terrainChecks=0,unsupported=0;
+ let checked=0,terrainChecks=0,unsupported=0,geometricMisses=0;
  // A stationary birth-time miss is not a certified miss for a moving hull.
  // The actual engine can steer, collide or change velocity after firing;
  // preserve uncertainty rather than silently asserting a physical impossibility.
@@ -40,7 +40,7 @@ function projectileCandidate(game,shooter,victim,startIndex=0,options={}){
   const along=Math.max(0,Math.min(maxTravel,projection));
   const miss=Math.hypot(dx-ux*along,dy-uy*along);
   const hitRadius=hull+radius;
-  if(miss>hitRadius)continue;
+  if(miss>hitRadius){geometricMisses++;continue;}
   // Test cover only up to the tank's first possible swept contact,
   // not its center: a wall behind the near hull face is not a veto.
   const lateral2=Math.max(0,dx*dx+dy*dy-projection*projection);
@@ -80,6 +80,6 @@ function projectileCandidate(game,shooter,victim,startIndex=0,options={}){
  const futureMotionUnknown=options.conservativeMotion===true;
  return {known:checked>0&&unsupported===0&&!movingVictim&&!invalidMotion&&!futureMotionUnknown,possible:false,
   checked,terrainChecks,unsupported,movingVictim,
-  futureMotionUnknown:futureMotionUnknown&&checked>0&&unsupported===0&&!movingVictim&&!invalidMotion};
+  futureMotionUnknown:futureMotionUnknown&&geometricMisses>0&&unsupported===0&&!movingVictim&&!invalidMotion};
 }
 module.exports={projectileCandidate};
