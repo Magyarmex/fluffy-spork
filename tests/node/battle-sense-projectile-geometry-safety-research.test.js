@@ -115,3 +115,24 @@ test('research projectile provenance: cover plus penetration is unknown until re
  assert.equal(spent.known,true);
  assert.equal(spent.possible,false);
 });
+
+test('research projectile provenance: seeded segment-circle oracle agrees for 512 lanes',()=>{
+ let seed=0x12345678;
+ function rand(){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return (seed>>>0)/4294967296;}
+ for(let i=0;i<512;i++){
+  const b={ownerId:7,x:(rand()-.5)*4500,y:(rand()-.5)*4500,
+   vx:(rand()-.5)*2000,vy:(rand()-.5)*2000,ttl:.01+rand()*3,r:rand()*8};
+  const v={x:(rand()-.5)*4500,y:(rand()-.5)*4500};
+  const speed=Math.hypot(b.vx,b.vy);
+  if(speed<=1)continue;
+  const dx=b.vx*b.ttl,dy=b.vy*b.ttl,fx=b.x-v.x,fy=b.y-v.y,rr=18+b.r;
+  const A=dx*dx+dy*dy,B=2*(fx*dx+fy*dy),C=fx*fx+fy*fy-rr*rr;
+  const D=B*B-4*A*C;
+  const hit=C<=0||(D>=0&&(
+   ((-B-Math.sqrt(D))/(2*A)>=0&&(-B-Math.sqrt(D))/(2*A)<=1)||
+   ((-B+Math.sqrt(D))/(2*A)>=0&&(-B+Math.sqrt(D))/(2*A)<=1)));
+  const result=projectileCandidate({bullets:[b]},shooter,v);
+  assert.equal(result.known,true,'valid seeded lane '+i);
+  assert.equal(result.possible,hit,'seeded lane '+i);
+ }
+});
