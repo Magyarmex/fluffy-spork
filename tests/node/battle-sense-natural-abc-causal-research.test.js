@@ -11,11 +11,17 @@ function run(seed,arm){
  return withSeed(seed,()=>{
   const g=bootGame();
   const stats={seed,arm,frames:0,shots:0,originalMemberships:0,
-   retainedMemberships:0,knownMisses:0,unknownRetained:0,terrainChecks:0,
-   crossfireSamples:0,modeTrace:[]};
+   retainedMemberships:0,snapshotMisses:0,unknownRetained:0,terrainChecks:0,
+   crossfireBotFrames:0,modeTrace:[],moveTrace:[]};
   try{
    g.sfx.muted=true;g.sfx.startMusic=()=>{};
    g.status='playing';g.paused=false;
+   const originalMove=g.moveTank;
+   let commands=[];
+   g.moveTank=function(t,vx,vy,dt){
+    if(t&&t.ai)commands.push([t.id,+vx.toFixed(3),+vy.toFixed(3)]);
+    return originalMove.apply(this,arguments);
+   };
    const original=g.tryFire;
    g.tryFire=function(shooter){
     const before=this.bullets.length;
@@ -46,7 +52,7 @@ function run(seed,arm){
         stats.terrainChecks+=evidence.terrainChecks||0;
        }
        if(evidence.known&&!evidence.possible){
-        retain=false;stats.knownMisses++;
+        retain=false;stats.snapshotMisses++;
        }else if(!evidence.known)stats.unknownRetained++;
       }
       if(retain){count++;stats.retainedMemberships++;if(next)next.add(victim);}
@@ -59,18 +65,20 @@ function run(seed,arm){
     return out;
    };
    for(let frame=0;frame<720;frame++){
+    commands=[];
     g.update(1/60);stats.frames++;
-    if(frame%30===0){
+    {
      const modes=g.tanks.filter(t=>t&&t.ai&&t.alive!==false)
       .map(t=>[t.id,t.ai.__v181Mode||'none']).sort((a,b)=>a[0]-b[0]);
-     stats.crossfireSamples+=modes.filter(x=>x[1]==='crossfire').length;
+     stats.crossfireBotFrames+=modes.filter(x=>x[1]==='crossfire').length;
      stats.modeTrace.push(modes);
+     stats.moveTrace.push(commands.sort((a,b)=>a[0]-b[0]));
     }
    }
    assert.equal(stats.frames,720);
    assert.equal(stats.originalMemberships,
-    stats.retainedMemberships+stats.knownMisses);
-   if(arm==='A')assert.equal(stats.knownMisses,0);
+    stats.retainedMemberships+stats.snapshotMisses);
+   if(arm==='A')assert.equal(stats.snapshotMisses,0);
    if(arm==='B')assert.equal(stats.terrainChecks,0);
    return stats;
   }finally{g.destroy();}
@@ -79,26 +87,38 @@ function run(seed,arm){
 function firstDifference(a,b){
  for(let i=0;i<Math.min(a.modeTrace.length,b.modeTrace.length);i++){
   if(JSON.stringify(a.modeTrace[i])!==JSON.stringify(b.modeTrace[i]))
-   return {frame:i*30,a:a.modeTrace[i],b:b.modeTrace[i]};
+   return {frame:i,a:a.modeTrace[i],b:b.modeTrace[i]};
+ }
+ return null;
+}
+function firstTraceDifference(a,b){
+ for(let i=0;i<Math.min(a.length,b.length);i++){
+  if(JSON.stringify(a[i])!==JSON.stringify(b[i]))
+   return {frame:i,a:a[i],b:b[i]};
  }
  return null;
 }
 test('research: natural 49-overlay A/B/C crossfire decisions remain auditable',()=>{
  for(const seed of [1517800,1517802,1517810]){
   const A=run(seed,'A'),B=run(seed,'B'),C=run(seed,'C');
-  assert.equal(A.modeTrace.length,24);
-  assert.equal(B.modeTrace.length,24);
-  assert.equal(C.modeTrace.length,24);
-  assert.ok(B.knownMisses>=0&&C.knownMisses>=0);
+  assert.equal(A.modeTrace.length,720);
+  assert.equal(B.modeTrace.length,720);
+  assert.equal(C.modeTrace.length,720);
+  assert.equal(A.moveTrace.length,720);
+  assert.equal(B.moveTrace.length,720);
+  assert.equal(C.moveTrace.length,720);
+  assert.ok(B.snapshotMisses>=0&&C.snapshotMisses>=0);
   console.log('NOVA_BATTLE_SENSE_NATURAL_ABC '+JSON.stringify({
    seed,
    arms:[A,B,C].map(({arm,shots,originalMemberships,retainedMemberships,
-    knownMisses,unknownRetained,terrainChecks,crossfireSamples})=>({
+    snapshotMisses,unknownRetained,terrainChecks,crossfireBotFrames})=>({
     arm,shots,originalMemberships,retainedMemberships,
-    knownMisses,unknownRetained,terrainChecks,crossfireSamples})),
-   firstAB:firstDifference(A,B),firstAC:firstDifference(A,C),
-   // Later divergence can change RNG draw counts and opponent encounters.
-   // Only the first mismatch is a clean matched-world decision comparison.
+    snapshotMisses,unknownRetained,terrainChecks,crossfireBotFrames})),
+   firstModeAB:firstDifference(A,B),firstModeAC:firstDifference(A,C),
+   firstMoveAB:firstTraceDifference(A.moveTrace,B.moveTrace),
+   firstMoveAC:firstTraceDifference(A.moveTrace,C.moveTrace),
+   // First frame-level difference is an observation, not proof of a unique
+   // causal decision: movement and RNG can diverge within that same frame.
   }));
  }
 });
