@@ -148,6 +148,8 @@ jobs:
           node tests/browser/tempest-apex-heat-cue.cjs
           NOVA_TEMPEST_TRIALS=24 node tests/browser/tempest-trusted-touch-hp-contact-research.cjs
           NOVA_TEMPEST_HALF_RATE=1 NOVA_TEMPEST_TRIALS=24 node tests/browser/tempest-trusted-touch-hp-contact-research.cjs
+          NOVA_TEMPEST_HALF_RATE=1 NOVA_TEMPEST_LATCH=1 NOVA_TEMPEST_TRIALS=24 node tests/browser/tempest-trusted-touch-hp-contact-research.cjs
+          NOVA_TEMPEST_HALF_RATE=1 NOVA_TEMPEST_LATCH=1 NOVA_TEMPEST_EXPLICIT=1 NOVA_TEMPEST_TRIALS=24 node tests/browser/tempest-trusted-touch-hp-contact-research.cjs
           node tests/browser/bomber-terrain-child-birth.cjs
           node tests/browser/bomber-airburst-child-birth.cjs
           node tests/browser/controller-command-ttl-contact.cjs

@@ -5,6 +5,11 @@
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
 const halfRate=process.env.NOVA_TEMPEST_HALF_RATE==='1';
+const latchMode=process.env.NOVA_TEMPEST_LATCH==='1';
+const explicitMode=process.env.NOVA_TEMPEST_EXPLICIT==='1';
+const {patchEngineHtml}=require('../research/explicit-shot-intent.cjs');
+assert.ok(!explicitMode||latchMode,'explicit intent pilot requires latch mode');
+assert.ok(!latchMode||halfRate,'latch pilot requires half-rate arm');
 const trialCount=Number(process.env.NOVA_TEMPEST_TRIALS||8);
 assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
  'short-touch research trials must stay bounded');
@@ -14,13 +19,20 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
  const page=await context.newPage(),errors=[];
  page.on('pageerror',e=>errors.push(String(e.stack||e)));
  try{
+  if(explicitMode)await page.route('http://127.0.0.1:8765/',async route=>{
+   const response=await route.fetch();
+   assert.equal(response.status(),200,'research shell must load');
+   await route.fulfill({response,body:patchEngineHtml(await response.text())});
+  });
   await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
   await page.getByRole('button',{name:/DEPLOY/i}).first().waitFor({timeout:45000});
-  await page.evaluate(halfRate=>{
+  await page.evaluate(({halfRate,latchMode,explicitMode})=>{
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const start=Game.prototype.start,fire=Game.prototype.tryFire,damage=Game.prototype.damageTank,
-    update=Game.prototype.update;
-   window.__novaTempestHp={births:[],hits:[],events:[],updates:[],targetReady:false};
+    update=Game.prototype.update,updateDrones=Game.prototype.updateDrones;
+   window.__novaTempestHp={births:[],hits:[],events:[],updates:[],latches:[],droneReads:[],targetReady:false};
+   let activeTouch=null,pendingShot=null;
+   const touchOwners=new Map();
    // Research-only: keep the actual Game.update/combat chain, but sample it
    // at roughly half the host RAF cadence. This is NOT a native 30Hz display
    // or a shipping scheduler: real callback timestamps remain the authority.
@@ -33,11 +45,70 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
       args[0]=Math.min(1/30,pendingDt);
       pendingDt=Math.max(0,pendingDt-args[0]);
      }
+     if(!latchMode){
+      window.__novaTempestHp.updates.push({at:performance.now(),gameTime:this.time,
+       aimActive:!!this.input?.aim?.active,firing:!!this.input?.firing,
+       aimMagnitude:Math.hypot(this.input?.aim?.dx||0,this.input?.aim?.dy||0)});
+      return update.apply(this,args);
+     }
+     if(activeTouch&&this.input?.firing&&this.input?.aim?.active&&
+        Math.hypot(this.input.aim.dx,this.input.aim.dy)>=9)activeTouch.sampled=true;
+     const p=pendingShot,now=performance.now();pendingShot=null;
+     const valid=latchMode&&p&&p.player===this.player&&this.player?.alive&&
+      this.status==='playing'&&!this.paused&&!this.input?.__novaInputPaused&&
+      !document.hidden&&this.input?.stickId?.aim===-1&&
+      !this.input?.firing&&!this.input?.aim?.active&&
+      now-p.at>=0&&now-p.at<=50&&
+      Number.isFinite(p.physicalAt)&&now-p.physicalAt>=0&&
+      now-p.physicalAt<=50&&
+      Number.isFinite(p.physicalDownAt)&&
+      p.physicalAt-p.physicalDownAt>=0&&
+      p.physicalAt-p.physicalDownAt<=50;
+     const input=this.input,aim=input.aim;
+     const prior={firing:input.firing,active:aim.active,dx:aim.dx,dy:aim.dy};
+     const birthsBefore=window.__novaTempestHp.births.length;
+     let latchRecord=null;
+     if(valid){
+      if(explicitMode){
+       const len=Math.hypot(p.dx,p.dy);
+       input.__novaShotIntent=Object.freeze({fire:true,
+        aim:Object.freeze({x:p.dx/len,y:p.dy/len})});
+      }else{input.firing=true;aim.active=true;aim.dx=p.dx;aim.dy=p.dy;}
+      latchRecord={at:now,releaseAt:p.at,
+       mode:explicitMode?'weapon-only':'whole-update',
+       physicalReleaseAgeMs:now-p.physicalAt,
+       physicalHoldMs:p.physicalAt-p.physicalDownAt,
+       requestedAngle:Math.atan2(p.dy,p.dx),
+       hullAngleBefore:this.player?.angle};
+      window.__novaTempestHp.latches.push(latchRecord);
+     }
      window.__novaTempestHp.updates.push({at:performance.now(),gameTime:this.time,
-      aimActive:!!this.input?.aim?.active,firing:!!this.input?.firing,
-      aimMagnitude:Math.hypot(this.input?.aim?.dx||0,this.input?.aim?.dy||0)});
+      aimActive:!!input?.aim?.active,firing:!!input?.firing,
+      aimMagnitude:Math.hypot(input?.aim?.dx||0,input?.aim?.dy||0)});
+     try{return update.apply(this,args);}
+     finally{if(valid){
+      const newBirths=window.__novaTempestHp.births.slice(birthsBefore);
+      latchRecord.hullAngleAfter=this.player?.angle;
+      latchRecord.projectileCount=newBirths.length;
+      latchRecord.firstProjectileBearing=newBirths.length?
+       Math.atan2(newBirths[0].vy,newBirths[0].vx):null;
+      const angularError=(a,b)=>Math.atan2(Math.sin(a-b),Math.cos(a-b));
+      latchRecord.hullAimErrorRad=Math.abs(angularError(
+       latchRecord.hullAngleAfter,latchRecord.requestedAngle));
+      if(explicitMode)delete input.__novaShotIntent;
+      else{input.firing=prior.firing;aim.active=prior.active;
+       aim.dx=prior.dx;aim.dy=prior.dy;}
+     }}
     }
     return update.apply(this,args);
+   };
+   Game.prototype.updateDrones=function(...args){
+    if(this===window.__novaTempestHpGame&&this.input?.__novaShotIntent)
+     window.__novaTempestHp.droneReads.push({
+      aimActive:!!this.input.aim?.active,firing:!!this.input.firing,
+      intent:!!this.input.__novaShotIntent.fire
+     });
+    return updateDrones.apply(this,args);
    };
    Game.prototype.start=function(...args){
     if(!this.__novaDecorativeWorld)window.__novaTempestHpGame=this;
@@ -63,10 +134,46 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
    };
    for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     document.addEventListener(type,e=>{
-     if(e.pointerType==='touch')window.__novaTempestHp.events.push({
-      type,trusted:e.isTrusted,at:performance.now(),pointerId:e.pointerId});
+     if(e.pointerType!=='touch')return;
+     const deliveredAt=performance.now();
+     window.__novaTempestHp.events.push({type,trusted:e.isTrusted,
+      at:deliveredAt,eventStamp:e.timeStamp,
+      deliveryLagMs:deliveredAt-e.timeStamp,pointerId:e.pointerId});
+     if(!latchMode||!e.isTrusted)return;
+     const g=window.__novaTempestHpGame;
+     // A second thumb may press the movement stick while the first aims.
+     // Track each physical pointer independently; only the actual Input aim
+     // owner may replace/cancel an aim-shot candidate.
+     if(type==='pointerdown')
+      touchOwners.set(e.pointerId,{id:e.pointerId,player:g?.player,
+       sampled:false,physicalDownAt:e.timeStamp});
+     if(type==='pointermove'&&g?.input?.stickId?.aim===e.pointerId){
+      const candidate=touchOwners.get(e.pointerId);
+      if(candidate&&activeTouch!==candidate){activeTouch=candidate;pendingShot=null;}
+     }
+     if(type==='pointerup'||type==='pointercancel'){
+      // A newer right-stick press without a delivered move still supersedes
+      // any older queued release; a left-stick release must not do so.
+      if(g?.input?.stickId?.aim===e.pointerId&&activeTouch?.id!==e.pointerId)
+       pendingShot=null;
+      if(activeTouch?.id===e.pointerId){
+       const a=g?.input?.aim,len=Math.hypot(a?.dx||0,a?.dy||0);
+       if(type==='pointerup'&&!activeTouch.sampled&&g?.input?.firing&&
+          g?.input?.stickId?.aim===e.pointerId&&a?.active&&len>=9)
+        pendingShot={player:activeTouch.player,dx:a.dx,dy:a.dy,
+         at:performance.now(),physicalAt:e.timeStamp,
+         physicalDownAt:activeTouch.physicalDownAt};
+       activeTouch=null;
+      }
+      touchOwners.delete(e.pointerId);
+     }
+     window.__novaTempestHp.aimOwnerId=activeTouch?.id??null;
     },{capture:true,passive:true});
-  },halfRate);
+   window.addEventListener('blur',()=>{pendingShot=null;activeTouch=null;touchOwners.clear();});
+   document.addEventListener('visibilitychange',()=>{
+    if(document.hidden){pendingShot=null;activeTouch=null;touchOwners.clear();}
+   });
+  },{halfRate,latchMode,explicitMode});
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
   const canvas=page.locator('canvas.absolute.inset-0');
   await canvas.waitFor({state:'visible',timeout:30000});
@@ -174,7 +281,7 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
      {x:58,y:-23,vx:0,vy:0,hp:100000});
     if(g.hash?.clear){g.hash.clear();for(const t of g.tanks)g.hash.insert(t);}
     return {events:r.events.length,births:r.births.length,hits:r.hits.length,
-     updates:r.updates.length};
+     updates:r.updates.length,latches:r.latches.length};
    });
    const touch={...origin,id:100+i};
    // Queue the start and move in protocol order without waiting for two
@@ -199,13 +306,19 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
    const trial=await page.evaluate(before=>{
     const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
     const events=r.events.slice(before.events),births=r.births.slice(before.births),
-     hits=r.hits.slice(before.hits),updates=r.updates.slice(before.updates);
+     hits=r.hits.slice(before.hits),updates=r.updates.slice(before.updates),
+     latches=r.latches.slice(before.latches);
     const down=events.find(e=>e.type==='pointerdown');
     const move=events.find(e=>e.type==='pointermove');
     const up=events.find(e=>e.type==='pointerup'||e.type==='pointercancel');
     const previousUpdate=move?[...r.updates].reverse().find(u=>u.at<=move.at):null;
     const nextUpdate=move?r.updates.find(u=>u.at>move.at):null;
-    return {phaseSincePreviousUpdateMs:previousUpdate?move.at-previousUpdate.at:null,
+    return {recoveredIntents:latches.length,
+     recoveredLatencyMs:latches.map(l=>l.at-l.releaseAt),
+     physicalReleaseAgeMs:latches.map(l=>l.physicalReleaseAgeMs),
+     physicalHoldMs:latches.map(l=>l.physicalHoldMs),
+     postReleaseProjectileLatencyMs:up?births.filter(b=>b.at>up.at).map(b=>b.at-up.at):[],
+     phaseSincePreviousUpdateMs:previousUpdate?move.at-previousUpdate.at:null,
      phaseUntilNextUpdateMs:nextUpdate?nextUpdate.at-move.at:null,
      trusted:events.every(e=>e.trusted),down:!!down,move:!!move,
      up:!!up,durationMs:down&&up?up.at-down.at:null,
@@ -228,16 +341,92 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
     'a delivered deflection must occur within the measured touch lifetime');
    // A short move may be coalesced before release. Record that as an input
    // delivery outcome rather than falsely requiring an aim deflection.
-   assert.equal(trial.postReleaseBirths,0,
-    'short touch must not create projectiles after release');
+   if(latchMode){
+    assert.ok(trial.postReleaseBirths<=trial.recoveredIntents,
+     'only a bounded deliberate intent may fire after release');
+    assert.ok(trial.recoveredLatencyMs.every(ms=>ms>=0&&ms<=50),
+     'a recovered shot intent must expire after 50ms');
+    assert.ok(trial.physicalReleaseAgeMs.every(ms=>ms>=0&&ms<=50),
+     'a trusted physically stale release cannot be recovered');
+    assert.ok(trial.physicalHoldMs.every(ms=>ms>=0&&ms<=50),
+     'a stalled long hold cannot masquerade as a short unsampled shot');
+   }
+   else assert.equal(trial.postReleaseBirths,0,
+    'baseline short touch must not create projectiles after release');
    assert.equal(trial.aimActive,false,'short trial must release aim ownership');
    assert.equal(trial.firing,false,'short trial must release firing');
    assert.equal(trial.stickId,-1,'short trial must clear aim pointer ID');
-   trial.outcome=!trial.move?'move-not-delivered':
+   trial.outcome=trial.recoveredIntents&&trial.births?'recovered-intent-projectile':
+    !trial.move?'move-not-delivered':
     trial.aimedFiringSamples===0?'no-deflected-simulation-sample':
     trial.births===0?'sampled-but-no-projectile':
     trial.hits===0?'projectile-without-hp-contact':'hp-contact';
    shortTrials.push(trial);
+  }
+  if(explicitMode)assert.ok(shortTrials.filter(t=>t.recoveredIntents>0)
+   .every(t=>t.births===1&&t.postReleaseBirths===1),
+   'each eligible weapon-only intent must create exactly one player projectile');
+  if(latchMode){
+   // A browser-trusted cancellation is not a deliberate completed shot.
+   const beforeCancel=await page.evaluate(()=>window.__novaTempestHp.latches.length);
+   const canceled={...origin,id:999};
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[canceled]});
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+    {...canceled,x:canceled.x+35,y:canceled.y-20}]});
+   await cdp.send('Input.dispatchTouchEvent',{type:'touchCancel',touchPoints:[]});
+   await page.waitForTimeout(140);
+   const afterCancel=await page.evaluate(()=>({
+    latches:window.__novaTempestHp.latches.length,
+    aimActive:window.__novaTempestHpGame.input.aim.active,
+    firing:window.__novaTempestHpGame.input.firing
+   }));
+   assert.equal(afterCancel.latches,beforeCancel,'cancel cannot queue a shot intent');
+   assert.equal(afterCancel.aimActive,false,'cancel releases aim ownership');
+   assert.equal(afterCancel.firing,false,'cancel releases firing ownership');
+   // Real twin-stick players hold movement while aiming. A second pointerdown
+   // must not overwrite the first right-stick shot owner.
+   for(const aimFirst of [true,false]){
+    const right={...origin,id:1501+(aimFirst?0:10)};
+    const left={...origin,x:box.x+box.width*.28,id:1502+(aimFirst?0:10)};
+    if(aimFirst)
+     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[right]});
+    else
+     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[left]});
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[
+     right,left]});
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[
+     {...right,x:right.x+35,y:right.y-20},left]});
+    await page.waitForFunction(()=>{
+     const g=window.__novaTempestHpGame,r=window.__novaTempestHp;
+     return g?.input?.stickId?.aim>=0&&r.aimOwnerId===g.input.stickId.aim;
+    },null,{timeout:5000});
+    const rightOwner=await page.evaluate(()=>window.__novaTempestHp.aimOwnerId);
+    const twoFinger=await page.evaluate(()=>({
+     tracked:window.__novaTempestHp.aimOwnerId,
+     physical:window.__novaTempestHpGame.input.stickId.aim
+    }));
+    assert.equal(twoFinger.tracked,rightOwner,
+     'second thumb must not steal the actual aim owner');
+    assert.equal(twoFinger.physical,rightOwner,
+     'physical aim owner must match tracked right stick');
+    // CDP's partial touchEnd semantics are not reliable evidence of
+    // independent finger release here; end the full gesture explicitly.
+    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    await page.waitForFunction(()=>{
+     const i=window.__novaTempestHpGame.input;
+     return i.stickId.aim===-1&&i.stickId.move===-1;
+    },null,{timeout:5000});
+   }
+  }
+  if(explicitMode){
+   const {droneReads,latches}=await page.evaluate(()=>({
+    droneReads:window.__novaTempestHp.droneReads,
+    latches:window.__novaTempestHp.latches
+   }));
+   assert.equal(droneReads.length,latches.length,
+    'each weapon-only intent must traverse the real drone-update owner once');
+   assert.ok(droneReads.every(x=>x.intent&&!x.aimActive&&!x.firing),
+    'weapon-only intent must never revive the physical right stick for drones');
   }
   assert.equal(errors.length,0,
    'no browser page errors during short-touch trials: '+JSON.stringify(errors));
@@ -246,10 +435,27 @@ assert.ok(Number.isInteger(trialCount)&&trialCount>=8&&trialCount<=32,
    .filter(g=>Number.isFinite(g)&&g>0&&g<100).sort((a,b)=>a-b);
   const medianSampleGapMs=sampleGaps.length?
    sampleGaps[Math.floor(sampleGaps.length/2)]:null;
+  // Compare only phase-overlapping cohorts: identical trial numbers are not
+  // matched physical input phases across independent Chromium runs.
+  const phaseBuckets={'0-8ms':{trials:0,shots:0,recovered:0},
+   '8-16ms':{trials:0,shots:0,recovered:0},
+   '16-24ms':{trials:0,shots:0,recovered:0},
+   '24ms+':{trials:0,shots:0,recovered:0},
+   'unknown':{trials:0,shots:0,recovered:0}};
+  for(const t of shortTrials){
+   const phase=t.phaseSincePreviousUpdateMs;
+   const key=!Number.isFinite(phase)?'unknown':phase<8?'0-8ms':
+    phase<16?'8-16ms':phase<24?'16-24ms':'24ms+';
+   const bucket=phaseBuckets[key];
+   bucket.trials++;bucket.shots+=Number(t.births>0);
+   bucket.recovered+=Number(t.recoveredIntents>0);
+  }
   console.log('NOVA_TEMPEST_TRUSTED_20MS_DIAGNOSTIC '+JSON.stringify({
-   requestedHoldMs:20,halfRateSamplingPilot:halfRate,
+   requestedHoldMs:20,halfRateSamplingPilot:halfRate,latchPilot:latchMode,
+   explicitWeaponOnlyPilot:explicitMode,
    medianObservedGameUpdateGapMs:medianSampleGapMs,
    attempts:shortTrials.length,
+   phaseBuckets,
    shotTrials:shortTrials.filter(t=>t.births>0).length,
    hitTrials:shortTrials.filter(t=>t.hits>0).length,
    trials:shortTrials
