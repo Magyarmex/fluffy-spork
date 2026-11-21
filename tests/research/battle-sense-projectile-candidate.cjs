@@ -57,7 +57,10 @@ function projectileCandidate(game,shooter,victim,startIndex=0,options={}){
     // The shipping Battlefield can let penetrating rounds breach cover.
     // A confirmed permanent wall cannot be breached; destructible or
     // unclassified obstructions need actual impact resolution.
-    if(b.pen>0&&(!hit.solid||hit.solid.destructible!==false))unsupported++;
+    // Battlefield only permits a live breach when launch penetration >= 2
+    // AND the destructible obstacle breaks. Pen=0/1 is a known blocker.
+    // A malformed terrain hit without an identified solid stays unknown.
+    if(!hit.solid||(b.pen>=2&&hit.solid.destructible!==false))unsupported++;
     continue;
    }
   }
