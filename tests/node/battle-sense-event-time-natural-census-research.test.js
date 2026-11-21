@@ -21,7 +21,7 @@ test('natural composed matches bound firing-time witness scans and report incide
      laneOnlyPossibleMemberships:0,laneOnlyKnownMissMemberships:0,
      laneOnlyUnknownMemberships:0,
      oraclePossibleMemberships:0,oracleKnownMissMemberships:0,
-     oracleUnknownMemberships:0,oracleTerrainChecks:0,
+     oracleUnknownMemberships:0,oracleMovingUnknownMemberships:0,oracleTerrainChecks:0,
      oracleUncachedTerrainChecks:0,oracleReusedMemberships:0,
      fireLOSCalls:0,maxFireLOSCalls:0,crossfireSamples:0,
      crossfireWithLaneEvidence:0,crossfireWithoutLaneEvidence:0,
@@ -89,7 +89,9 @@ test('natural composed matches bound firing-time witness scans and report incide
         stats.oracleUncachedTerrainChecks+=oracle.terrainChecks||0;
         if(oracle.possible){stats.oraclePossibleMemberships++;observerPhysical++;}
         else if(oracle.known)stats.oracleKnownMissMemberships++;
-        else{stats.oracleUnknownMemberships++;observerPhysicalUnknown++;}
+        else{stats.oracleUnknownMemberships++;observerPhysicalUnknown++;
+         if(oracle.movingVictim)stats.oracleMovingUnknownMemberships++;
+        }
         let aligned=false,clear=false;
         for(const b of emitted){
          const speed=Math.hypot(b.vx,b.vy);
@@ -186,6 +188,8 @@ test('natural composed matches bound firing-time witness scans and report incide
      'every crossfire sample must have a recorded evidence provenance or be marked unattributed');
     assert.equal(stats.crossfireWithPhysicalEvidence+stats.crossfireWithoutPhysicalEvidence+
       stats.crossfirePhysicalUnknown+stats.crossfireUnattributed,stats.crossfireSamples);
+    assert.ok(stats.oracleMovingUnknownMemberships<=stats.oracleUnknownMemberships,
+     'moving-hull uncertainty must be a subset of unknown projectile outcomes');
     assert.ok(stats.oracleTerrainChecks<=stats.oracleUncachedTerrainChecks,
      'per-shot victim caching must not increase terrain query count');
     assert.ok(stats.oraclePossibleMemberships<=stats.laneOnlyPossibleMemberships,
