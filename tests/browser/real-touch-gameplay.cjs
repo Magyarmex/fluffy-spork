@@ -104,7 +104,20 @@ async function run(browser,label,viewport){
    return {paused:g.paused,statPoints:g.statPoints,level:g.player?.level,
     damage:g.player?.stats?.damage,pendingOffer:g.pendingOffer};
   });
-  await firstStat.tap();
+  await page.evaluate(()=>{
+   const g=window.__novaTouchGame,original=g.upgradeStat;
+   window.__novaUpgradeCalls=[];
+   g.upgradeStat=function(key){
+    const before={key,paused:this.paused,points:this.statPoints,
+     stat:this.player?.stats?.[key]};
+    try{return original.apply(this,arguments);}
+    finally{window.__novaUpgradeCalls.push({...before,
+     afterPoints:this.statPoints,afterStat:this.player?.stats?.[key]});}
+   };
+   window.__novaRestoreUpgrade=()=>{g.upgradeStat=original;};
+  });
+  try{await firstStat.tap();}
+  finally{await page.evaluate(()=>window.__novaRestoreUpgrade?.());}
   const afterStat=await page.evaluate(()=>window.__novaTouchGame.statPoints);
   if(afterStat!==beforeStat-1){
    const afterUpgrade=await page.evaluate(()=>{
@@ -112,7 +125,7 @@ async function run(browser,label,viewport){
     const el=document.querySelector('[data-nova-upgrade-tray] .stat-btn');
     return {paused:g.paused,statPoints:g.statPoints,level:g.player?.level,
      damage:g.player?.stats?.damage,pendingOffer:g.pendingOffer,
-     firstButton:el?.outerHTML.slice(0,400),
+     firstButton:el?.outerHTML.slice(0,400),upgradeCalls:window.__novaUpgradeCalls,
      activeElement:document.activeElement?.outerHTML.slice(0,250)};
    });
    try{
