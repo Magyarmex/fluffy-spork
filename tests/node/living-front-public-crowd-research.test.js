@@ -186,3 +186,43 @@ test('public signal dispersion spreads a cohort without extra random draws',()=>
     Array.from({length:64},(_,i)=>publicSignalLane(i+1,6,9)),
     'a new public destination may create a different dispersion');
 });
+
+/* Alternative C: distance-sensitive, public-signal threshold. Nearer
+ * participants retain their normal strategic advantage; faraway bots need
+ * a stronger public-signal affinity to rotate. No hidden commitment scan.
+ * This is a falsifiable research model, not production balance. */
+function publicOpportunityAdmitted(base, routeCost, id, sector, started) {
+  const lane = publicSignalLane(id, sector, started);
+  if (lane === null || !Number.isFinite(base) ||
+      !Number.isFinite(routeCost) || routeCost < 0) return false;
+  const score = base - routeCost / 2300;
+  return score > .20 + .28 * lane;
+}
+
+test('public-signal admission favors legitimate shorter routes without private coordination',()=>{
+  const sector=5,started=9,ids=Array.from({length:64},(_,i)=>i+1);
+  const admitted = d => ids.filter(id=>
+    publicOpportunityAdmitted(.68,d,id,sector,started)).length;
+  const near=admitted(300),middle=admitted(900),far=admitted(1100);
+  assert.equal(near,64,'strong nearby public opportunity remains attractive');
+  assert.ok(middle>0&&middle<near,
+    'medium routes should diversify without private coordination');
+  assert.ok(far<middle,'long routes must not gain priority over shorter routes');
+  assert.equal(publicOpportunityAdmitted(.68,300,NaN,sector,started),false);
+  assert.equal(publicOpportunityAdmitted(.68,-1,1,sector,started),false);
+});
+
+test('public-signal admission is unchanged by hidden rivals private ecology keys',()=>{
+  withSeed(1517805,()=>{
+    const s=scene();
+    try {
+      const route=900;
+      const before=publicOpportunityAdmitted(.68,route,s.observer.id,
+        s.sector,s.g.__lfState.signal.started);
+      s.others.forEach(q=>q.ai.__lfEcoKey='BLOOM:'+s.sector);
+      const after=publicOpportunityAdmitted(.68,route,s.observer.id,
+        s.sector,s.g.__lfState.signal.started);
+      assert.equal(after,before);
+    } finally {s.g.destroy();}
+  });
+});
