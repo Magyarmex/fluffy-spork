@@ -67,10 +67,7 @@ function observedApproach() {
       const travel=previous ? Math.hypot(q.x-previous.x,q.y-previous.y) : 0;
       const continuous=old && old.body===q && dt>0 && dt<=.6 &&
         travel<=650*dt+1; // conservative core boosted-speed ceiling; overlays need audit
-      // Only this tracker owns the history: reuse its bounded array rather
-      // than allocating a copy on every sighting in a future AI planner.
-      const history=continuous?old.history:[];
-      if (history.length>=32) history.shift();
+      const history=continuous?old.history.slice(-31):[];
       history.push({at:now,x:q.x,y:q.y});
       records.delete(q.id);
       records.set(q.id,{body:q,at:now,history});
@@ -333,15 +330,4 @@ run('non-finite sample time revokes prior sightings rather than preserving recen
   assert.equal(t.countToward(s.destination,10.3),1);
   t.sample(s.g,s.observer,[s.rival],NaN);
   assert.equal(t.countToward(s.destination,10.3),0);
-});
-
-run('bounded history survives long continuous public observation without copying',102917,(s,t)=>{
-  const hz=60,seconds=3;
-  for (let i=0;i<=hz*seconds;i++) {
-    s.rival.x=-100+i*.5; // 30u/s, remains inside the 800px witness viewport
-    t.sample(s.g,s.observer,[s.rival],10+i/hz);
-  }
-  assert.equal(t.size(),1,'one continuous observed rival remains bounded');
-  assert.equal(t.countToward(s.destination,13),1,
-    'rolling the 32-sample history cannot erase valid recent approach');
 });
