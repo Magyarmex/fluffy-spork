@@ -119,7 +119,8 @@ test('natural composed matches bound firing-time witness scans and report incide
         stats.crossfireSamples++;
         const e=evidence.get(t);
         if(e&&e.shotId===a.__v181ObservedShotId&&
-           Number.isFinite(at)&&Math.abs(e.shotAt-at)<1e-8){
+           Number.isFinite(at)&&g.time-at>=0&&g.time-at<=1.25&&
+           Math.abs(e.shotAt-at)<1e-8){
          if(e.lane)stats.crossfireWithLaneEvidence++;
          else stats.crossfireWithoutLaneEvidence++;
          if(e.physical)stats.crossfireWithPhysicalEvidence++;
