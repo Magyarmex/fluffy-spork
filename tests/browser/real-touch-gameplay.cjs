@@ -84,6 +84,23 @@ async function run(browser,label,viewport){
     });
    };
    document.addEventListener('click',window.__novaUpgradeTraceListener,true);
+   // A bounded 125 ms timeline distinguishes a chip that never rendered
+   // from one briefly rendered then collapsed/removed by a later update.
+   window.__novaUpgradeRenderTrace=[];
+   const sample=()=>{
+    const g=window.__novaTouchGame;
+    const labels=[...document.querySelectorAll('button[data-ui]')]
+     .map(b=>(b.textContent||'').trim())
+     .filter(v=>/^(MINIMIZE|UPGRADE READY)/.test(v));
+    window.__novaUpgradeRenderTrace.push({
+     at:performance.now(),labels,points:g?.statPoints,
+     pendingOffer:!!g?.pendingOffer,status:g?.status
+    });
+    if(window.__novaUpgradeRenderTrace.length>=90)
+     clearInterval(window.__novaUpgradeRenderSampler);
+   };
+   sample();
+   window.__novaUpgradeRenderSampler=setInterval(sample,125);
   });
   await minimize.tap();
   try{
@@ -107,7 +124,8 @@ async function run(browser,label,viewport){
       input:g?.input&&{moveActive:g.input.move?.active,
        aimActive:g.input.aim?.active,firing:g.input.firing},
       buttons,upgradeTray:!!document.querySelector('[data-nova-upgrade-tray]'),
-      upgradeClickTrace:window.__novaUpgradeClickTrace||[]};
+      upgradeClickTrace:window.__novaUpgradeClickTrace||[],
+      upgradeRenderTrace:window.__novaUpgradeRenderTrace||[]};
     });
    }catch(diagnosticError){state={diagnosticError:String(diagnosticError)};}
    try{
@@ -117,6 +135,8 @@ async function run(browser,label,viewport){
    throw new Error(label+': second upgrade chip absent after MINIMIZE; state='+JSON.stringify(state),{cause:error});
   }
   await page.evaluate(()=>{
+   clearInterval(window.__novaUpgradeRenderSampler);
+   window.__novaUpgradeRenderSampler=null;
    if(window.__novaUpgradeTraceListener){
     document.removeEventListener('click',window.__novaUpgradeTraceListener,true);
     window.__novaUpgradeTraceListener=null;
