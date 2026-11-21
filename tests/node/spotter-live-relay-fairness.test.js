@@ -129,3 +129,33 @@ test('legitimate close-range omnidirectional Observer sight remains available', 
   assert.equal(w.owner.__novaSpotterContactId, 2,
     'the existing within-135u proximity exception remains part of the sensor');
 });
+
+test('real Spotter relay never reads HP of an untracked or expired remote candidate', () => {
+  const w=world(),live=w.g.constructor.__novaLiveRelay;
+  Object.defineProperty(w.target,'hp',{get(){throw Error('unwitnessed remote health');}});
+  assert.equal(live(w.g,w.owner,w.target),false);
+  w.owner.__novaSpotterContactId=w.target.id;
+  w.owner.__novaSpotterContactUntil=w.g.time;
+  assert.equal(live(w.g,w.owner,w.target),false,
+    'expired memory cannot authorize health inspection');
+});
+
+test('Spotter cannot inspect remote HP after live drone or terrain witness disappears', () => {
+  for(const fault of ['missing-drone','covered','dead-drone']){
+    const w=world();acquire(w);
+    const live=w.g.constructor.__novaLiveRelay;
+    if(fault==='missing-drone')w.g.drones=[];
+    if(fault==='covered')w.g.blocked=true;
+    if(fault==='dead-drone')w.drone.hp=0;
+    Object.defineProperty(w.target,'hp',{get(){throw Error('unwitnessed remote health');}});
+    assert.equal(live(w.g,w.owner,w.target),false,fault);
+  }
+});
+
+test('live Observer still permits health verification after real sight', () => {
+  const w=world();acquire(w);
+  let reads=0;
+  Object.defineProperty(w.target,'hp',{get(){reads++;return 100;}});
+  assert.equal(w.g.constructor.__novaLiveRelay(w.g,w.owner,w.target),true);
+  assert.ok(reads>0,'a witnessed target may expose its current health');
+});

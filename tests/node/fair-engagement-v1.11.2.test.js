@@ -236,3 +236,83 @@ test('Fair Engagement Controller replan respects an existing think interval',()=
   assert.equal(owner.__novaLiveVectorAI.targetId,nearer.id,
     'after the scheduled think, the fair target must update');
 });
+
+test('offscreen target health is never consulted by scoreTarget or a held-target replan', () => {
+  const {window,load}=boot();
+  const T=window.__NOVA_FAIR_ENGAGEMENT_TEST__,C=classes();
+  const observer=tank(1,0,0,{ai:{state:'hunt',targetId:2,__v1112TargetId:2,__v1112NextThink:10}});
+  const hidden=tank(2,1500,0);
+  Object.defineProperty(hidden,'hp',{get(){throw Error('hidden health accessed');}});
+  const g=game(800,600,1);g.tanks=[observer,hidden];g.time=1;
+  assert.equal(T.scoreTarget(g,C,observer,observer.ai,hidden,g.time),-Infinity);
+  const ai=load('game/ai');
+  assert.doesNotThrow(()=>ai.updateAI(observer,g,1/60));
+  assert.equal(observer.ai.__v1112TargetId,-1);
+});
+
+test('covered or offscreen health is not read while a visible target remains selectable', () => {
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__,C=classes();
+  const observer=tank(1,0,0),visible=tank(3,100,0),hidden=tank(2,1500,0);
+  // Isolate visibility gating from #1025's separate global AI saturation scan.
+  hidden.ai=null;
+  Object.defineProperty(hidden,'hp',{get(){throw Error('offscreen health accessed');}});
+  const g=game(800,600,1);g.tanks=[observer,hidden,visible];
+  assert.equal(T.chooseTarget(g,C,observer,observer.ai,g.time).id,visible.id);
+});
+
+test('Battle Sense tactical contacts cannot inspect offscreen rival health', () => {
+  const {window,load}=boot(),ai=load('game/ai');
+  window.__NOVA_BATTLE_SENSE__={};
+  const owner=tank(1,0,0,{ai:{state:'hunt',targetId:-1,__v181Think:0}});
+  const visible=tank(2,100,0),hidden=tank(3,1400,0);
+  // Isolate visibility gating from #1025's separate global AI saturation scan.
+  hidden.ai=null;
+  Object.defineProperty(hidden,'hp',{get(){throw Error('offscreen tactical contact health');}});
+  const g=game(800,600,1);g.tanks=[owner,visible,hidden];
+  assert.doesNotThrow(()=>ai.updateAI(owner,g,1/60));
+  assert.equal(owner.ai.__v1112TargetId,visible.id);
+});
+
+test('Controller cached target checks public sight before private health', () => {
+  const {load}=boot(),Game=load('game/engine').Game;
+  const g=Object.assign(new Game(),game(800,600,1));
+  const owner=tank(1,0,0,{cls:'carrier',ai:{state:'hunt',targetId:2,__v1112TargetId:2}});
+  const hidden=tank(2,1400,0),visible=tank(3,100,0);
+  // Isolate visibility gating from #1025's separate global AI saturation scan.
+  hidden.ai=null;
+  Object.defineProperty(hidden,'hp',{get(){throw Error('offscreen Controller target health');}});
+  g.tanks=[owner,hidden,visible];
+  assert.doesNotThrow(()=>g.updateDrones(1/60));
+  assert.equal(owner.__novaLiveVectorAI.targetId,visible.id);
+});
+
+test('legal live Sniper Observer relay still permits remote target scoring', () => {
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__,C=classes();
+  const sniper=tank(1,0,0,{cls:'marksman',__novaSpotterContactId:2,__novaSpotterContactUntil:2}),remote=tank(2,1200,0);
+  const g=game(800,600,1);g.tanks=[sniper,remote];
+  let reads=0;
+  Object.defineProperty(remote,'hp',{get(){reads++;return 75;}});
+  window.__NOVA_SPOTTER_LIVE_RELAY__=(_g,owner,target)=>owner===sniper&&target===remote;
+  assert.ok(Number.isFinite(T.scoreTarget(g,C,sniper,sniper.ai,remote,g.time)));
+  assert.ok(reads>0,'valid remote sight may consult observed health');
+  delete window.__NOVA_SPOTTER_LIVE_RELAY__;
+  reads=0;
+  assert.equal(T.scoreTarget(g,C,sniper,sniper.ai,remote,g.time),-Infinity);
+  assert.equal(reads,0,'revoked relay must not retain remote health access');
+});
+
+test('untracked or expired Sniper relay never invokes a remote health-reading owner', () => {
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__,C=classes();
+  const sniper=tank(1,0,0,{cls:'marksman',__novaSpotterContactId:99,__novaSpotterContactUntil:10});
+  const remote=tank(2,1200,0);
+  Object.defineProperty(remote,'hp',{get(){throw Error('unwitnessed remote HP');}});
+  const g=game(800,600,1);g.tanks=[sniper,remote];
+  let calls=0;
+  window.__NOVA_SPOTTER_LIVE_RELAY__=()=>{calls++;throw Error('unwitnessed relay called');};
+  assert.equal(T.scoreTarget(g,C,sniper,sniper.ai,remote,g.time),-Infinity);
+  assert.equal(calls,0);
+  sniper.__novaSpotterContactId=remote.id;
+  sniper.__novaSpotterContactUntil=g.time;
+  assert.equal(T.scoreTarget(g,C,sniper,sniper.ai,remote,g.time),-Infinity);
+  assert.equal(calls,0,'expired contact is not live remote authority');
+});
