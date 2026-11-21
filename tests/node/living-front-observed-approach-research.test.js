@@ -10,7 +10,10 @@ function observedApproach() {
   const records=new Map();
   let lastTime=-Infinity,owner=null;
   function sample(g,observer,rivals,now) {
-    if (!Number.isFinite(now)) return;
+    if (!Number.isFinite(now)) {
+      records.clear(); // A corrupt clock cannot preserve certified recency.
+      return;
+    }
     if (now<lastTime || (owner && observer!==owner)) records.clear();
     // Never transfer one observer's private sightings to its replacement.
     owner=observer;
@@ -315,4 +318,13 @@ run('invalid observer coordinates revoke previously valid movement evidence',102
   s.observer.x=NaN;
   t.sample(s.g,s.observer,[s.rival],10.35);
   assert.equal(t.countToward(s.destination,10.35),0);
+});
+
+run('non-finite sample time revokes prior sightings rather than preserving recency',102916,(s,t)=>{
+  t.sample(s.g,s.observer,[s.rival],10);
+  s.rival.x=-85;t.sample(s.g,s.observer,[s.rival],10.15);
+  s.rival.x=-70;t.sample(s.g,s.observer,[s.rival],10.3);
+  assert.equal(t.countToward(s.destination,10.3),1);
+  t.sample(s.g,s.observer,[s.rival],NaN);
+  assert.equal(t.countToward(s.destination,10.3),0);
 });
