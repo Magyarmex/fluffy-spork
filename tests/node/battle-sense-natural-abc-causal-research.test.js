@@ -19,7 +19,9 @@ function run(seed,arm){
    const originalMove=g.moveTank;
    let commands=[];
    g.moveTank=function(t,vx,vy,dt){
-    if(t&&t.ai)commands.push([t.id,+vx.toFixed(3),+vy.toFixed(3)]);
+    if(t&&t.ai)commands.push([t.id,
+     Number.isFinite(vx)?+vx.toFixed(3):null,
+     Number.isFinite(vy)?+vy.toFixed(3):null]);
     return originalMove.apply(this,arguments);
    };
    const original=g.tryFire;
