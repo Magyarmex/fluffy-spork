@@ -17,23 +17,21 @@ function observedApproach() {
         !Number.isFinite(observer.y)) return;
     const F=g.__testFair;
     if (!F || typeof F.inGameplayViewport!=='function') return;
+    const ext=F.viewportHalfExtents && F.viewportHalfExtents(g);
+    if (!ext || !(ext.x>0) || !(ext.y>0)) return;
     for (const q of rivals || []) {
-      if (!q || q===observer || !Number.isSafeInteger(q.id)) continue;
-      if (!(q.hp>0) || q.alive===false || q.spawnShieldT>0) {
-        // Only a currently observable death is public evidence.
-        if (Number.isFinite(q.x) && Number.isFinite(q.y) &&
-            F.viewportHalfExtents &&
-            Math.abs(q.x-observer.x)<=F.viewportHalfExtents(g).x &&
-            Math.abs(q.y-observer.y)<=F.viewportHalfExtents(g).y &&
-            (!g.hasLineOfSight ||
-             g.hasLineOfSight(observer.x,observer.y,q.x,q.y,2)))
-          records.delete(q.id);
-        continue;
-      }
-      if (!Number.isFinite(q.x) || !Number.isFinite(q.y) ||
-          !F.inGameplayViewport(g,observer,q)) continue;
+      if (!q || q===observer || q.id===observer.id ||
+          !Number.isSafeInteger(q.id) ||
+          !Number.isFinite(q.x) || !Number.isFinite(q.y)) continue;
+      // Geometry first. Never inspect offscreen health, shield or private AI.
+      if (Math.abs(q.x-observer.x)>ext.x ||
+          Math.abs(q.y-observer.y)>ext.y) continue;
       if (g.hasLineOfSight &&
           !g.hasLineOfSight(observer.x,observer.y,q.x,q.y,2)) continue;
+      if (!(q.hp>0) || q.alive===false || q.spawnShieldT>0) {
+        records.delete(q.id); // Only a witnessed death/shield is evidence.
+        continue;
+      }
       const old=records.get(q.id),previous=old&&old.history.at(-1);
       const dt=previous ? now-previous.at : 0;
       const travel=previous ? Math.hypot(q.x-previous.x,q.y-previous.y) : 0;
