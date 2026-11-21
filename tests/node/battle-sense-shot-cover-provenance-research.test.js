@@ -83,6 +83,14 @@ test('research characterization: real Battlefield wall blocks shot lane but not 
   assert.ok(g.bullets.length>before,'composed Game must emit a real projectile');
   assert.equal(observer.ai.__v181ObservedShotVictims?.has(victim),true,
    'KNOWN CANDIDATE DEFECT: event-time witness ignores physical shot obstruction');
+  // Advance the actual Battlefield swept-bullet owner before removing cover.
+  // Isolate the physical contact from unrelated spawned shapes and bots.
+  g.shapes=[];g.drones=[];g.powerups=[];
+  if(g.hash?.clear){g.hash.clear();for(const t of g.tanks)g.hash.insert(t);}
+  const born=g.bullets.slice(before);
+  g.updateBullets(.2);
+  assert.ok(born.every(b=>b.dead||!g.bullets.includes(b)||b.x<=wall.x-wall.w/2+2),
+   'permanent Battlefield wall must stop the actual swept projectile before the victim');
   wall.solid=false;
   assert.equal(g.hasLineOfSight(0,0,100,0,2),true,
    'removing cover should make the current corridor clear');
