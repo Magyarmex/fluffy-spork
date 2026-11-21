@@ -279,3 +279,18 @@ test('Controller cached target checks public sight before private health', () =>
   assert.doesNotThrow(()=>g.updateDrones(1/60));
   assert.equal(owner.__novaLiveVectorAI.targetId,visible.id);
 });
+
+test('legal live Sniper Observer relay still permits remote target scoring', () => {
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__,C=classes();
+  const sniper=tank(1,0,0,{cls:'marksman'}),remote=tank(2,1200,0);
+  const g=game(800,600,1);g.tanks=[sniper,remote];
+  let reads=0;
+  Object.defineProperty(remote,'hp',{get(){reads++;return 75;}});
+  window.__NOVA_SPOTTER_LIVE_RELAY__=(_g,owner,target)=>owner===sniper&&target===remote;
+  assert.ok(Number.isFinite(T.scoreTarget(g,C,sniper,sniper.ai,remote,g.time)));
+  assert.ok(reads>0,'valid remote sight may consult observed health');
+  delete window.__NOVA_SPOTTER_LIVE_RELAY__;
+  reads=0;
+  assert.equal(T.scoreTarget(g,C,sniper,sniper.ai,remote,g.time),-Infinity);
+  assert.equal(reads,0,'revoked relay must not retain remote health access');
+});
