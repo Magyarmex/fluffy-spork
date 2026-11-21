@@ -63,3 +63,25 @@ test('research: no new shot and unsupported splash are not silently certified',(
   assert.equal(unsupported.unsupported,1);
  }finally{a.g.destroy();}
 });
+
+test('research: 13-tank candidate scan adds no observer visibility rays',()=>{
+ const a=arm();
+ try{
+  const bots=Array.from({length:12},(_,i)=>({
+   ...a.victim,id:9100+i,x:80+i*9,y:(i%3-1)*9,alive:true
+  }));
+  a.g.tanks=[a.shooter,...bots];
+  let los=0;const old=a.g.hasLineOfSight;
+  a.g.hasLineOfSight=function(){los++;return old.apply(this,arguments);};
+  const outcomes=bots.map(v=>projectileCandidate(a.g,a.shooter,v,a.before));
+  assert.equal(outcomes.length,12);
+  assert.ok(outcomes.every(o=>o.known),
+   'ordinary emitted bullets must have enough physical data for every candidate');
+  assert.equal(los,0,
+   'projectile geometry prototype should not repeat observer×victim LOS probes');
+  console.log('NOVA_PROJECTILE_CANDIDATE_RESEARCH '+JSON.stringify({
+   victims:bots.length,possible:outcomes.filter(o=>o.possible).length,
+   terrainChecks:outcomes.reduce((n,o)=>n+o.terrainChecks,0),los
+  }));
+ }finally{a.g.destroy();}
+});
