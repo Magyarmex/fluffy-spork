@@ -221,3 +221,12 @@ test('research projectile provenance: wall behind first tank contact is not a bl
  assert.equal(blocked.known,true);
  assert.equal(blocked.possible,false,'wall before first contact still blocks');
 });
+
+test('research projectile provenance: finite endpoints with overflowing deltas stay unknown',()=>{
+ const r=projectileCandidate({bullets:[{
+  ownerId:7,x:-1e308,y:0,vx:100,vy:0,ttl:2,r:3
+ }]},shooter,{x:1e308,y:0});
+ assert.equal(r.known,false);
+ assert.equal(r.possible,false);
+ assert.equal(r.unsupported,1);
+});
