@@ -129,3 +129,13 @@ test('legitimate close-range omnidirectional Observer sight remains available', 
   assert.equal(w.owner.__novaSpotterContactId, 2,
     'the existing within-135u proximity exception remains part of the sensor');
 });
+
+test('real Spotter relay never reads HP of an untracked or expired remote candidate', () => {
+  const w=world(),live=w.g.constructor.__novaLiveRelay;
+  Object.defineProperty(w.target,'hp',{get(){throw Error('unwitnessed remote health');}});
+  assert.equal(live(w.g,w.owner,w.target),false);
+  w.owner.__novaSpotterContactId=w.target.id;
+  w.owner.__novaSpotterContactUntil=w.g.time;
+  assert.equal(live(w.g,w.owner,w.target),false,
+    'expired memory cannot authorize health inspection');
+});
