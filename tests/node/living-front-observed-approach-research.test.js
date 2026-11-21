@@ -163,3 +163,20 @@ run('portrait gameplay viewport cannot infer an offscreen rival rotation',102906
   assert.equal(t.countToward(s.destination,10.3),0,
     '200+ units horizontal separation is not a legal 390px portrait witness');
 });
+
+run('offscreen rivals cannot expose hidden health or consume terrain rays',102907,(s,t)=>{
+  const offscreen={id:99001,x:1800,y:1800,
+    get hp(){throw Error('offscreen health must never be inspected');},
+    alive:true,ai:{__lfEcoKey:'BLOOM:5'}};
+  let rays=0;s.g.hasLineOfSight=()=>{rays++;return true;};
+  t.sample(s.g,s.observer,[offscreen,s.rival],10);
+  assert.equal(rays,1,'only the nearby visible rival merits a terrain ray');
+});
+
+run('observer memory is capped independently of global bot population',102908,(s,t)=>{
+  const rivals=Array.from({length:30},(_,i)=>({
+    id:9000+i,x:-200+i*2,y:-280,hp:100,alive:true,spawnShieldT:0
+  }));
+  t.sample(s.g,s.observer,rivals,10);
+  assert.equal(t.size(),16,'bounded memory must not scale with the whole roster');
+});
