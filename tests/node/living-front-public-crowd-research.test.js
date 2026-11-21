@@ -347,8 +347,10 @@ test('research public crowd requires Fair Engagement viewport authority',()=>{
       s.g.w=2400;s.g.h=1200;s.g.cam={zoom:1};
       s.others[0].x=s.center.x;s.others[0].y=s.center.y;
       assert.equal(physicalCrowd(s.g,s.observer,s.center),1);
-      s.g.__testFair=null;
-      assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
+      // The composed Game exposes this test authority as read-only.
+      // Mask it on an isolated shallow view instead of mutating the Game.
+      const missingFair={...s.g,__testFair:null};
+      assert.equal(physicalCrowd(missingFair,s.observer,s.center),0);
     } finally {s.g.destroy();}
   });
 });
