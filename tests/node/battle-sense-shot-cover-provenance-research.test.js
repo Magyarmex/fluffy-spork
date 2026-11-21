@@ -251,7 +251,8 @@ test('research A/B/C matched-world: projectile lane removes cone errors but only
     assert.ok(shooter&&observer&&victim);
     g.status='playing';g.paused=false;g.time=10;
     shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
-    observer.x=-100;observer.y=100;
+    // The observer-to-victim diagonal must clear the real wall padding.
+    observer.x=0;observer.y=100;
     victim.x=100;victim.y=0;
     g.tanks=[observer,shooter,victim];
     g.__novaFairVisibleTanks=g.tanks;
