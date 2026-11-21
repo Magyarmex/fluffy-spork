@@ -79,6 +79,7 @@ function projectileCandidate(game,shooter,victim,startIndex=0,options={}){
  // because a target was momentarily at rest at projectile birth.
  const futureMotionUnknown=options.conservativeMotion===true;
  return {known:checked>0&&unsupported===0&&!movingVictim&&!invalidMotion&&!futureMotionUnknown,possible:false,
-  checked,terrainChecks,unsupported,movingVictim};
+  checked,terrainChecks,unsupported,movingVictim,
+  futureMotionUnknown:futureMotionUnknown&&checked>0&&unsupported===0&&!movingVictim&&!invalidMotion};
 }
 module.exports={projectileCandidate};
