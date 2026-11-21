@@ -8,10 +8,12 @@ const { bootGame, withSeed } = require('../research/audio-rng-causal-pilot.cjs')
 
 function observedApproach() {
   const records=new Map();
-  let lastTime=-Infinity;
+  let lastTime=-Infinity,owner=null;
   function sample(g,observer,rivals,now) {
     if (!Number.isFinite(now)) return;
-    if (now<lastTime) records.clear(); // new match / rewound clock
+    if (now<lastTime || (owner && observer!==owner)) records.clear();
+    // Never transfer one observer's private sightings to its replacement.
+    owner=observer;
     lastTime=now;
     if (!g || !observer || !Number.isFinite(observer.x) ||
         !Number.isFinite(observer.y)) return;
@@ -65,8 +67,9 @@ function observedApproach() {
         const speed=Math.hypot(vx,vy);
         const sx=destination.x-a.x,sy=destination.y-a.y;
         const segmentRange=Math.hypot(sx,sy);
-        if (!(speed>=25 && speed<=401) || !(segmentRange>0) ||
-            (vx*sx+vy*sy)/(speed*segmentRange)<.8) break;
+        const alignment=(vx*sx+vy*sy)/(speed*segmentRange);
+        if (!(speed>=25 && speed<=401) ||
+            !Number.isFinite(alignment) || alignment<.8) break;
         alignedSeconds+=dt;segments++;
       }
       if (segments>=2 && alignedSeconds+1e-9>=.25) count++;
@@ -181,4 +184,15 @@ run('observer memory is capped independently of global bot population',102908,(s
   }));
   t.sample(s.g,s.observer,rivals,10);
   assert.equal(t.size(),16,'bounded memory must not scale with the whole roster');
+});
+
+run('replacement observer never inherits prior-life sightings',102909,(s,t)=>{
+  t.sample(s.g,s.observer,[s.rival],10);
+  s.rival.x=-85;t.sample(s.g,s.observer,[s.rival],10.15);
+  s.rival.x=-70;t.sample(s.g,s.observer,[s.rival],10.3);
+  assert.equal(t.countToward(s.destination,10.3),1);
+  const replacement={...s.observer,ai:{...s.observer.ai}};
+  t.sample(s.g,replacement,[],10.35);
+  assert.equal(t.size(),0);
+  assert.equal(t.countToward(s.destination,10.35),0);
 });
