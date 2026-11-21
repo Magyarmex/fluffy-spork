@@ -1,0 +1,104 @@
+'use strict';
+// RESEARCH ONLY: A/B/C natural-match causal probe of event-time crossfire.
+// A = existing observer-owned hull cone; B = emitted lanes; C = emitted lanes
+// plus terrain. Unknown lanes remain eligible: never silently erase a threat.
+// Exact shipping 49-overlay Game. NOT a balance win-rate or Android benchmark.
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+const {projectileCandidate}=require('../research/battle-sense-projectile-candidate.cjs');
+function run(seed,arm){
+ return withSeed(seed,()=>{
+  const g=bootGame();
+  const stats={seed,arm,frames:0,shots:0,originalMemberships:0,
+   retainedMemberships:0,knownMisses:0,unknownRetained:0,terrainChecks:0,
+   crossfireSamples:0,modeTrace:[]};
+  try{
+   g.sfx.muted=true;g.sfx.startMusic=()=>{};
+   g.status='playing';g.paused=false;
+   const original=g.tryFire;
+   g.tryFire=function(shooter){
+    const before=this.bullets.length;
+    const out=original.apply(this,arguments);
+    if(!shooter||this.bullets.length<=before)return out;
+    stats.shots++;
+    const roster=this.__novaFairShotWitnesses||this.tanks||[];
+    // The shot-to-victim physical lane is observer-independent at birth.
+    const physicalByVictim=new Map();
+    for(const observer of roster){
+     const a=observer&&observer.ai;
+     if(!a||a.__v181ObservedShotId!==shooter.id||
+        a.__v181ObservedShotAt!==this.time)continue;
+     const old=a.__v181ObservedShotVictims;
+     if(!old)continue;
+     const next=arm==='A'?null:new WeakSet();
+     let count=0;
+     for(const victim of roster){
+      if(!victim||victim===shooter||victim===observer||!old.has(victim))continue;
+      stats.originalMemberships++;
+      let retain=true;
+      if(arm!=='A'){
+       let evidence=physicalByVictim.get(victim);
+       if(!evidence){
+        evidence=projectileCandidate(this,shooter,victim,before,
+         {terrain:arm==='C'});
+        physicalByVictim.set(victim,evidence);
+        stats.terrainChecks+=evidence.terrainChecks||0;
+       }
+       if(evidence.known&&!evidence.possible){
+        retain=false;stats.knownMisses++;
+       }else if(!evidence.known)stats.unknownRetained++;
+      }
+      if(retain){count++;stats.retainedMemberships++;if(next)next.add(victim);}
+     }
+     if(next){
+      a.__v181ObservedShotVictims=count?next:null;
+      a.__v181ObservedShotVictimCount=count;
+     }
+    }
+    return out;
+   };
+   for(let frame=0;frame<720;frame++){
+    g.update(1/60);stats.frames++;
+    if(frame%30===0){
+     const modes=g.tanks.filter(t=>t&&t.ai&&t.alive!==false)
+      .map(t=>[t.id,t.ai.__v181Mode||'none']).sort((a,b)=>a[0]-b[0]);
+     stats.crossfireSamples+=modes.filter(x=>x[1]==='crossfire').length;
+     stats.modeTrace.push(modes);
+    }
+   }
+   assert.equal(stats.frames,720);
+   assert.equal(stats.originalMemberships,
+    stats.retainedMemberships+stats.knownMisses);
+   if(arm==='A')assert.equal(stats.knownMisses,0);
+   if(arm==='B')assert.equal(stats.terrainChecks,0);
+   return stats;
+  }finally{g.destroy();}
+ });
+}
+function firstDifference(a,b){
+ for(let i=0;i<Math.min(a.modeTrace.length,b.modeTrace.length);i++){
+  if(JSON.stringify(a.modeTrace[i])!==JSON.stringify(b.modeTrace[i]))
+   return {frame:i*30,a:a.modeTrace[i],b:b.modeTrace[i]};
+ }
+ return null;
+}
+test('research: natural 49-overlay A/B/C crossfire decisions remain auditable',()=>{
+ for(const seed of [1517800,1517802,1517810]){
+  const A=run(seed,'A'),B=run(seed,'B'),C=run(seed,'C');
+  assert.equal(A.modeTrace.length,24);
+  assert.equal(B.modeTrace.length,24);
+  assert.equal(C.modeTrace.length,24);
+  assert.ok(B.knownMisses>=0&&C.knownMisses>=0);
+  console.log('NOVA_BATTLE_SENSE_NATURAL_ABC '+JSON.stringify({
+   seed,
+   arms:[A,B,C].map(({arm,shots,originalMemberships,retainedMemberships,
+    knownMisses,unknownRetained,terrainChecks,crossfireSamples})=>({
+    arm,shots,originalMemberships,retainedMemberships,
+    knownMisses,unknownRetained,terrainChecks,crossfireSamples})),
+   firstAB:firstDifference(A,B),firstAC:firstDifference(A,C),
+   // Later divergence can change RNG draw counts and opponent encounters.
+   // Only the first mismatch is a clean matched-world decision comparison.
+  }));
+ }
+});
