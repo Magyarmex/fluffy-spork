@@ -153,6 +153,11 @@ test('research characterization: shotgun hull cone can witness a lane with no pe
                       Math.cos(Math.atan2(b.vy,b.vx)-toward)))));
   assert.ok(nearest>.15,
    'fixture must place the victim outside every real pellet direction');
+  const laneOnly=projectileCandidate(g,shooter,victim,before,{terrain:false});
+  assert.equal(laneOnly.known,true);
+  assert.equal(laneOnly.possible,false,
+   'B projectile-only arm must reject the broad Shotgunner cone without terrain rays');
+  assert.equal(laneOnly.terrainChecks,0);
   const pelletProvenance=projectileCandidate(g,shooter,victim,before);
   assert.equal(pelletProvenance.known,true,
    'real composed Shotgunner pellet geometry should be classifiable');
