@@ -18,6 +18,8 @@ test('natural composed matches bound firing-time witness scans and report incide
      eligibleVictimMemberships:0,shotsWithAnyVictimWitness:0,
      projectileAlignedMemberships:0,projectileBlockedMemberships:0,
      noProjectileLaneMemberships:0,
+     laneOnlyPossibleMemberships:0,laneOnlyKnownMissMemberships:0,
+     laneOnlyUnknownMemberships:0,
      oraclePossibleMemberships:0,oracleKnownMissMemberships:0,
      oracleUnknownMemberships:0,oracleTerrainChecks:0,
      fireLOSCalls:0,maxFireLOSCalls:0,crossfireSamples:0,
@@ -59,6 +61,13 @@ test('natural composed matches bound firing-time witness scans and report incide
        for(const victim of observers){
         if(!victim||victim===shooter||victim===observer||
            candidates?.has(victim)!==true)continue;
+        // B: emitted-projectile lane without extra terrain queries.
+        // C: same lane with physical first-contact terrain handling.
+        const laneOnly=projectileCandidate(this,shooter,victim,before,{terrain:false});
+        assert.equal(laneOnly.terrainChecks,0,'geometry-only arm must add zero terrain rays');
+        if(laneOnly.possible)stats.laneOnlyPossibleMemberships++;
+        else if(laneOnly.known)stats.laneOnlyKnownMissMemberships++;
+        else stats.laneOnlyUnknownMemberships++;
         const oracle=projectileCandidate(this,shooter,victim,before);
         stats.oracleTerrainChecks+=oracle.terrainChecks||0;
         if(oracle.possible)stats.oraclePossibleMemberships++;
@@ -121,6 +130,12 @@ test('natural composed matches bound firing-time witness scans and report incide
      }
     }
     assert.equal(stats.frames,720);
+    assert.equal(
+     stats.laneOnlyPossibleMemberships+stats.laneOnlyKnownMissMemberships+
+      stats.laneOnlyUnknownMemberships,
+     stats.eligibleVictimMemberships,
+     'projectile-only B arm must partition every witnessed victim (seed '+seed+')'
+    );
     assert.equal(
      stats.oraclePossibleMemberships+stats.oracleKnownMissMemberships+
       stats.oracleUnknownMemberships,
