@@ -81,7 +81,7 @@ async function run(browser,label,viewport){
       .map(b=>({text:(b.textContent||'').trim().slice(0,80),
        visible:!!(b.getClientRects().length&&getComputedStyle(b).visibility!=='hidden'),
        disabled:b.disabled,html:b.outerHTML.slice(0,240)}));
-     return {status:g?.status,paused:g?.paused,time:g?.time,
+     return {status:g?.status,paused:g?.paused,documentHidden:document.hidden,time:g?.time,
       statPoints:g?.statPoints,level:g?.player?.level,
       pendingOffer:g?.pendingOffer==null?null:String(g.pendingOffer.tier||g.pendingOffer),playerAlive:g?.player?.alive,
       input:g?.input&&{moveActive:g.input.move?.active,
@@ -101,7 +101,7 @@ async function run(browser,label,viewport){
   const firstStat=page.locator('[data-nova-upgrade-tray] .stat-btn').first();
   const beforeUpgrade=await page.evaluate(()=>{
    const g=window.__novaTouchGame;
-   return {paused:g.paused,statPoints:g.statPoints,level:g.player?.level,
+   return {paused:g.paused,documentHidden:document.hidden,statPoints:g.statPoints,level:g.player?.level,
     damage:g.player?.stats?.damage,pendingOffer:g.pendingOffer};
   });
   await page.evaluate(()=>{
@@ -123,7 +123,7 @@ async function run(browser,label,viewport){
    const afterUpgrade=await page.evaluate(()=>{
     const g=window.__novaTouchGame;
     const el=document.querySelector('[data-nova-upgrade-tray] .stat-btn');
-    return {paused:g.paused,statPoints:g.statPoints,level:g.player?.level,
+    return {paused:g.paused,documentHidden:document.hidden,statPoints:g.statPoints,level:g.player?.level,
      damage:g.player?.stats?.damage,pendingOffer:g.pendingOffer,
      firstButton:el?.outerHTML.slice(0,400),upgradeCalls:window.__novaUpgradeCalls,
      activeElement:document.activeElement?.outerHTML.slice(0,250)};
