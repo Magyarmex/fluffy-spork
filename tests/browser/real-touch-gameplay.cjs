@@ -105,16 +105,17 @@ async function run(browser,label,viewport){
     damage:g.player?.stats?.damage,pendingOffer:g.pendingOffer};
   });
   await page.evaluate(()=>{
-   const g=window.__novaTouchGame,original=g.upgradeStat;
+   const Game=window.__novaMakeRequire('')('game/engine').Game;
+   const original=Game.prototype.upgradeStat;
    window.__novaUpgradeCalls=[];
-   g.upgradeStat=function(key){
-    const before={key,paused:this.paused,points:this.statPoints,
-     stat:this.player?.stats?.[key]};
+   Game.prototype.upgradeStat=function(key){
+    const before={key,observedGame:this===window.__novaTouchGame,
+     paused:this.paused,points:this.statPoints,stat:this.player?.stats?.[key]};
     try{return original.apply(this,arguments);}
     finally{window.__novaUpgradeCalls.push({...before,
      afterPoints:this.statPoints,afterStat:this.player?.stats?.[key]});}
    };
-   window.__novaRestoreUpgrade=()=>{g.upgradeStat=original;};
+   window.__novaRestoreUpgrade=()=>{Game.prototype.upgradeStat=original;};
   });
   try{await firstStat.tap();}
   finally{await page.evaluate(()=>window.__novaRestoreUpgrade?.());}
