@@ -287,3 +287,31 @@ test('research A/B/C: penetrating destructible cover is unknown, not a certified
  assert.equal(C.unsupported,1);
  assert.equal(C.terrainChecks,1);
 });
+
+test('research projectile provenance: only launch penetration >=2 can leave destructible cover unresolved',()=>{
+ const cover={solid:{destructible:true,hp:1}};
+ for(const pen of [0,1]){
+  const r=projectileCandidate({
+   bullets:[{ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3,pen}],
+   firstTerrainHit(){return cover;}
+  },shooter,victim);
+  assert.equal(r.known,true,'pen='+pen+' cannot survive Battlefield breach');
+  assert.equal(r.possible,false);
+  assert.equal(r.unsupported,0);
+ }
+ for(const pen of [2,3]){
+  const r=projectileCandidate({
+   bullets:[{ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3,pen}],
+   firstTerrainHit(){return cover;}
+  },shooter,victim);
+  assert.equal(r.known,false,'pen='+pen+' may survive a successful cover break');
+  assert.equal(r.possible,false);
+  assert.equal(r.unsupported,1);
+ }
+ const malformed=projectileCandidate({
+  bullets:[{ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3,pen:0}],
+  firstTerrainHit(){return {x:40,y:0};}
+ },shooter,victim);
+ assert.equal(malformed.known,false,'terrain hit without solid identity cannot certify a veto');
+ assert.equal(malformed.unsupported,1);
+});
