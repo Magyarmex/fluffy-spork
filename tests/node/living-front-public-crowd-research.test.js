@@ -178,15 +178,19 @@ test('public signal dispersion is stable and independent of hidden AI plans',()=
 });
 
 test('public signal dispersion spreads a cohort without extra random draws',()=>{
-  const cohort=Array.from({length:64},(_,i)=>publicSignalLane(i+1,5,9));
-  const lower=cohort.filter(v=>v<.33).length;
-  const upper=cohort.filter(v=>v>.66).length;
-  assert.ok(lower>=8&&upper>=8,
-    'public-signal hash must not collapse a 64-bot cohort into one lane');
-  assert.notDeepEqual(
-    Array.from({length:64},(_,i)=>publicSignalLane(i+1,5,9)),
-    Array.from({length:64},(_,i)=>publicSignalLane(i+1,6,9)),
-    'a new public destination may create a different dispersion');
+  withSeed(1517807,draws=>{
+    const before=draws();
+    const cohort=Array.from({length:64},(_,i)=>publicSignalLane(i+1,5,9));
+    const lower=cohort.filter(v=>v<.33).length;
+    const upper=cohort.filter(v=>v>.66).length;
+    assert.ok(lower>=8&&upper>=8,
+      'public-signal hash must not collapse a 64-bot cohort into one lane');
+    assert.notDeepEqual(
+      Array.from({length:64},(_,i)=>publicSignalLane(i+1,5,9)),
+      Array.from({length:64},(_,i)=>publicSignalLane(i+1,6,9)),
+      'a new public destination may create a different dispersion');
+    assert.equal(draws(),before,'public-signal dispersion must not consume game RNG');
+  });
 });
 
 /* Alternative C: distance-sensitive, public-signal threshold. Nearer
