@@ -258,3 +258,19 @@ test('research projectile provenance: a later clear pellet survives an earlier t
  assert.equal(result.terrainChecks,2);
  assert.equal(result.unsupported,1);
 });
+
+test('research A/B/C: geometry-only projectile arm does not spend terrain rays or certify cover',()=>{
+ const bullet={ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3};
+ let rays=0;
+ const g={bullets:[bullet],firstTerrainHit(){rays++;return {solid:{destructible:false}};}};
+ const laneOnly=projectileCandidate(g,shooter,victim,0,{terrain:false});
+ assert.equal(laneOnly.known,true);
+ assert.equal(laneOnly.possible,true,'B arm measures only emitted projectile geometry');
+ assert.equal(laneOnly.terrainChecks,0);
+ assert.equal(rays,0,'B arm must not query terrain');
+ const physical=projectileCandidate(g,shooter,victim);
+ assert.equal(physical.known,true);
+ assert.equal(physical.possible,false,'C arm recognizes permanent cover');
+ assert.equal(physical.terrainChecks,1);
+ assert.equal(rays,1);
+});
