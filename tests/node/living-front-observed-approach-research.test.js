@@ -10,7 +10,10 @@ function observedApproach() {
   const records=new Map();
   let lastTime=-Infinity,owner=null;
   function sample(g,observer,rivals,now) {
-    if (!Number.isFinite(now)) return;
+    if (!Number.isFinite(now)) {
+      records.clear(); // A corrupt clock cannot preserve certified recency.
+      return;
+    }
     if (now<lastTime || (owner && observer!==owner)) records.clear();
     // Never transfer one observer's private sightings to its replacement.
     owner=observer;
@@ -21,12 +24,24 @@ function observedApproach() {
       records.clear();
       return;
     }
+    // Loss of the visibility authority invalidates existing evidence too:
+    // retaining old sightings here would still influence decisions for 1.25s.
     if (!g || typeof g.hasLineOfSight!=='function' ||
-        !Number.isFinite(observer.x) || !Number.isFinite(observer.y)) return;
+        !Number.isFinite(observer.x) || !Number.isFinite(observer.y)) {
+      records.clear();
+      return;
+    }
     const F=g.__testFair;
-    if (!F || typeof F.inGameplayViewport!=='function') return;
+    if (!F || typeof F.inGameplayViewport!=='function') {
+      records.clear();
+      return;
+    }
     const ext=F.viewportHalfExtents && F.viewportHalfExtents(g);
-    if (!ext || !(ext.x>0) || !(ext.y>0)) return;
+    if (!ext || !Number.isFinite(ext.x) || !Number.isFinite(ext.y) ||
+        !(ext.x>0) || !(ext.y>0)) {
+      records.clear();
+      return;
+    }
     for (const q of rivals || []) {
       if (!q || q===observer || q.id===observer.id ||
           !Number.isSafeInteger(q.id) ||
@@ -260,4 +275,59 @@ run('observer death clears sightings even if the same tank object respawns',1029
   s.rival.x=-55;t.sample(s.g,s.observer,[s.rival],10.5);
   assert.equal(t.countToward(s.destination,10.5),0,
     'a new life must accumulate its own public evidence');
+});
+
+run('loss of viewport or terrain authority revokes previously valid evidence',102914,(s,t)=>{
+  function establish(at) {
+    s.rival.x=-100;t.sample(s.g,s.observer,[s.rival],at);
+    s.rival.x=-85;t.sample(s.g,s.observer,[s.rival],at+.15);
+    s.rival.x=-70;t.sample(s.g,s.observer,[s.rival],at+.3);
+    assert.equal(t.countToward(s.destination,at+.3),1);
+  }
+  establish(10);
+  s.g.hasLineOfSight=null;
+  t.sample(s.g,s.observer,[s.rival],10.35);
+  assert.equal(t.countToward(s.destination,10.35),0);
+  s.g.hasLineOfSight=()=>true;
+  establish(11);
+  const missingFair={...s.g,__testFair:null};
+  t.sample(missingFair,s.observer,[s.rival],11.35);
+  assert.equal(t.countToward(s.destination,11.35),0);
+  establish(12);
+  const badViewport={...s.g,__testFair:{
+    inGameplayViewport:s.g.__testFair.inGameplayViewport,
+    viewportHalfExtents:()=>({x:0,y:0})
+  }};
+  t.sample(badViewport,s.observer,[s.rival],12.35);
+  assert.equal(t.countToward(s.destination,12.35),0);
+  establish(13);
+  const infiniteViewport={...s.g,__testFair:{
+    inGameplayViewport:s.g.__testFair.inGameplayViewport,
+    viewportHalfExtents:()=>({x:Infinity,y:300})
+  }};
+  t.sample(infiniteViewport,s.observer,[s.rival],13.35);
+  assert.equal(t.countToward(s.destination,13.35),0,
+    'unbounded viewport cannot become a source of omniscient sightings');
+});
+
+run('invalid observer coordinates revoke previously valid movement evidence',102915,(s,t)=>{
+  t.sample(s.g,s.observer,[s.rival],10);
+  s.rival.x=-85;t.sample(s.g,s.observer,[s.rival],10.15);
+  s.rival.x=-70;t.sample(s.g,s.observer,[s.rival],10.3);
+  assert.equal(t.countToward(s.destination,10.3),1);
+  const priorX=s.observer.x;
+  s.observer.x=NaN;
+  try {
+    t.sample(s.g,s.observer,[s.rival],10.35);
+    assert.equal(t.countToward(s.destination,10.35),0);
+  } finally {s.observer.x=priorX;}
+});
+
+run('non-finite sample time revokes prior sightings rather than preserving recency',102916,(s,t)=>{
+  t.sample(s.g,s.observer,[s.rival],10);
+  s.rival.x=-85;t.sample(s.g,s.observer,[s.rival],10.15);
+  s.rival.x=-70;t.sample(s.g,s.observer,[s.rival],10.3);
+  assert.equal(t.countToward(s.destination,10.3),1);
+  t.sample(s.g,s.observer,[s.rival],NaN);
+  assert.equal(t.countToward(s.destination,10.3),0);
 });
