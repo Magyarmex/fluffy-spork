@@ -18,16 +18,7 @@ async function run(browser,label,viewport){
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const oldUpdate=Game.prototype.update;
    Game.prototype.update=function(dt){
-    if(!this.__novaDecorativeWorld){
-     window.__novaTouchGame=this;
-     // The real touch test intentionally disables autofire. Do so before
-     // the FIRST playable update, not after the loading veil, so incidental
-     // early kills cannot bank extra points and invalidate tray assertions.
-     if(!this.__novaTouchAutofireInitialized){
-      if(this.input)this.input.autofire=false;
-      this.__novaTouchAutofireInitialized=true;
-     }
-    }
+    if(!this.__novaDecorativeWorld)window.__novaTouchGame=this;
     return oldUpdate.apply(this,arguments);
    };
    const oldFire=Game.prototype.tryFire;
@@ -96,8 +87,10 @@ async function run(browser,label,viewport){
   // A real finger cannot reach the canvas until the veil finishes leaving.
   await page.locator('.nv-loading').waitFor({state:'hidden',timeout:20000});
   await page.evaluate(()=>{const g=window.__novaTouchGame;g.input.autofire=false;g.player.spawnShieldT=20;});
+  // Measure the suspected prelude-XP confound instead of changing gameplay
+  // setup to assume it: default autofire requires an actual aim vector.
   assert.equal(await page.evaluate(()=>window.__novaTouchGame.statPoints),0,
-   label+': touch fixture starts without autofire-earned upgrade points');
+   label+': pre-grant upgrade points must be zero (check startup input/XP)');
   // Regression #615: earn a REAL level point before the first joystick touch.
   // A pending upgrade must never trap either stick, even after the dwell expires.
   await page.evaluate(()=>{
