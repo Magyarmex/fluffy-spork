@@ -207,14 +207,17 @@ test('research matched-world control: false witness changes composed AI strategi
     a.__v181ObservedShotY=0;
     a.__v181ObservedShotVictims=withWitness?new WeakSet([third]):null;
     a.__v181Think=0;
+    const oldMove=g.moveTank;let commanded=null;
+    g.moveTank=function(t,vx,vy,dt){if(t===observer)commanded=[vx,vy];return oldMove.apply(this,arguments);};
     ai.updateAI(observer,g,1/60);
-    return a.__v181Mode;
+    return {mode:a.__v181Mode,commanded};
    }finally{g.destroy();}
   });
  }
- const falseWitnessMode=run(true),noWitnessMode=run(false);
- assert.equal(falseWitnessMode,'crossfire',
+ const falseWitness=run(true),noWitness=run(false);
+ assert.equal(falseWitness.mode,'crossfire',
   'KNOWN CANDIDATE DEFECT: false witness reaches the actual AI planning owner');
- assert.notEqual(noWitnessMode,'crossfire',
+ assert.notEqual(noWitness.mode,'crossfire',
   'identical seeded world without false witness must not choose crossfire');
+ console.log('NOVA_FALSE_WITNESS_MOVE_RESEARCH '+JSON.stringify({falseWitness,noWitness}));
 });
