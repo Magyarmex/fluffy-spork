@@ -14,7 +14,7 @@ function projectileCandidate(game,shooter,victim,startIndex=0){
   if(!b||b.ownerId!==shooter.id||b.dead)continue;
   if(b.shell||b.splash||b.cluster){unsupported++;continue;}
   const speed=Math.hypot(b.vx,b.vy);
-  const radius=Number(b.r??0);
+  const radius=b.r==null?0:b.r;
   if(!Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
      !(speed>1)||!Number.isFinite(speed)||
      !Number.isFinite(b.x)||!Number.isFinite(b.y)||
