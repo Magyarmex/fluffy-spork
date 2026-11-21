@@ -41,8 +41,16 @@ function projectileCandidate(game,shooter,victim,startIndex=0){
   if(!Number.isFinite(entry)){unsupported++;continue;}
   if(typeof game.firstTerrainHit==='function'){
    terrainChecks++;
-   const hit=game.firstTerrainHit(b.x,b.y,b.x+ux*entry,b.y+uy*entry,
+   let hit;
+   try{
+    hit=game.firstTerrainHit(b.x,b.y,b.x+ux*entry,b.y+uy*entry,
       radius*.45);
+   }catch(_){
+    // A failed terrain query is unknown, never proof of a clear shot.
+    // Another independently clear projectile may still certify the volley.
+    unsupported++;
+    continue;
+   }
    if(hit){
     // The shipping Battlefield can let penetrating rounds breach cover.
     // A confirmed permanent wall cannot be breached; destructible or
