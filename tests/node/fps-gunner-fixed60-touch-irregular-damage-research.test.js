@@ -26,6 +26,10 @@ function schedule(mode){
   return Array.from({length:3},()=>shifted).flat();
  }
  if(mode==='jitter38_27_35')return Array.from({length:60},()=>[38,27,35]).flat();
+ // A six-second 20Hz real-Game touch gate: three canonical updates per
+ // uniform frame; the 95/5ms pair requires four-step bounded catch-up.
+ if(mode==='uniform20')return Array(120).fill(50);
+ if(mode==='alternating95_5')return Array.from({length:60},()=>[95,5]).flat();
  if(mode==='uniform30')return Array(180).fill(1000/30);
  if(mode==='alternating20_60')return Array.from({length:90},()=>[50,1000/60]).flat();
  if(mode==='alternating60_20')return Array.from({length:90},()=>[1000/60,50]).flat();
@@ -578,4 +582,40 @@ test('Tempest reload 4/5 threshold retains real-hit parity when 30Hz jitter full
  }
  assert.equal(rows.length,8);
  console.log('TEMPEST_RELOAD45_REAL_HIT_JITTER '+JSON.stringify(rows));
+});
+
+
+// #799/#648: complete the 20Hz acceptance intersection with actual
+// browser-shaped touch press/move/release edges and real target HP contact.
+// This is a controlled Node/Game chronology gate, NOT phone CPU or photons.
+test('fixed60 20Hz touch bursts preserve actual Gunner HP and shot chronology',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]])
+  for(const seed of [1517800,1517802]){
+   const baseline=trial(seed,cls,reload,'uniform60',12);
+   for(const mode of ['uniform20','alternating95_5']){
+    const result=trial(seed,cls,reload,mode,12,360,4,2);
+    assert.equal(result.ticks,360,'all six seconds must execute');
+    assert.equal(result.droppedMs,0,'no simulation time may be discarded');
+    assert.equal(result.droppedFrames,0);
+    assert.equal(result.applied,baseline.applied,'all touch edges must replay');
+    assert.equal(result.volleys,baseline.volleys,'volley chronology changed');
+    assert.equal(result.hits,baseline.hits,'physical target contacts changed');
+    assert.equal(result.damage,baseline.damage,'target HP changed');
+    assert.deepEqual(result.allBirths,baseline.allBirths,'shot birth times changed');
+    assert.equal(result.heat,baseline.heat,'Gunner heat changed');
+    assert.equal(result.spin,baseline.spin,'rotary spin changed');
+    assert.ok(Number.isFinite(result.maxInputSampleLagMs)&&
+     Number.isFinite(result.maxRenderCallbackLagMs));
+    if(mode==='uniform20')assert.ok(result.stepsByFrame.three>0,
+     '20Hz must actually run three canonical updates per frame');
+    else assert.ok(result.stepsByFrame.four>0,
+     '95ms bursts must actually exercise four-step catch-up');
+    rows.push({cls,seed,mode,volleys:result.volleys,hits:result.hits,
+     damage:result.damage,maxInputSampleLagMs:result.maxInputSampleLagMs,
+     maxRenderCallbackLagMs:result.maxRenderCallbackLagMs});
+   }
+  }
+ assert.equal(rows.length,8);
+ console.log('GUNNER_20HZ_TOUCH_DAMAGE '+JSON.stringify(rows));
 });
