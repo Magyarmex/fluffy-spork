@@ -22,6 +22,7 @@ test('natural composed matches bound firing-time witness scans and report incide
      laneOnlyUnknownMemberships:0,
      oraclePossibleMemberships:0,oracleKnownMissMemberships:0,
      oracleUnknownMemberships:0,oracleTerrainChecks:0,
+     oracleUncachedTerrainChecks:0,oracleReusedMemberships:0,
      fireLOSCalls:0,maxFireLOSCalls:0,crossfireSamples:0,
      crossfireWithLaneEvidence:0,crossfireWithoutLaneEvidence:0,
      crossfireWithPhysicalEvidence:0,crossfireWithoutPhysicalEvidence:0,
@@ -46,6 +47,9 @@ test('natural composed matches bound firing-time witness scans and report incide
        Number.isFinite(b.x)&&Number.isFinite(b.y)&&
        Number.isFinite(b.vx)&&Number.isFinite(b.vy));
       let witnessed=false;
+      // The physical shot-to-victim path is observer-independent at birth.
+      // Cache once per actual victim object, not once per witness observer.
+      const physicalByVictim=new Map();
       for(const observer of observers){
        if(!observer||!observer.ai||observer===shooter)continue;
        if(observer.ai.__v181ObservedShotId!==shooter.id||
@@ -73,8 +77,14 @@ test('natural composed matches bound firing-time witness scans and report incide
         if(laneOnly.possible){stats.laneOnlyPossibleMemberships++;observerLane++;}
         else if(laneOnly.known)stats.laneOnlyKnownMissMemberships++;
         else stats.laneOnlyUnknownMemberships++;
-        const oracle=projectileCandidate(this,shooter,victim,before);
-        stats.oracleTerrainChecks+=oracle.terrainChecks||0;
+        let oracle=physicalByVictim.get(victim);
+        if(oracle){stats.oracleReusedMemberships++;}
+        else{
+         oracle=projectileCandidate(this,shooter,victim,before);
+         physicalByVictim.set(victim,oracle);
+         stats.oracleTerrainChecks+=oracle.terrainChecks||0;
+        }
+        stats.oracleUncachedTerrainChecks+=oracle.terrainChecks||0;
         if(oracle.possible){stats.oraclePossibleMemberships++;observerPhysical++;}
         else if(oracle.known)stats.oracleKnownMissMemberships++;
         else stats.oracleUnknownMemberships++;
@@ -171,6 +181,8 @@ test('natural composed matches bound firing-time witness scans and report incide
      'every crossfire sample must have a recorded evidence provenance or be marked unattributed');
     assert.equal(stats.crossfireWithPhysicalEvidence+stats.crossfireWithoutPhysicalEvidence+
       stats.crossfireUnattributed,stats.crossfireSamples);
+    assert.ok(stats.oracleTerrainChecks<=stats.oracleUncachedTerrainChecks,
+     'per-shot victim caching must not increase terrain query count');
     assert.ok(stats.oraclePossibleMemberships<=stats.laneOnlyPossibleMemberships,
      'adding terrain occlusion cannot create a projectile lane (seed '+seed+')');
     assert.ok(stats.successfulFireCalls>=0);
