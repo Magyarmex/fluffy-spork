@@ -79,6 +79,12 @@ async function run(browser,label,viewport){
        window.__novaUpgradeRenderTrace.length===0){
      sampleUpgrade();
      window.__novaUpgradeRenderSampler=setInterval(sampleUpgrade,125);
+    }else if(label.includes('UPGRADE READY') &&
+             window.__novaUpgradeRenderSampler){
+     // The chip was found and tapped again: stop sampling before the
+     // subsequent stat-spend regression, without a Playwright round trip.
+     clearInterval(window.__novaUpgradeRenderSampler);
+     window.__novaUpgradeRenderSampler=null;
     }
    },true);
   });
