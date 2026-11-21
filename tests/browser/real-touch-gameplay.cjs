@@ -83,7 +83,7 @@ async function run(browser,label,viewport){
        disabled:b.disabled,html:b.outerHTML.slice(0,240)}));
      return {status:g?.status,paused:g?.paused,time:g?.time,
       statPoints:g?.statPoints,level:g?.player?.level,
-      pendingOffer:g?.pendingOffer,playerAlive:g?.player?.alive,
+      pendingOffer:g?.pendingOffer==null?null:String(g.pendingOffer.tier||g.pendingOffer),playerAlive:g?.player?.alive,
       input:g?.input&&{moveActive:g.input.move?.active,
        aimActive:g.input.aim?.active,firing:g.input.firing},
       buttons,upgradeTray:!!document.querySelector('[data-nova-upgrade-tray]')};
