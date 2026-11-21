@@ -35,6 +35,14 @@ test('research: replacing a witnessed shooter with the same ID retains a stale c
   g.__novaFairVisibleTanks=g.tanks;
   g.__novaFairShotWitnesses=g.tanks;
   const stale=sense.thirdPartyVector(g,observer,replacement,{}).weight;
+  const distinctId={...replacement,id:shooter.id+50000};
+  assert.equal(sense.thirdPartyVector(g,observer,distinctId,{}).weight,0,
+   'negative control: unrelated numerical ID must not inherit the shot');
+  const replacedVictim={...victim,id:victim.id};
+  g.tanks=[observer,replacement,replacedVictim];
+  g.__novaFairVisibleTanks=g.tanks;
+  assert.equal(sense.thirdPartyVector(g,observer,replacement,{}).weight,0,
+   'negative control: weak victim identity must reject replacement victim');
   assert.equal(stale,.62,
    'KNOWN PROTOTYPE DEFECT: ID reuse impersonates a witnessed shooter');
  }finally{g.destroy();}
