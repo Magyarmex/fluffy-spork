@@ -245,7 +245,7 @@ wrap('game/ai',function(ai,require){
       if(!target)contacts.__novaNoCombatTarget=true;
       for(var ci=0;ci<all.length;ci++){
         var cq=all[ci];
-        if(cq&&cq.id!==t.id&&alive(cq)&&canPerceive(g,classes,t,cq))
+        if(cq&&cq.id!==t.id&&canPerceive(g,classes,t,cq)&&alive(cq))
           contacts.push(cq);
       }
       g.__novaFairVisibleTanks=contacts;
@@ -372,7 +372,7 @@ wrap('game/engine',function(engine,require){
     var id=owner&&owner.ai&&owner.ai.__v1112TargetId;
     var t=id>=0&&g.getTank?g.getTank(id):null;
     /* The fast cached Controller slot must enforce the same spawn-shield gate as scoreTarget. */
-    return t&&alive(t)&&hostile(g,owner,t)&&!(t.spawnShieldT>0)&&canPerceive(g,classes,owner,t)?t:null;
+    return t&&canPerceive(g,classes,owner,t)&&alive(t)&&hostile(g,owner,t)&&!(t.spawnShieldT>0)?t:null;
   }
   function syncControllerPlans(g){
     var now=Number(g.time)||0,ts=g.tanks||[];
