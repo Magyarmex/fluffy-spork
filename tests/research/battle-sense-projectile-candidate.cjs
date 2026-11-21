@@ -14,8 +14,9 @@ function projectileCandidate(game,shooter,victim,startIndex=0,options={}){
  // A stationary birth-time miss is not a certified miss for a moving hull.
  // The actual engine can steer, collide or change velocity after firing;
  // preserve uncertainty rather than silently asserting a physical impossibility.
- const movingVictim=Number.isFinite(victim.vx)&&Number.isFinite(victim.vy)&&
-  Math.hypot(victim.vx,victim.vy)>1e-6;
+ const invalidMotion=(victim.vx!=null&&!Number.isFinite(victim.vx))||
+  (victim.vy!=null&&!Number.isFinite(victim.vy));
+ const movingVictim=!invalidMotion&&Math.hypot(victim.vx??0,victim.vy??0)>1e-6;
  for(let i=startIndex;i<game.bullets.length;i++){
   const b=game.bullets[i];
   if(!b||b.ownerId!==shooter.id||b.dead)continue;
@@ -72,7 +73,7 @@ function projectileCandidate(game,shooter,victim,startIndex=0,options={}){
   }
   return {known:true,possible:true,checked,terrainChecks,unsupported};
  }
- return {known:checked>0&&unsupported===0&&!movingVictim,possible:false,
+ return {known:checked>0&&unsupported===0&&!movingVictim&&!invalidMotion,possible:false,
   checked,terrainChecks,unsupported,movingVictim};
 }
 module.exports={projectileCandidate};
