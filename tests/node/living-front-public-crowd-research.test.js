@@ -81,8 +81,10 @@ test('public physical crowd is invariant to hidden AI intent in composed Game',(
       const shippingAfter=s.T.publicEcoBias(s.g,s.observer,{},{});
       assert.equal(before,0);
       assert.equal(after,before,'private hidden commitments must not change public crowd');
-      assert.notEqual(shippingAfter.mode,shippingBefore.mode,
-        'control confirms the current private-intent leak is reproduced');
+      console.log('NOVA_PUBLIC_CROWD_LIVE_COUNTERFACTUAL '+
+        JSON.stringify({before:shippingBefore.mode,after:shippingAfter.mode}));
+      // Do not freeze a known information leak as a required CI golden:
+      // a future production fix should make both decisions agree.
     } finally {s.g.destroy();}
   });
 });
@@ -248,7 +250,7 @@ test('public crowd performs terrain rays only for visible near-destination candi
   });
 });
 
-test('composed LOCAL farming can also be vetoed by offscreen private AI keys',()=>{
+test('composed LOCAL farming private-intent counterfactual remains observable',()=>{
   withSeed(1517808,()=>{
     const s=scene(),LF=s.g.__testLivingFront;
     const originalQuery=LF.query;
@@ -272,8 +274,9 @@ test('composed LOCAL farming can also be vetoed by offscreen private AI keys',()
       const publicSnapshot=JSON.stringify(shapes.map(q=>[q.id,q.x,q.y,q.hp]));
       s.others.forEach(q=>q.ai.__lfEcoKey='LOCAL:'+localSector);
       const after=s.T.publicEcoBias(s.g,s.observer,defs,{});
-      assert.equal(after.mode,'none',
-        'three offscreen private LOCAL keys can veto a visible farm');
+      console.log('NOVA_PUBLIC_CROWD_LOCAL_COUNTERFACTUAL '+
+        JSON.stringify({before:before.mode,after:after.mode}));
+      // A corrected shipping planner may legitimately retain local mode.
       assert.equal(JSON.stringify(shapes.map(q=>[q.id,q.x,q.y,q.hp])),
         publicSnapshot,'visible local farm changed during hidden counterfactual');
       assert.equal(physicalCrowd(s.g,s.observer,{x:-245,y:-397}),0,
@@ -282,7 +285,7 @@ test('composed LOCAL farming can also be vetoed by offscreen private AI keys',()
   });
 });
 
-test('composed remembered public BLOOM also reads remote private commitments',()=>{
+test('composed remembered BLOOM private-intent counterfactual remains observable',()=>{
   withSeed(1517809,()=>{
     const s=scene();
     try {
@@ -297,8 +300,9 @@ test('composed remembered public BLOOM also reads remote private commitments',()
         'public remembered BLOOM must be a valid route before intervention');
       s.others.forEach(q=>q.ai.__lfEcoKey='BLOOM:'+s.sector);
       const hidden=s.T.publicEcoBias(s.g,s.observer,{},{});
-      assert.equal(hidden.mode,'none',
-        'offscreen private ecology assignments veto remembered public route');
+      console.log('NOVA_PUBLIC_CROWD_MEMORY_COUNTERFACTUAL '+
+        JSON.stringify({before:baseline.mode,after:hidden.mode}));
+      // A corrected shipping planner may legitimately retain memory mode.
       assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
     } finally {s.g.destroy();}
   });
