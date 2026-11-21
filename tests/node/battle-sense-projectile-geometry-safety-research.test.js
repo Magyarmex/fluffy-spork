@@ -334,3 +334,16 @@ test('research projectile provenance: moving victims are not certified misses fr
  assert.equal(clear.possible,true,'a present clear lane remains possible, not guaranteed');
  assert.equal(clear.known,true);
 });
+
+test('research projectile provenance: corrupt or partial victim motion cannot certify a static miss',()=>{
+ const game={bullets:[{ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3}]};
+ for(const motion of [{vx:Infinity,vy:0},{vx:NaN,vy:0},{vx:0,vy:'-50'}]){
+  const r=projectileCandidate(game,shooter,{x:100,y:50,...motion});
+  assert.equal(r.possible,false,JSON.stringify(motion));
+  assert.equal(r.known,false,JSON.stringify(motion));
+ }
+ const partial=projectileCandidate(game,shooter,{x:100,y:50,vx:0,vy:-50});
+ assert.equal(partial.known,false);
+ const missingY=projectileCandidate(game,shooter,{x:100,y:50,vx:50});
+ assert.equal(missingY.known,false,'missing component defaults to zero motion');
+});
