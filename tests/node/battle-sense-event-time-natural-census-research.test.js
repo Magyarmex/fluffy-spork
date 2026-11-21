@@ -23,7 +23,11 @@ test('natural composed matches bound firing-time witness scans and report incide
      oraclePossibleMemberships:0,oracleKnownMissMemberships:0,
      oracleUnknownMemberships:0,oracleTerrainChecks:0,
      fireLOSCalls:0,maxFireLOSCalls:0,crossfireSamples:0,
+     crossfireWithLaneEvidence:0,crossfireWithoutLaneEvidence:0,
+     crossfireWithPhysicalEvidence:0,crossfireWithoutPhysicalEvidence:0,
+     crossfireUnattributed:0,
      geometricComparisons:0,oldOnlyGeometry:0,newOnlyGeometry:0};
+    const evidence=new WeakMap();
     const originalLOS=g.hasLineOfSight,originalFire=g.tryFire;
     let insideFire=false,shotRays=0;
     g.hasLineOfSight=function(){if(insideFire)shotRays++;
@@ -56,6 +60,7 @@ test('natural composed matches bound firing-time witness scans and report incide
        stats.observedShotRecords++;
        stats.eligibleVictimMemberships+=count;
        if(count)witnessed=true;
+       let observerLane=0,observerPhysical=0;
        // Descriptive event-time physical plausibility, not a damage prediction.
        // A victim may move, cover may break and another unit may intercept.
        for(const victim of observers){
@@ -65,12 +70,12 @@ test('natural composed matches bound firing-time witness scans and report incide
         // C: same lane with physical first-contact terrain handling.
         const laneOnly=projectileCandidate(this,shooter,victim,before,{terrain:false});
         assert.equal(laneOnly.terrainChecks,0,'geometry-only arm must add zero terrain rays');
-        if(laneOnly.possible)stats.laneOnlyPossibleMemberships++;
+        if(laneOnly.possible){stats.laneOnlyPossibleMemberships++;observerLane++;}
         else if(laneOnly.known)stats.laneOnlyKnownMissMemberships++;
         else stats.laneOnlyUnknownMemberships++;
         const oracle=projectileCandidate(this,shooter,victim,before);
         stats.oracleTerrainChecks+=oracle.terrainChecks||0;
-        if(oracle.possible)stats.oraclePossibleMemberships++;
+        if(oracle.possible){stats.oraclePossibleMemberships++;observerPhysical++;}
         else if(oracle.known)stats.oracleKnownMissMemberships++;
         else stats.oracleUnknownMemberships++;
         let aligned=false,clear=false;
@@ -96,6 +101,8 @@ test('natural composed matches bound firing-time witness scans and report incide
         else if(!clear)stats.projectileBlockedMemberships++;
         else stats.projectileAlignedMemberships++;
        }
+       evidence.set(observer,{shotAt:this.time,shotId:shooter.id,
+        lane:observerLane,physical:observerPhysical});
       }
       if(witnessed)stats.shotsWithAnyVictimWitness++;
      }
@@ -107,8 +114,18 @@ test('natural composed matches bound firing-time witness scans and report incide
      if(frame%30===0){
       for(const t of g.tanks){
        if(!t||!t.ai||t.alive===false)continue;
-       if(t.ai.__v181Mode==='crossfire')stats.crossfireSamples++;
        const a=t.ai,at=a.__v181ObservedShotAt;
+       if(a.__v181Mode==='crossfire'){
+        stats.crossfireSamples++;
+        const e=evidence.get(t);
+        if(e&&e.shotId===a.__v181ObservedShotId&&
+           Number.isFinite(at)&&Math.abs(e.shotAt-at)<1e-8){
+         if(e.lane)stats.crossfireWithLaneEvidence++;
+         else stats.crossfireWithoutLaneEvidence++;
+         if(e.physical)stats.crossfireWithPhysicalEvidence++;
+         else stats.crossfireWithoutPhysicalEvidence++;
+        }else stats.crossfireUnattributed++;
+       }
        if(!Number.isFinite(at)||g.time-at<0||g.time-at>1.25||
           !Number.isFinite(a.__v181ObservedShotAngle)||
           !Number.isFinite(a.__v181ObservedShotX)||
@@ -148,6 +165,11 @@ test('natural composed matches bound firing-time witness scans and report incide
      stats.eligibleVictimMemberships,
      'the legacy approximate lane census must also partition the same witnessed set (seed '+seed+')'
     );
+    assert.equal(stats.crossfireWithLaneEvidence+stats.crossfireWithoutLaneEvidence+
+      stats.crossfireUnattributed,stats.crossfireSamples,
+     'every crossfire sample must have a recorded evidence provenance or be marked unattributed');
+    assert.equal(stats.crossfireWithPhysicalEvidence+stats.crossfireWithoutPhysicalEvidence+
+      stats.crossfireUnattributed,stats.crossfireSamples);
     assert.ok(stats.oraclePossibleMemberships<=stats.laneOnlyPossibleMemberships,
      'adding terrain occlusion cannot create a projectile lane (seed '+seed+')');
     assert.ok(stats.successfulFireCalls>=0);
