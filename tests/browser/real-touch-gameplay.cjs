@@ -65,6 +65,26 @@ async function run(browser,label,viewport){
   const minimize=page.getByRole('button',{name:'MINIMIZE'});
   await minimize.waitFor({state:'visible',timeout:10000});
   assert.ok((await stickClear()).every(v=>v.canvas),label+': even deliberately opened upgrade tray must not cover either stick');
+  // Record the provenance of actual MINIMIZE clicks. The shipping
+  // evolution-grace overlay also calls button.click() on a 40 ms timer;
+  // that programmatic click is untrusted, unlike a real Playwright tap.
+  // Do not change any UI state or relax the existing strict regression.
+  await page.evaluate(()=>{
+   window.__novaUpgradeClickTrace=[];
+   window.__novaUpgradeTraceListener=e=>{
+    const button=e.target?.closest?.('button[data-ui]');
+    if(!button)return;
+    const label=(button.textContent||'').trim();
+    if(!/^(MINIMIZE|UPGRADE READY)/.test(label))return;
+    const g=window.__novaTouchGame;
+    window.__novaUpgradeClickTrace.push({
+     label, trusted:e.isTrusted,detail:e.detail,at:performance.now(),
+     points:g?.statPoints,level:g?.player?.level,
+     pendingOffer:!!g?.pendingOffer,paused:g?.paused
+    });
+   };
+   document.addEventListener('click',window.__novaUpgradeTraceListener,true);
+  });
   await minimize.tap();
   try{
    await upgradeChip.waitFor({state:'visible',timeout:10000});
@@ -86,7 +106,8 @@ async function run(browser,label,viewport){
       pendingOffer:g?.pendingOffer==null?null:String(g.pendingOffer.tier||g.pendingOffer),playerAlive:g?.player?.alive,
       input:g?.input&&{moveActive:g.input.move?.active,
        aimActive:g.input.aim?.active,firing:g.input.firing},
-      buttons,upgradeTray:!!document.querySelector('[data-nova-upgrade-tray]')};
+      buttons,upgradeTray:!!document.querySelector('[data-nova-upgrade-tray]'),
+      upgradeClickTrace:window.__novaUpgradeClickTrace||[]};
     });
    }catch(diagnosticError){state={diagnosticError:String(diagnosticError)};}
    try{
@@ -95,6 +116,12 @@ async function run(browser,label,viewport){
    }catch(_){}
    throw new Error(label+': second upgrade chip absent after MINIMIZE; state='+JSON.stringify(state),{cause:error});
   }
+  await page.evaluate(()=>{
+   if(window.__novaUpgradeTraceListener){
+    document.removeEventListener('click',window.__novaUpgradeTraceListener,true);
+    window.__novaUpgradeTraceListener=null;
+   }
+  });
   await upgradeChip.tap();
   await minimize.waitFor({state:'visible',timeout:10000});
   const beforeStat=await page.evaluate(()=>window.__novaTouchGame.statPoints);
