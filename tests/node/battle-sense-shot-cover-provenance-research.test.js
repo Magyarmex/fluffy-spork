@@ -159,7 +159,7 @@ test('research causal control: false event-time witness changes composed AI stra
   const [observer,third]=g.tanks.filter(t=>t!==shooter&&t.ai).slice(0,2);
   assert.ok(shooter&&observer&&third);
   g.status='playing';g.paused=false;g.time=10.5;
-  shooter.x=0;shooter.y=0;shooter.cls='twin';
+  shooter.x=0;shooter.y=0;shooter.cls='twin';shooter.spawnShieldT=0;
   observer.x=-200;observer.y=0;observer.hp=observer.maxHp;
   third.x=100;third.y=0;
   g.tanks=[observer,shooter,third];
@@ -172,6 +172,7 @@ test('research causal control: false event-time witness changes composed AI stra
   const a=observer.ai;
   const plan=(victims)=>{
    a.__v1112TargetId=shooter.id;
+   a.__v1112NextThink=10.6; // keep the same fair, visible target for this causal contrast
    a.__v180TargetId=shooter.id;
    a.__v181ObservedShotId=shooter.id;
    a.__v181ObservedShotAt=10;
