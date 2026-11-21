@@ -83,7 +83,7 @@ function scene() {
   Object.assign(observer,{x:-300,y:-300,hp:100,alive:true,spawnShieldT:0});
   Object.assign(rival,{x:-100,y:-300,hp:100,alive:true,spawnShieldT:0});
   g.tanks=[observer,rival];g.tankById=new Map(g.tanks.map(t=>[t.id,t]));
-  g.w=1600;g.h=1200;g.cam={zoom:1};g.hasLineOfSight=()=>true;
+  g.w=800;g.h=600;g.cam={zoom:1};g.hasLineOfSight=()=>true;
   return {g,observer,rival,destination:{x:300,y:-300}};
 }
 function run(name,seed,fn) {
@@ -155,4 +155,13 @@ run('short-lived observer memory never reads private remote assignments',102905,
   const before=t.countToward(s.destination,10.3);
   for (const key of ['none','LOCAL:7','BLOOM:5','MIGRATION:3'])
     {s.rival.ai.__lfEcoKey=key;assert.equal(t.countToward(s.destination,10.3),before);}
+});
+
+run('portrait gameplay viewport cannot infer an offscreen rival rotation',102906,(s,t)=>{
+  s.g.w=390;s.g.h=844;
+  t.sample(s.g,s.observer,[s.rival],10);
+  s.rival.x=-85;t.sample(s.g,s.observer,[s.rival],10.15);
+  s.rival.x=-70;t.sample(s.g,s.observer,[s.rival],10.3);
+  assert.equal(t.countToward(s.destination,10.3),0,
+    '200+ units horizontal separation is not a legal 390px portrait witness');
 });
