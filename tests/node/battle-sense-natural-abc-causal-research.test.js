@@ -13,7 +13,7 @@ function run(seed,arm){
  return withSeed(seed,()=>{
   const g=bootGame();
   const stats={seed,arm,frames:0,shots:0,originalMemberships:0,
-   retainedMemberships:0,snapshotMisses:0,unknownRetained:0,terrainChecks:0,
+   retainedMemberships:0,snapshotMisses:0,unknownRetained:0,futureMotionUnknown:0,terrainChecks:0,
    crossfireBotFrames:0,modeTrace:[],moveTrace:[]};
   try{
    g.sfx.muted=true;g.sfx.startMusic=()=>{};
@@ -57,7 +57,10 @@ function run(seed,arm){
        }
        if(evidence.known&&!evidence.possible){
         retain=false;stats.snapshotMisses++;
-       }else if(!evidence.known)stats.unknownRetained++;
+       }else if(!evidence.known){
+        stats.unknownRetained++;
+        if(evidence.futureMotionUnknown)stats.futureMotionUnknown++;
+       }
       }
       if(retain){count++;stats.retainedMemberships++;if(next)next.add(victim);}
      }
@@ -115,9 +118,9 @@ test('research: natural 49-overlay A/B/C crossfire decisions remain auditable',(
   console.log('NOVA_BATTLE_SENSE_NATURAL_ABC '+JSON.stringify({
    seed,
    arms:[A,B,C].map(({arm,shots,originalMemberships,retainedMemberships,
-    snapshotMisses,unknownRetained,terrainChecks,crossfireBotFrames})=>({
+    snapshotMisses,unknownRetained,futureMotionUnknown,terrainChecks,crossfireBotFrames})=>({
     arm,shots,originalMemberships,retainedMemberships,
-    snapshotMisses,unknownRetained,terrainChecks,crossfireBotFrames})),
+    snapshotMisses,unknownRetained,futureMotionUnknown,terrainChecks,crossfireBotFrames})),
    firstModeAB:firstDifference(A,B),firstModeAC:firstDifference(A,C),
    firstMoveAB:firstTraceDifference(A.moveTrace,B.moveTrace),
    firstMoveAC:firstTraceDifference(A.moveTrace,C.moveTrace),
