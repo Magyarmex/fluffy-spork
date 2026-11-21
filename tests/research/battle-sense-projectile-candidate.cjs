@@ -36,6 +36,7 @@ function projectileCandidate(game,shooter,victim,startIndex=0){
   const lateral2=Math.max(0,dx*dx+dy*dy-projection*projection);
   const entry=Math.max(0,Math.min(maxTravel,
     projection-Math.sqrt(Math.max(0,hitRadius*hitRadius-lateral2))));
+  if(!Number.isFinite(entry)){unsupported++;continue;}
   if(typeof game.firstTerrainHit==='function'){
    terrainChecks++;
    const hit=game.firstTerrainHit(b.x,b.y,b.x+ux*entry,b.y+uy*entry,
