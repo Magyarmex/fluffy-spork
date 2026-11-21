@@ -19,6 +19,9 @@ function arm({wall=false,shotgun=false,vy=0}={}){
  g.__novaFairVisibleTanks=g.tanks;
  g.areHostile=()=>true;g.areAllies=()=>false;
  if(shotgun)g.setClass(shooter,'shotgun');
+ // Isolate the exact fixture geometry from whichever random arena boot selected.
+ g.__novaTerrain=[];
+ delete g.__novaBattlefieldIndex;delete g.__novaPerfTerrainIndex;
  if(wall){
   g.__novaTerrain=[{id:-9003,kind:'terrain',shape:'rect',type:'wall',
    x:50,y:0,w:20,h:36,solid:true,destructible:false,hp:0}];
