@@ -66,6 +66,12 @@ function gameplayViewportFilter(g,observer){
 }
 function hasSpotterRelay(g,classes,observer,target){
   if(!g||!observer||!target||!isSniper(classes,observer))return false;
+  /* The canonical Spotter relay checks target.hp before its stored-contact ID.
+   * A remote candidate not actually tracked by this observer must never reach
+   * that query. ID/expiry only prefilter; live cone, drone and terrain remain
+   * authoritative in the Spotter owner below. */
+  var now=Number(g.time),until=Number(observer.__novaSpotterContactUntil);
+  if(observer.__novaSpotterContactId!==target.id||!Number.isFinite(now)||!(until>now))return false;
   /* A stored ID is not live sight: AI runs before the drone scan and can
    * otherwise consume the previous frame's remote coordinates. The Spotter
    * owner checks the actual active Observer, current cone and terrain LoS. */
