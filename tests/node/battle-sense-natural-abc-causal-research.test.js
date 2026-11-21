@@ -2,6 +2,8 @@
 // RESEARCH ONLY: A/B/C natural-match causal probe of event-time crossfire.
 // A = existing observer-owned hull cone; B = emitted lanes; C = emitted lanes
 // plus terrain. Unknown lanes remain eligible: never silently erase a threat.
+// Both projectile arms preserve future-motion uncertainty: a currently
+// stationary target may accelerate into a shot after its birth.
 // Exact shipping 49-overlay Game. NOT a balance win-rate or Android benchmark.
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const test=require('node:test'),assert=require('node:assert/strict');
@@ -49,7 +51,7 @@ function run(seed,arm){
        let evidence=physicalByVictim.get(victim);
        if(!evidence){
         evidence=projectileCandidate(this,shooter,victim,before,
-         {terrain:arm==='C'});
+         {terrain:arm==='C',conservativeMotion:true});
         physicalByVictim.set(victim,evidence);
         stats.terrainChecks+=evidence.terrainChecks||0;
        }
