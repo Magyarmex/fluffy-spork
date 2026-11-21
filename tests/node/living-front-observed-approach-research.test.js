@@ -292,13 +292,15 @@ run('loss of viewport or terrain authority revokes previously valid evidence',10
   assert.equal(t.countToward(s.destination,11.35),0);
   establish(12);
   const badViewport={...s.g,__testFair:{
-    ...s.g.__testFair,viewportHalfExtents:()=>({x:0,y:0})
+    inGameplayViewport:s.g.__testFair.inGameplayViewport,
+    viewportHalfExtents:()=>({x:0,y:0})
   }};
   t.sample(badViewport,s.observer,[s.rival],12.35);
   assert.equal(t.countToward(s.destination,12.35),0);
   establish(13);
   const infiniteViewport={...s.g,__testFair:{
-    ...s.g.__testFair,viewportHalfExtents:()=>({x:Infinity,y:300})
+    inGameplayViewport:s.g.__testFair.inGameplayViewport,
+    viewportHalfExtents:()=>({x:Infinity,y:300})
   }};
   t.sample(infiniteViewport,s.observer,[s.rival],13.35);
   assert.equal(t.countToward(s.destination,13.35),0,
