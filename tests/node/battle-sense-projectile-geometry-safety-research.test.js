@@ -98,12 +98,18 @@ test('research projectile provenance: a blocked first pellet cannot suppress a l
 test('research projectile provenance: cover plus penetration is unknown until real impact resolution',()=>{
  const bullet={ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3,pen:3};
  const covered=projectileCandidate({
-  bullets:[bullet],firstTerrainHit(){return {solid:true,destructible:true,hp:10};}
+  bullets:[bullet],firstTerrainHit(){return {solid:{destructible:true,hp:10}};}
  },shooter,victim);
  assert.equal(covered.possible,false);
  assert.equal(covered.known,false,'penetration may breach destructible cover');
  assert.equal(covered.unsupported,1);
  assert.equal(covered.terrainChecks,1);
+ const permanent=projectileCandidate({
+  bullets:[bullet],firstTerrainHit(){return {solid:{destructible:false}};}
+ },shooter,victim);
+ assert.equal(permanent.known,true,'permanent wall is a known veto');
+ assert.equal(permanent.possible,false);
+ assert.equal(permanent.unsupported,0);
  const clear=projectileCandidate({
   bullets:[bullet],firstTerrainHit(){return null;}
  },shooter,victim);
