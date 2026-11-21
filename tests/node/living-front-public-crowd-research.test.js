@@ -322,6 +322,7 @@ test('research public crowd cannot read offscreen private health or AI',()=>{
         get hp(){throw Error('hidden HP must not be inspected');}};
       s.g.tanks.push(hidden);
       assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
+      s.g.tanks.pop(); // Do not expose the artificial poison object to teardown.
     } finally {s.g.destroy();}
   });
 });
