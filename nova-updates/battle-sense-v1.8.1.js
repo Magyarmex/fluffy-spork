@@ -46,8 +46,9 @@ function witnessedDuel(g,observer,target,third){
  /* Event-time public witness set: later movement cannot rewrite a shot's intent.
   * Trusted origin and bearing remain mandatory even for cached candidates. */
  if(a.__v181ObservedShotVictims===null)return false;
- if(a.__v181ObservedShotVictims&&typeof a.__v181ObservedShotVictims.has==='function')return a.__v181ObservedShotVictims.has(victim);
  if(Array.isArray(a.__v181ObservedShotVictims))return a.__v181ObservedShotVictims.indexOf(victim)!==-1;
+ /* A lookalike object with a forged .has method is not a real event-time witness. */
+ if(a.__v181ObservedShotVictims){try{return WeakSet.prototype.has.call(a.__v181ObservedShotVictims,victim);}catch(_){return false;}}
  /* A missing/malformed event-time set is not permission to reconstruct
   * historical intent from a victim's later position. Fail closed. */
  return false;
