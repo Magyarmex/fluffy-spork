@@ -75,7 +75,7 @@ async function run(browser,label,viewport){
     const button=e.target?.closest?.('button[data-ui]');
     if(!button)return;
     const label=(button.textContent||'').trim();
-    if(!/^(MINIMIZE|UPGRADE READY)/.test(label))return;
+    if(!/MINIMIZE|UPGRADE READY/.test(label))return;
     const g=window.__novaTouchGame;
     window.__novaUpgradeClickTrace.push({
      label, trusted:e.isTrusted,detail:e.detail,at:performance.now(),
@@ -91,7 +91,7 @@ async function run(browser,label,viewport){
     const g=window.__novaTouchGame;
     const labels=[...document.querySelectorAll('button[data-ui]')]
      .map(b=>(b.textContent||'').trim())
-     .filter(v=>/^(MINIMIZE|UPGRADE READY)/.test(v));
+     .filter(v=>/MINIMIZE|UPGRADE READY/.test(v));
     window.__novaUpgradeRenderTrace.push({
      at:performance.now(),labels,points:g?.statPoints,
      pendingOffer:!!g?.pendingOffer,status:g?.status
