@@ -26,12 +26,19 @@ function projectileCandidate(game,shooter,victim,startIndex=0){
   const ux=b.vx/speed,uy=b.vy/speed;
   const dx=victim.x-b.x,dy=victim.y-b.y;
   const maxTravel=speed*b.ttl;
-  const along=Math.max(0,Math.min(maxTravel,dx*ux+dy*uy));
+  const projection=dx*ux+dy*uy;
+  const along=Math.max(0,Math.min(maxTravel,projection));
   const miss=Math.hypot(dx-ux*along,dy-uy*along);
-  if(miss>hull+radius)continue;
+  const hitRadius=hull+radius;
+  if(miss>hitRadius)continue;
+  // Test cover only up to the tank's first possible swept contact,
+  // not its center: a wall behind the near hull face is not a veto.
+  const lateral2=Math.max(0,dx*dx+dy*dy-projection*projection);
+  const entry=Math.max(0,Math.min(maxTravel,
+    projection-Math.sqrt(Math.max(0,hitRadius*hitRadius-lateral2))));
   if(typeof game.firstTerrainHit==='function'){
    terrainChecks++;
-   const hit=game.firstTerrainHit(b.x,b.y,b.x+ux*along,b.y+uy*along,
+   const hit=game.firstTerrainHit(b.x,b.y,b.x+ux*entry,b.y+uy*entry,
       radius*.45);
    if(hit){
     // The shipping Battlefield can let penetrating rounds breach cover.
