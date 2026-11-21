@@ -391,6 +391,7 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
        this.addParticles(t.x,t.y,'#b06bff',16,120,'glow');
        this.addRing(t.x,t.y,'#b06bff',40);
        this.addText(t.x,t.y-30,'PHASE SHIFT!','#c9a0ff',15);
+       t.__novaPhaseShiftEpoch=this.time;
        t.__novaSweepMoveTime=this.time;
        t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
        return;
@@ -398,6 +399,7 @@ wrap('game/engine',function(engine,require){var Game=engine.Game;if(!Game||Game.
    }
    var out=oldAbility.apply(this,arguments);
    if(phase&&(t.x!==ox||t.y!==oy)){
+     t.__novaPhaseShiftEpoch=this.time;
      t.__novaSweepMoveTime=this.time;
      t.__novaSweepPrevX=t.x;t.__novaSweepPrevY=t.y;
    }
@@ -1985,10 +1987,117 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   if(!(dt>0&&dt<=.05)||!Number.isFinite(dt))return false;
   var bullets=g.bullets||[],tanks=g.tanks||[],
       shapes=g.shapes||[],drones=g.drones||[];
-  if(bullets.length!==2||
+  if((bullets.length!==2&&bullets.length!==3)||
      tanks.length+shapes.length+drones.length>ISOLATED_RECOVERY_SCAN_CAP||
      g.__novaWallProofHadShell)return false;
-  var a=bullets[0],b=bullets[1];
+  var a=bullets[0],b=bullets[1],remote=null;
+  if(bullets.length===3){
+   var pair=bullets.filter(function(x){return x&&!x.dead&&x.pen===1;});
+   if(pair.length!==2)return false;
+   a=pair[0];b=pair[1];
+   remote=bullets.filter(function(x){return x!==a&&x!==b;})[0];
+   /* A third projectile between the pair can run between their damage
+    * callbacks in the reverse-iteration core. A callback may create a new
+    * body or change cover, so spatial separation at frame start alone is
+    * not proof that swapping the pair leaves that middle shot untouched. */
+   if(bullets[1]===remote)return false;
+   if(!remote||remote.dead||remote.pen!==0||
+      !certifiedTTLFrameStart(g,remote)||
+      remote.shell||remote.beam||remote.splash||remote.__v17Cannon||
+      (remote.hits!=null&&!Number.isFinite(remote.hits))||
+      (remote.knock!=null&&!Number.isFinite(remote.knock))||
+      (remote.hits||0)!==0||(remote.knock||0)!==0||
+      !Number.isFinite(remote.dmg)||!(remote.dmg>0)||
+      !Number.isFinite(remote.ttl)||!(remote.ttl>dt)||
+      !Number.isFinite(remote.x)||
+      !Number.isFinite(remote.y)||!Number.isFinite(remote.vx)||
+      !Number.isFinite(remote.vy)||!Number.isFinite(remote.r)||
+      !(remote.r>0))return false;
+   var rx=remote.x+remote.vx*dt,ry=remote.y+remote.vy*dt;
+   if(!Number.isFinite(rx)||!Number.isFinite(ry)||
+      firstSolidHit(g,remote.x,remote.y,rx,ry,remote.r*.45))
+    return false;
+   function separate(other,pad){
+    var ox=other.x+other.vx*dt,oy=other.y+other.vy*dt;
+    return Math.max(remote.x,rx)+pad<Math.min(other.x,ox)||
+     Math.max(other.x,ox)+pad<Math.min(remote.x,rx)||
+     Math.max(remote.y,ry)+pad<Math.min(other.y,oy)||
+     Math.max(other.y,oy)+pad<Math.min(remote.y,ry);
+   }
+   if(!separate(a,remote.r+a.r+2)||
+      !separate(b,remote.r+b.r+2))return false;
+   /* Abstain if the third shot can contact ANY body this frame.
+    * This makes array-order changes independent of its side effects. */
+   var entities=tanks.concat(shapes,drones);
+   for(var ri=0;ri<entities.length;ri++){
+    var e=entities[ri];if(!e)continue;
+    /* Match core collision eligibility by kind. A contradictory dead/HP
+     * flag cannot make a still-collidable body disappear from the proof. */
+    if(e.kind==='tank'){
+     if(e.alive===false)continue;
+     if(e.dead===true||(e.hp!=null&&!(e.hp>0)))return false;
+    }else if(e.kind==='shape'){
+     if(e.dead===true||e.alive===false||
+        (e.hp!=null&&!(e.hp>0)))return false;
+    }else if(e.kind==='drone'){
+     if(!(e.hp>0))continue;
+     if(e.dead===true||e.alive===false)return false;
+    }else return false;
+    /* Core tank/drone collision radii include class padding; an
+     * optional tank r field is not authoritative for body contacts. */
+    if(e.kind==='tank'&&e.r!=null&&
+       (!(e.r>0)||!Number.isFinite(e.r)))return false;
+    var er=e.kind==='tank'?
+       (CLASSES[e.cls]&&CLASSES[e.cls].size+3):
+       e.kind==='drone'?e.r+1:e.r;
+    if(!(er>0)||!Number.isFinite(er)||!Number.isFinite(e.x)||
+       !Number.isFinite(e.y)||
+       (e.vx!=null&&!Number.isFinite(e.vx))||
+       (e.vy!=null&&!Number.isFinite(e.vy)))return false;
+    /* Live Vector drone motion is integrated through separate channels.
+     * Until those channels have a trustworthy frame corridor, abstain. */
+    if(e.kind==='tank'&&e.__novaPhaseShiftEpoch===g.time)return false;
+    /* A zero current velocity is not a stationary witness: terrain,
+     * knockback or ability movement may already have displaced this hull. */
+    if(e.kind==='tank'&&e.__novaSweepMoveTime===g.time&&
+       (!Number.isFinite(e.__novaSweepPrevX)||
+        !Number.isFinite(e.__novaSweepPrevY)||
+        e.__novaSweepPrevX!==e.x||e.__novaSweepPrevY!==e.y))return false;
+    /* Full Game.update snapshots every pre-existing shape and drone.
+     * Missing epoch/pose means a body may have been created during this
+     * frame, after the remote projectile's independence was assumed. */
+    if(e.kind==='shape'&&
+       (g.__novaShapeSweepActive!==true||
+       (e.__novaShapeSweepEpoch!==g.__novaShapeSweepEpoch||
+        !Number.isFinite(e.__novaShapeSweepPrevX)||
+        !Number.isFinite(e.__novaShapeSweepPrevY)||
+        e.__novaShapeSweepPrevX!==e.x||
+        e.__novaShapeSweepPrevY!==e.y)))return false;
+    if(e.kind==='drone'&&
+       (g.__novaShapeSweepActive!==true||
+       (e.__novaChronoDroneEpoch!==g.__novaShapeSweepEpoch||
+        !Number.isFinite(e.__novaChronoDronePrevX)||
+        !Number.isFinite(e.__novaChronoDronePrevY)||
+        e.__novaChronoDronePrevX!==e.x||
+        e.__novaChronoDronePrevY!==e.y)))return false;
+    if(e.kind==='drone'&&(e.__lvVX!=null||e.__lvVY!=null||
+       e.__novaVX!=null||e.__novaVY!=null||
+       e.__novaIdleVX!=null||e.__novaIdleVY!=null||
+       e.__novaPhase==='dash'||e.__novaCommitted))return false;
+    /* Missing velocity is allowed for stationary shapes; malformed
+     * velocity must never silently become zero via `|| 0`. */
+    /* A velocity estimate is not a witnessed movement corridor. Until
+     * movement history is certified per kind, refuse moving third-party
+     * bodies instead of granting clearance from a guessed distance. */
+    if((e.vx!=null&&e.vx!==0)||(e.vy!=null&&e.vy!==0))return false;
+    var motion=96;
+    if(!(Math.max(remote.x,rx)+remote.r+er+motion<e.x||
+       Math.min(remote.x,rx)-remote.r-er-motion>e.x||
+       Math.max(remote.y,ry)+remote.r+er+motion<e.y||
+       Math.min(remote.y,ry)-remote.r-er-motion>e.y))
+     return false;
+   }
+  }
   if(!a||!b||!certifiedTTLFrameStart(g,a)||
      !certifiedTTLFrameStart(g,b)||
      a.dead||b.dead||a.shell||b.shell||a.beam||b.beam||
@@ -2026,10 +2135,10 @@ var oldEntityBullets=Game.prototype.updateBullets;Game.prototype.updateBullets=f
   if(!(at>0&&bt>0&&Math.abs(at-bt)>1e-7))return false;
   var first=at<bt?a:b,second=at<bt?b:a;
   if(!(target.hp>first.dmg*2))return false;
-  if(bullets[1]!==first){
-   var priorOrder=[bullets[0],bullets[1]];
-   bullets[0]=second;bullets[1]=first;
-   return priorOrder;
+  if(bullets.indexOf(first)<bullets.indexOf(second)){
+   var fi=bullets.indexOf(first),si=bullets.indexOf(second);
+   bullets[fi]=second;bullets[si]=first;
+   return {first:first,second:second};
   }
   return false;
  }
@@ -3786,11 +3895,15 @@ function certifiedMultiShotCoverPriority(g,dt){
   /* Restore only the two original live bullets, if both survived.
    * This frame's physical callback order must not permanently change
    * their presentation or later collision enumeration order. */
-  if(restoreLivePairOrder&&this.bullets.length===2&&
-     this.bullets.indexOf(restoreLivePairOrder[0])>=0&&
-     this.bullets.indexOf(restoreLivePairOrder[1])>=0){
-   this.bullets[0]=restoreLivePairOrder[0];
-   this.bullets[1]=restoreLivePairOrder[1];
+  if(restoreLivePairOrder){
+   var liveFirst=this.bullets.indexOf(restoreLivePairOrder.first),
+       liveSecond=this.bullets.indexOf(restoreLivePairOrder.second);
+   /* Revert only the surviving pair's relative order, even if another
+    * legitimate callback removed or appended an unrelated projectile. */
+   if(liveFirst>=0&&liveSecond>=0&&liveFirst>liveSecond){
+    this.bullets[liveFirst]=restoreLivePairOrder.second;
+    this.bullets[liveSecond]=restoreLivePairOrder.first;
+   }
   }
   for(var ci=0;ci<ttlChildren.length;ci++){var saved=ttlChildren[ci];saved.child.vx=saved.vx;saved.child.vy=saved.vy;}}for(var j=0;j<terrain.length;j++){var q=terrain[j];if(q.flash>0)q.flash=Math.max(0,q.flash-dt);}return out;};
 
