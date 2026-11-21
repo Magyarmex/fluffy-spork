@@ -1,6 +1,6 @@
 'use strict';
 // RESEARCH ONLY. A sufficient (not necessary) miss certificate for a linear
-// projectile against a hull starting at rest with bounded control magnitude.
+// projectile against a hull with finite initial velocity and bounded control magnitude.
 // Matches base Game.moveTank's discrete f=min(1,dt*9) smoothing; NOT valid
 // for dash, knockback, teleports, variable frame steps, speed boosts, terrain
 // ricochets, homing, AoE or any unbounded external displacement.
@@ -13,7 +13,7 @@ function reachabilityMiss(bullet,victim,options={}){
   !Number.isFinite(speedLimit)||speedLimit<0||
   !Number.isFinite(hullRadius)||hullRadius<=0||
   !Number.isFinite(victim.x)||!Number.isFinite(victim.y)||
-  victim.vx!==0||victim.vy!==0||
+  !Number.isFinite(victim.vx)||!Number.isFinite(victim.vy)||
   !Number.isFinite(bullet.x)||!Number.isFinite(bullet.y)||
   !Number.isFinite(bullet.vx)||!Number.isFinite(bullet.vy)||
   !Number.isFinite(bullet.ttl)||bullet.ttl<=0||
@@ -28,7 +28,8 @@ function reachabilityMiss(bullet,victim,options={}){
  const dx=victim.x-bullet.x,dy=victim.y-bullet.y;
  const projection=dx*ux+dy*uy;
  if(!Number.isFinite(projection))return {known:false,reason:'geometry'};
- let velocityBound=0,displacementBound=0;
+ let velocityBound=Math.hypot(victim.vx,victim.vy),displacementBound=0;
+ if(!Number.isFinite(velocityBound))return {known:false,reason:'motion'};
  for(let n=1;n<=frames;n++){
   const segmentStart=bulletSpeed*(n-1)*dt;
   const segmentEnd=Math.min(bulletSpeed*bullet.ttl,bulletSpeed*n*dt);
@@ -36,7 +37,8 @@ function reachabilityMiss(bullet,victim,options={}){
   const miss=Math.hypot(dx-ux*along,dy-uy*along);
   // For a bounded control vector, each component of velocity is a convex
   // combination of the previous velocity and legal input. The scalar
-  // recurrence upper-bounds displacement in any direction from rest.
+  // recurrence upper-bounds displacement in any direction from the
+  // finite initial velocity (including a moving target).
   velocityBound+=(speedLimit-velocityBound)*f;
   displacementBound+=velocityBound*dt;
   if(!Number.isFinite(miss)||!Number.isFinite(displacementBound))
