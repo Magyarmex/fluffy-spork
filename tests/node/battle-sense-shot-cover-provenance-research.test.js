@@ -5,6 +5,7 @@
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+const {projectileCandidate}=require('../research/battle-sense-projectile-candidate.cjs');
 function unit(id,x,y,ai){return {id,x,y,alive:true,hp:100,maxHp:100,cls:'twin',ai};}
 function fireScenario(blockShotLane){
  const g=bootGame();
@@ -90,6 +91,10 @@ test('research characterization: real Battlefield wall blocks shot lane but not 
   g.shapes=[];g.drones=[];g.powerups=[];
   if(g.hash?.clear){g.hash.clear();for(const t of g.tanks)g.hash.insert(t);}
   const born=g.bullets.slice(before),hpBefore=victim.hp;
+  const blockedProvenance=projectileCandidate(g,shooter,victim,before);
+  assert.equal(blockedProvenance.known,true,'real permanent wall is a known physical veto');
+  assert.equal(blockedProvenance.possible,false,
+   'research projectile oracle must reject the same blocked shot');
   g.updateBullets(.2);
   assert.equal(victim.hp,hpBefore,'the real permanent wall must prevent victim HP contact');
   assert.ok(born.every(b=>b.dead||!g.bullets.includes(b)||b.x<=wall.x-wall.w/2+2),
@@ -108,6 +113,10 @@ test('research characterization: real Battlefield wall blocks shot lane but not 
   if(g.hash?.clear){g.hash.clear();for(const t of g.tanks)g.hash.insert(t);}
   g.tryFire(shooter);
   const clearShot=g.bullets.find(b=>b.ownerId===shooter.id&&b.vx>1);
+  const clearProvenance=projectileCandidate(g,shooter,victim,0);
+  assert.equal(clearProvenance.known,true,'clear real projectile must be classifiable');
+  assert.equal(clearProvenance.possible,true,
+   'research projectile oracle must accept the real unblocked corridor');
   assert.ok(clearShot,'unblocked control must emit a forward projectile');
   const travel=(victim.x-clearShot.x)/clearShot.vx;
   assert.ok(travel>0&&travel<clearShot.ttl,
