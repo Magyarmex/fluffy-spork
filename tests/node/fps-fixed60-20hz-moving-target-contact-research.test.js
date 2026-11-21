@@ -10,7 +10,7 @@ const {bootGame,withSeed,digest,physical}=
 const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
 const {FixedStepRafOwner}=require('../research/fixed-step-raf-owner.cjs');
 const STEP=1/60,TICKS=240,PERIOD=1.37,AMP=26,PHASE=.19;
-function run(cls,seed,schedule){
+function run(cls,seed,schedule,policy){
  return withSeed(seed,draws=>{
   const g=bootGame(),p=g.player;
   g.sfx.muted=true;g.sfx.startMusic=()=>{};
@@ -68,6 +68,13 @@ function run(cls,seed,schedule){
    }
    return out;
   };
+  // Burst state is sampled at canonical simulation ticks, not at RAF boundaries.
+  // Browser event timing is covered by separate touch tests.
+  const originalUpdate=g.update;let inputTick=0;
+  g.update=function(dt){
+   this.input.firing=policy==='held'||inputTick%75<60;
+   inputTick++;return originalUpdate.apply(this,arguments);
+  };
   let owner=null,callback=null,now=1000;
   try{
    if(schedule!=='native'){
@@ -96,6 +103,7 @@ function run(cls,seed,schedule){
     assert.equal(owner.droppedMs,0,'healthy 20Hz must not discard time');
     assert.equal(owner.droppedFrames,0);
    }
+   assert.equal(inputTick,TICKS);
    assert.equal(updates,TICKS);
    assert.ok(volleys>0&&hits>0&&damage>0,'real moving-target damage required');
    assert.ok(assistVetoes>0,'manual aim must not silently track target');
@@ -108,12 +116,14 @@ function run(cls,seed,schedule){
   }finally{if(owner)owner.stop();g.destroy();}
  });
 }
-test('bounded 20Hz uniform and 95/5ms RAF preserve moving-target Gunner collision chronology',()=>{
+test('bounded 20Hz uniform and 95/5ms RAF preserve moving-target Gunner held/burst chronology',()=>{
  for(const cls of ['minigun','needlestorm'])
   for(const seed of [1517800,1517802]){
-   const native=run(cls,seed,'native');
-   for(const schedule of ['uniform20','bursty20'])
-    assert.deepEqual(run(cls,seed,schedule),native,
-     cls+' seed='+seed+' schedule='+schedule);
+   for(const policy of ['held','1s-on-250ms-off']){
+    const native=run(cls,seed,'native',policy);
+    for(const schedule of ['uniform20','bursty20'])
+     assert.deepEqual(run(cls,seed,schedule,policy),native,
+      cls+' seed='+seed+' policy='+policy+' schedule='+schedule);
+   }
   }
 });
