@@ -50,3 +50,45 @@ test('research characterization: shooter-to-victim wall is absent from event-tim
    'candidate never checks shooter-to-victim physical reachability at shot birth');
  }finally{clear.g.destroy();blocked.g.destroy();}
 });
+
+test('research characterization: real Battlefield wall blocks shot lane but not observer contacts',()=>{
+ const g=bootGame();
+ try{
+  const shooter=g.player,observer=g.tanks.find(t=>t!==shooter&&t.ai);
+  assert.ok(shooter&&observer);
+  const victim=unit(9003,100,0,{});
+  g.time=10;g.status='playing';g.paused=false;
+  shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
+  observer.x=0;observer.y=100;
+  g.tanks=[observer,shooter,victim];
+  g.__novaFairVisibleTanks=g.tanks;
+  g.__novaFairShotWitnesses=g.tanks;
+  g.areHostile=()=>true;g.areAllies=()=>false;
+  // Real Battlefield rect: shot travels through x=50,y=0; the
+  // observer-to-victim diagonal crosses x=50,y=50 above the wall.
+  const wall={id:-9003,kind:'terrain',shape:'rect',type:'wall',
+   x:50,y:0,w:20,h:36,solid:true,destructible:false,hp:0};
+  g.__novaTerrain=[wall];
+  delete g.__novaBattlefieldIndex;
+  delete g.__novaPerfTerrainIndex;
+  assert.equal(g.hasLineOfSight(shooter.x,shooter.y,victim.x,victim.y,2),false,
+   'actual Battlefield geometry must occlude the shot corridor');
+  assert.equal(g.hasLineOfSight(observer.x,observer.y,shooter.x,shooter.y,2),true);
+  assert.equal(g.hasLineOfSight(observer.x,observer.y,victim.x,victim.y,2),true,
+   'the observer legitimately sees both combatants around the wall');
+  assert.ok(g.firstTerrainHit(0,0,100,0,2),
+   'physical swept projectile segment must intersect the same permanent wall');
+  const before=g.bullets.length;
+  g.tryFire(shooter);
+  assert.ok(g.bullets.length>before,'composed Game must emit a real projectile');
+  assert.equal(observer.ai.__v181ObservedShotVictims?.has(victim),true,
+   'KNOWN CANDIDATE DEFECT: event-time witness ignores physical shot obstruction');
+  wall.solid=false;
+  assert.equal(g.hasLineOfSight(0,0,100,0,2),true,
+   'removing cover should make the current corridor clear');
+  g.time=10.5;
+  assert.equal(g.__testWindow.__NOVA_BATTLE_SENSE_TEST__
+   .thirdPartyVector(g,observer,shooter,{}).weight,.62,
+   'KNOWN CANDIDATE DEFECT: a historically obstructed shot creates later crossfire');
+ }finally{g.destroy();}
+});
