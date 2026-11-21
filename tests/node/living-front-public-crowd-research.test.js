@@ -13,19 +13,14 @@ function physicalCrowd(g, observer, destination, options = {}) {
   const radius = options.radius ?? 300;
   const maxCount = options.maxCount ?? 4;
   const F = g.__testFair;
-  const zoom = Math.max(.1, Number(g.cam && g.cam.zoom) || 1);
-  const halfX = (Number(g.w) || 800) / (2 * zoom);
-  const halfY = (Number(g.h) || 600) / (2 * zoom);
+  if (!F || typeof F.inGameplayViewport !== 'function') return 0;
   let count = 0;
   for (const q of g.tanks || []) {
     if (!q || q === observer || q.id === observer.id ||
         !Number.isFinite(q.x) || !Number.isFinite(q.y)) continue;
     // The candidate deliberately does not inspect __lfEcoKey, private target
     // IDs, unseen world sectors, or the target's actual planned destination.
-    const seen = F && typeof F.inGameplayViewport === 'function'
-      ? F.inGameplayViewport(g, observer, q)
-      : Math.abs(q.x - observer.x) <= halfX &&
-        Math.abs(q.y - observer.y) <= halfY;
+    const seen = F.inGameplayViewport(g, observer, q);
     if (!seen) continue;
     // Cheap public geometry first: do not spend a terrain ray on a visible
     // bot that is nowhere near the public opportunity.
@@ -335,6 +330,19 @@ test('research public crowd fails closed without authoritative terrain LOS',()=>
       s.others[0].x=s.center.x;s.others[0].y=s.center.y;
       assert.equal(physicalCrowd(s.g,s.observer,s.center),1);
       s.g.hasLineOfSight=null;
+      assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
+    } finally {s.g.destroy();}
+  });
+});
+
+test('research public crowd requires Fair Engagement viewport authority',()=>{
+  withSeed(1517812,()=>{
+    const s=scene();
+    try {
+      s.g.w=2400;s.g.h=1200;s.g.cam={zoom:1};
+      s.others[0].x=s.center.x;s.others[0].y=s.center.y;
+      assert.equal(physicalCrowd(s.g,s.observer,s.center),1);
+      s.g.__testFair=null;
       assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
     } finally {s.g.destroy();}
   });
