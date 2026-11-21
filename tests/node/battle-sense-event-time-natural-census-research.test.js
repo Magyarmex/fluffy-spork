@@ -121,6 +121,18 @@ test('natural composed matches bound firing-time witness scans and report incide
      }
     }
     assert.equal(stats.frames,720);
+    assert.equal(
+     stats.oraclePossibleMemberships+stats.oracleKnownMissMemberships+
+      stats.oracleUnknownMemberships,
+     stats.eligibleVictimMemberships,
+     'every event-time witnessed victim must be accounted for by exactly one physical-plausibility category (seed '+seed+')'
+    );
+    assert.equal(
+     stats.projectileAlignedMemberships+stats.projectileBlockedMemberships+
+      stats.noProjectileLaneMemberships,
+     stats.eligibleVictimMemberships,
+     'the legacy approximate lane census must also partition the same witnessed set (seed '+seed+')'
+    );
     assert.ok(stats.successfulFireCalls>=0);
     assert.ok(stats.fireLOSCalls>=0);
     console.log('NOVA_EVENT_TIME_WITNESS_NATURAL_RESEARCH '+JSON.stringify(stats));
