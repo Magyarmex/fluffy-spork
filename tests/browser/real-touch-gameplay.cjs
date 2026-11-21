@@ -66,12 +66,77 @@ async function run(browser,label,viewport){
   await minimize.waitFor({state:'visible',timeout:10000});
   assert.ok((await stickClear()).every(v=>v.canvas),label+': even deliberately opened upgrade tray must not cover either stick');
   await minimize.tap();
-  await upgradeChip.waitFor({state:'visible',timeout:10000});
+  try{
+   await upgradeChip.waitFor({state:'visible',timeout:10000});
+  }catch(error){
+   // Preserve the strict touch regression gate. On an intermittent failure,
+   // capture the actual UI/game state rather than guessing whether XP,
+   // evolution, input ownership or a delayed tray collapse caused it.
+   let state;
+   try{
+    state=await page.evaluate(()=>{
+     const g=window.__novaTouchGame;
+     const buttons=[...document.querySelectorAll('button[data-ui]')]
+      .filter(b=>/UPGRADE READY|MINIMIZE|UPGRADES/.test(b.textContent||''))
+      .map(b=>({text:(b.textContent||'').trim().slice(0,80),
+       visible:!!(b.getClientRects().length&&getComputedStyle(b).visibility!=='hidden'),
+       disabled:b.disabled,html:b.outerHTML.slice(0,240)}));
+     return {status:g?.status,paused:g?.paused,documentHidden:document.hidden,time:g?.time,
+      statPoints:g?.statPoints,level:g?.player?.level,
+      pendingOffer:g?.pendingOffer==null?null:String(g.pendingOffer.tier||g.pendingOffer),playerAlive:g?.player?.alive,
+      input:g?.input&&{moveActive:g.input.move?.active,
+       aimActive:g.input.aim?.active,firing:g.input.firing},
+      buttons,upgradeTray:!!document.querySelector('[data-nova-upgrade-tray]')};
+    });
+   }catch(diagnosticError){state={diagnosticError:String(diagnosticError)};}
+   try{
+    fs.mkdirSync(path.join('artifacts','browser'),{recursive:true});
+    await page.screenshot({path:path.join('artifacts','browser',label+'-upgrade-reopen-failure.png')});
+   }catch(_){}
+   throw new Error(label+': second upgrade chip absent after MINIMIZE; state='+JSON.stringify(state),{cause:error});
+  }
   await upgradeChip.tap();
   await minimize.waitFor({state:'visible',timeout:10000});
   const beforeStat=await page.evaluate(()=>window.__novaTouchGame.statPoints);
-  await page.locator('[data-nova-upgrade-tray] .stat-btn').first().tap();
-  assert.equal(await page.evaluate(()=>window.__novaTouchGame.statPoints),beforeStat-1,label+': touch upgrade spends exactly one earned point');
+  const firstStat=page.locator('[data-nova-upgrade-tray] .stat-btn').first();
+  const beforeUpgrade=await page.evaluate(()=>{
+   const g=window.__novaTouchGame;
+   return {paused:g.paused,documentHidden:document.hidden,statPoints:g.statPoints,level:g.player?.level,
+    damage:g.player?.stats?.damage,pendingOffer:g.pendingOffer};
+  });
+  await page.evaluate(()=>{
+   const Game=window.__novaMakeRequire('')('game/engine').Game;
+   const original=Game.prototype.upgradeStat;
+   window.__novaUpgradeCalls=[];
+   Game.prototype.upgradeStat=function(key){
+    const before={key,observedGame:this===window.__novaTouchGame,
+     paused:this.paused,points:this.statPoints,stat:this.player?.stats?.[key]};
+    try{return original.apply(this,arguments);}
+    finally{window.__novaUpgradeCalls.push({...before,
+     afterPoints:this.statPoints,afterStat:this.player?.stats?.[key]});}
+   };
+   window.__novaRestoreUpgrade=()=>{Game.prototype.upgradeStat=original;};
+  });
+  try{await firstStat.tap();}
+  finally{await page.evaluate(()=>window.__novaRestoreUpgrade?.());}
+  const afterStat=await page.evaluate(()=>window.__novaTouchGame.statPoints);
+  if(afterStat!==beforeStat-1){
+   const afterUpgrade=await page.evaluate(()=>{
+    const g=window.__novaTouchGame;
+    const el=document.querySelector('[data-nova-upgrade-tray] .stat-btn');
+    return {paused:g.paused,documentHidden:document.hidden,statPoints:g.statPoints,level:g.player?.level,
+     damage:g.player?.stats?.damage,pendingOffer:g.pendingOffer,
+     firstButton:el?.outerHTML.slice(0,400),upgradeCalls:window.__novaUpgradeCalls,
+     activeElement:document.activeElement?.outerHTML.slice(0,250)};
+   });
+   try{
+    fs.mkdirSync(path.join('artifacts','browser'),{recursive:true});
+    await page.screenshot({path:path.join('artifacts','browser',label+'-upgrade-spend-failure.png')});
+   }catch(_){}
+   assert.fail(label+': touch upgrade spends exactly one earned point; before='+
+    JSON.stringify(beforeUpgrade)+' after='+JSON.stringify(afterUpgrade));
+  }
+  assert.equal(afterStat,beforeStat-1,label+': touch upgrade spends exactly one earned point');
   await page.evaluate(()=>{
    const g=window.__novaTouchGame;
    const types=window.__novaMakeRequire('')('game/types');
