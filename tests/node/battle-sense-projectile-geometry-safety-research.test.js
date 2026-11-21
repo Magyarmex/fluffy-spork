@@ -147,10 +147,12 @@ test('research projectile provenance: malformed penetration cannot certify a lan
 });
 
 test('research projectile provenance: dead bullets do not certify a fresh threat',()=>{
- const dead=evaluate({dead:true});
- assert.equal(dead.possible,false);
- assert.equal(dead.known,false);
- assert.equal(dead.checked,0);
+ for(const state of [true,1]){
+  const dead=evaluate({dead:state});
+  assert.equal(dead.possible,false);
+  assert.equal(dead.known,false);
+  assert.equal(dead.checked,0);
+ }
  const live=evaluate({dead:false});
  assert.equal(live.possible,true);
  assert.equal(live.known,true);
