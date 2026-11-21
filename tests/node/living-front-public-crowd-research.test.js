@@ -281,3 +281,25 @@ test('composed LOCAL farming can also be vetoed by offscreen private AI keys',()
     } finally {LF.query=originalQuery;s.g.destroy();}
   });
 });
+
+test('composed remembered public BLOOM also reads remote private commitments',()=>{
+  withSeed(1517809,()=>{
+    const s=scene();
+    try {
+      s.observer.x=-200;s.observer.y=-400;
+      s.g.time=11;
+      s.g.__lfState.signal=null;
+      s.g.__lfState.bloomMemory={
+        sector:s.sector,announcedAt:9,until:35,initialValue:500
+      };
+      const baseline=s.T.publicEcoBias(s.g,s.observer,{},{});
+      assert.equal(baseline.mode,'memory',
+        'public remembered BLOOM must be a valid route before intervention');
+      s.others.forEach(q=>q.ai.__lfEcoKey='BLOOM:'+s.sector);
+      const hidden=s.T.publicEcoBias(s.g,s.observer,{},{});
+      assert.equal(hidden.mode,'none',
+        'offscreen private ecology assignments veto remembered public route');
+      assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
+    } finally {s.g.destroy();}
+  });
+});
