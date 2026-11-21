@@ -197,7 +197,7 @@ run('replacement observer never inherits prior-life sightings',102909,(s,t)=>{
 });
 
 run('missing terrain visibility authority cannot certify a sighting',102910,(s,t)=>{
-  delete s.g.hasLineOfSight;
+  s.g.hasLineOfSight=null;
   t.sample(s.g,s.observer,[s.rival],10);
   s.rival.x=-85;t.sample(s.g,s.observer,[s.rival],10.15);
   s.rival.x=-70;t.sample(s.g,s.observer,[s.rival],10.3);
