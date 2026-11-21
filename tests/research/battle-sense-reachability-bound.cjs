@@ -24,28 +24,40 @@ function reachabilityMiss(bullet,victim,options={}){
   return {known:false,reason:'projectile'};
  const frames=Math.ceil(bullet.ttl/dt);
  if(frames>600||frames<1)return {known:false,reason:'horizon'};
+ const segments=options.segments??frames;
+ if(!Number.isInteger(segments)||segments<1||segments>frames)
+  return {known:false,reason:'segments'};
  const f=Math.min(1,dt*steer),ux=bullet.vx/bulletSpeed,uy=bullet.vy/bulletSpeed;
  const dx=victim.x-bullet.x,dy=victim.y-bullet.y;
  const projection=dx*ux+dy*uy;
- if(!Number.isFinite(projection))return {known:false,reason:'geometry'};
- let velocityBound=Math.hypot(victim.vx,victim.vy),displacementBound=0;
- if(!Number.isFinite(velocityBound))return {known:false,reason:'motion'};
- for(let n=1;n<=frames;n++){
-  const segmentStart=bulletSpeed*(n-1)*dt;
-  const segmentEnd=Math.min(bulletSpeed*bullet.ttl,bulletSpeed*n*dt);
+ const initialSpeed=Math.hypot(victim.vx,victim.vy);
+ if(!Number.isFinite(projection)||!Number.isFinite(initialSpeed))
+  return {known:false,reason:'geometry'};
+ // An exact scalar upper bound for the discrete Game.moveTank recurrence.
+ // Grouping adjacent frames into a segment and using its END displacement
+ // for the entire projectile segment can only make certification stricter.
+ // Eight groups usually preserve much of the 60-frame research signal while
+ // requiring only eight geometric distance checks. No terrain rays.
+ function maxDisplacement(n){
+  if(f===0)return initialSpeed*dt*n;
+  const decay=1-f;
+  return dt*(speedLimit*n+
+   (initialSpeed-speedLimit)*decay*(1-Math.pow(decay,n))/f);
+ }
+ for(let seg=1;seg<=segments;seg++){
+  const a=Math.floor((seg-1)*frames/segments);
+  const b=Math.floor(seg*frames/segments);
+  const segmentStart=bulletSpeed*a*dt;
+  const segmentEnd=Math.min(bulletSpeed*bullet.ttl,bulletSpeed*b*dt);
   const along=Math.max(segmentStart,Math.min(segmentEnd,projection));
   const miss=Math.hypot(dx-ux*along,dy-uy*along);
-  // For a bounded control vector, each component of velocity is a convex
-  // combination of the previous velocity and legal input. The scalar
-  // recurrence upper-bounds displacement in any direction from the
-  // finite initial velocity (including a moving target).
-  velocityBound+=(speedLimit-velocityBound)*f;
-  displacementBound+=velocityBound*dt;
+  const displacementBound=maxDisplacement(b);
   if(!Number.isFinite(miss)||!Number.isFinite(displacementBound))
    return {known:false,reason:'geometry'};
-  if(miss<=hullRadius+bullet.r+displacementBound)
-   return {known:false,reason:'reachable-tube',frame:n};
+  // Numerical guard favors unknown over a near-tangent false certificate.
+  if(miss<=hullRadius+bullet.r+displacementBound+1e-8)
+   return {known:false,reason:'reachable-tube',segment:seg};
  }
- return {known:true,possible:false,frames,reason:'bounded-miss'};
+ return {known:true,possible:false,frames,segments,reason:'bounded-miss'};
 }
 module.exports={reachabilityMiss};
