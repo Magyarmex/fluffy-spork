@@ -77,3 +77,33 @@ test('research reachability: invalid coarse window counts fail closed',()=>{
   assert.equal(reachabilityMiss(b,v,{speedLimit:S,hullRadius:R,segments}).known,false);
  }
 });
+
+test('research reachability: 512 seeded changing-direction inputs cannot beat the bound',()=>{
+ let seed=0x55112026;
+ function rand(){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return (seed>>>0)/4294967296;}
+ let certified=0,contacts=0;
+ for(let i=0;i<512;i++){
+  const speed=[120,200,350,500][i%4],ttl=[.8,1,.8,.6][i%4];
+  const b=bullet(speed,ttl);
+  const v={...victim(15+rand()*205,-100+rand()*200),
+   vx:(rand()-.5)*S,vy:(rand()-.5)*S};
+  const coarse=reachabilityMiss(b,v,{speedLimit:S,hullRadius:R,segments:8});
+  if(coarse.known)certified++;
+  let x=v.x,y=v.y,vx=v.vx,vy=v.vy;
+  for(let n=1;n<=Math.ceil(ttl/DT);n++){
+   const angle=rand()*Math.PI*2,power=rand()*S;
+   const ux=Math.cos(angle)*power,uy=Math.sin(angle)*power;
+   vx+=(ux-vx)*DT*9;vy+=(uy-vy)*DT*9;
+   x+=vx*DT;y+=vy*DT;
+   const t=Math.min(n*DT,ttl);
+   if(Math.hypot(x-b.vx*t,y-b.vy*t)<=R){
+    contacts++;
+    assert.equal(coarse.known,false,
+     'changing legal movement cannot outrun the conservative tube at '+i);
+    break;
+   }
+  }
+ }
+ assert.ok(certified>0);
+ assert.ok(contacts>0);
+});
