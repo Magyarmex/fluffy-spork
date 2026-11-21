@@ -5,7 +5,7 @@ const DT=1/60,S=124,R=21;
 function bullet(speed,ttl=1){return {x:0,y:0,vx:speed,vy:0,ttl,r:0};}
 function victim(x,y){return {x,y,vx:0,vy:0};}
 function actualContact(b,v,ux,uy){
- let x=v.x,y=v.y,vx=0,vy=0;
+ let x=v.x,y=v.y,vx=v.vx,vy=v.vy;
  for(let n=1;n<=Math.ceil(b.ttl/DT);n++){
   vx+=(ux-vx)*DT*9;vy+=(uy-vy)*DT*9;
   x+=vx*DT;y+=vy*DT;
@@ -28,13 +28,17 @@ test('research reachability: a far lateral target is a certified bounded miss',(
  assert.equal(r.possible,false);
  assert.equal(r.reason,'bounded-miss');
 });
-test('research reachability: missing speed proof, initial motion and invalid geometry fail closed',()=>{
+test('research reachability: missing speed proof, corrupt initial motion and invalid geometry fail closed',()=>{
  const b=bullet(200),v=victim(100,50);
  for(const opts of [{hullRadius:R},{speedLimit:S},{speedLimit:-1,hullRadius:R},
   {speedLimit:Infinity,hullRadius:R}]){
   assert.equal(reachabilityMiss(b,v,opts).known,false);
  }
- assert.equal(reachabilityMiss(b,{...v,vx:1},{speedLimit:S,hullRadius:R}).known,false);
+ assert.equal(reachabilityMiss(b,{...v,vx:Infinity},{speedLimit:S,hullRadius:R}).known,false);
+ assert.equal(reachabilityMiss(b,{...v,vy:NaN},{speedLimit:S,hullRadius:R}).known,false);
+ assert.equal(reachabilityMiss(bullet(500,.6),{...victim(200,300),vx:30,vy:-20},
+  {speedLimit:S,hullRadius:R}).known,true,
+  'a moving hull with finite initial velocity may still be provably unreachable');
  assert.equal(reachabilityMiss({...b,ttl:Infinity},v,
   {speedLimit:S,hullRadius:R}).known,false);
 });
@@ -45,7 +49,8 @@ test('research reachability: seeded four-command physical witness never contradi
  for(const speed of [120,200,350,500]){
   for(let i=0;i<512;i++){
    const b=bullet(speed,speed===500?.6:1);
-   const v=victim(15+rand()*205,-100+rand()*200);
+   const v={...victim(15+rand()*205,-100+rand()*200),
+    vx:(rand()-.5)*S,vy:(rand()-.5)*S};
    const r=reachabilityMiss(b,v,{speedLimit:S,hullRadius:R});
    if(r.known)certified++;
    for(const [ux,uy] of [[0,-S],[0,S],[S,0],[-S,0]]){
