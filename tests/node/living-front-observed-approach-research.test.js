@@ -21,12 +21,23 @@ function observedApproach() {
       records.clear();
       return;
     }
+    // Loss of the visibility authority invalidates existing evidence too:
+    // retaining old sightings here would still influence decisions for 1.25s.
     if (!g || typeof g.hasLineOfSight!=='function' ||
-        !Number.isFinite(observer.x) || !Number.isFinite(observer.y)) return;
+        !Number.isFinite(observer.x) || !Number.isFinite(observer.y)) {
+      records.clear();
+      return;
+    }
     const F=g.__testFair;
-    if (!F || typeof F.inGameplayViewport!=='function') return;
+    if (!F || typeof F.inGameplayViewport!=='function') {
+      records.clear();
+      return;
+    }
     const ext=F.viewportHalfExtents && F.viewportHalfExtents(g);
-    if (!ext || !(ext.x>0) || !(ext.y>0)) return;
+    if (!ext || !(ext.x>0) || !(ext.y>0)) {
+      records.clear();
+      return;
+    }
     for (const q of rivals || []) {
       if (!q || q===observer || q.id===observer.id ||
           !Number.isSafeInteger(q.id) ||
@@ -260,4 +271,38 @@ run('observer death clears sightings even if the same tank object respawns',1029
   s.rival.x=-55;t.sample(s.g,s.observer,[s.rival],10.5);
   assert.equal(t.countToward(s.destination,10.5),0,
     'a new life must accumulate its own public evidence');
+});
+
+run('loss of viewport or terrain authority revokes previously valid evidence',102914,(s,t)=>{
+  function establish(at) {
+    s.rival.x=-100;t.sample(s.g,s.observer,[s.rival],at);
+    s.rival.x=-85;t.sample(s.g,s.observer,[s.rival],at+.15);
+    s.rival.x=-70;t.sample(s.g,s.observer,[s.rival],at+.3);
+    assert.equal(t.countToward(s.destination,at+.3),1);
+  }
+  establish(10);
+  s.g.hasLineOfSight=null;
+  t.sample(s.g,s.observer,[s.rival],10.35);
+  assert.equal(t.countToward(s.destination,10.35),0);
+  s.g.hasLineOfSight=()=>true;
+  establish(11);
+  const missingFair={...s.g,__testFair:null};
+  t.sample(missingFair,s.observer,[s.rival],11.35);
+  assert.equal(t.countToward(s.destination,11.35),0);
+  establish(12);
+  const badViewport={...s.g,__testFair:{
+    ...s.g.__testFair,viewportHalfExtents:()=>({x:0,y:0})
+  }};
+  t.sample(badViewport,s.observer,[s.rival],12.35);
+  assert.equal(t.countToward(s.destination,12.35),0);
+});
+
+run('invalid observer coordinates revoke previously valid movement evidence',102915,(s,t)=>{
+  t.sample(s.g,s.observer,[s.rival],10);
+  s.rival.x=-85;t.sample(s.g,s.observer,[s.rival],10.15);
+  s.rival.x=-70;t.sample(s.g,s.observer,[s.rival],10.3);
+  assert.equal(t.countToward(s.destination,10.3),1);
+  s.observer.x=NaN;
+  t.sample(s.g,s.observer,[s.rival],10.35);
+  assert.equal(t.countToward(s.destination,10.35),0);
 });
