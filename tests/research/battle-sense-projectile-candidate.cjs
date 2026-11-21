@@ -12,7 +12,7 @@ function projectileCandidate(game,shooter,victim,startIndex=0){
  for(let i=startIndex;i<game.bullets.length;i++){
   const b=game.bullets[i];
   if(!b||b.ownerId!==shooter.id||b.dead)continue;
-  if(b.shell||b.splash||b.cluster){unsupported++;continue;}
+  if(b.shell||b.splash||b.cluster||b.beam){unsupported++;continue;}
   const speed=Math.hypot(b.vx,b.vy);
   const radius=b.r==null?0:b.r;
   if(!Number.isFinite(b.vx)||!Number.isFinite(b.vy)||
