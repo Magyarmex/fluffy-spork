@@ -123,3 +123,31 @@ test('research characterization: shotgun hull cone can witness a lane with no pe
    'KNOWN CANDIDATE DEFECT: a hull-cone candidate lacks projectile-bearing provenance');
  }finally{g.destroy();}
 });
+
+test('research characterization: dense witnessed volleys expose quadratic LOS growth',()=>{
+ const g=bootGame();
+ try{
+  const shooter=g.player;
+  assert.ok(shooter);
+  g.time=10;g.status='playing';g.paused=false;
+  shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
+  const bots=Array.from({length:12},(_,i)=>
+   unit(9100+i,80+i*9,(i%3-1)*9,{}));
+  g.tanks=[shooter,...bots];
+  g.__novaFairVisibleTanks=g.tanks;
+  g.__novaFairShotWitnesses=g.tanks;
+  g.areHostile=()=>true;g.areAllies=()=>false;
+  let rays=0;
+  g.hasLineOfSight=()=>{rays++;return true;};
+  const before=g.bullets.length;
+  g.tryFire(shooter);
+  assert.ok(g.bullets.length>before,'real composed Game must fire');
+  const memories=bots.map(t=>t.ai.__v181ObservedShotVictimCount);
+  assert.ok(memories.every(n=>n===11),
+   'every visible observer should record the other eleven cone candidates');
+  assert.ok(rays>=12*11,
+   'KNOWN COST RISK: dense shots perform observer-by-candidate visibility checks');
+  console.log('NOVA_EVENT_TIME_DENSE_RAY_RESEARCH '+JSON.stringify({
+   tanks:g.tanks.length,rays,observedMemberships:memories.reduce((a,b)=>a+b,0)}));
+ }finally{g.destroy();}
+});
