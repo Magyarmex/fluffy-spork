@@ -30,7 +30,13 @@ function projectileCandidate(game,shooter,victim,startIndex=0){
   if(typeof game.firstTerrainHit==='function'){
    terrainChecks++;
    if(game.firstTerrainHit(b.x,b.y,b.x+ux*along,b.y+uy*along,
-      radius*.45))continue;
+      radius*.45)){
+    // The shipping Battlefield can let penetrating rounds breach cover.
+    // Without resolving the real impact, a blocked penetrating lane is
+    // unknown, not proof that this victim could never be reached.
+    if(Number.isFinite(b.pen)&&b.pen>0)unsupported++;
+    continue;
+   }
   }
   return {known:true,possible:true,checked,terrainChecks,unsupported};
  }
