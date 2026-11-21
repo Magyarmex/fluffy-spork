@@ -166,3 +166,13 @@ test('research projectile provenance: coercible strings and booleans are not vel
   assert.equal(r.unsupported,1,JSON.stringify(patch));
  }
 });
+
+test('research projectile provenance: radius coercion cannot fabricate a hit',()=>{
+ for(const rValue of ['3',true,{},[]]){
+  const r=evaluate({r:rValue});
+  assert.equal(r.known,false,'radius='+String(rValue));
+  assert.equal(r.possible,false,'radius='+String(rValue));
+  assert.equal(r.unsupported,1,'radius='+String(rValue));
+ }
+ assert.equal(evaluate({r:null}).possible,true,'missing radius defaults to zero');
+});
