@@ -17,7 +17,8 @@ function physicalCrowd(g, observer, destination, options = {}) {
   // Use its exported point-only extents to avoid inspecting unseen rivals.
   const ext = F && typeof F.viewportHalfExtents === 'function'
     ? F.viewportHalfExtents(g) : null;
-  if (!ext || !(ext.x > 0) || !(ext.y > 0)) return 0;
+  if (!ext || !Number.isFinite(ext.x) || !Number.isFinite(ext.y) ||
+      !(ext.x > 0) || !(ext.y > 0)) return 0;
   let count = 0;
   for (const q of g.tanks || []) {
     if (!q || q === observer || q.id === observer.id ||
@@ -367,6 +368,26 @@ test('research public crowd cannot inspect a terrain-occluded visible rival',()=
       s.g.hasLineOfSight=()=>false;
       try {assert.equal(physicalCrowd(s.g,s.observer,s.center),0);}
       finally {s.g.tanks.pop();}
+    } finally {s.g.destroy();}
+  });
+});
+
+test('research public crowd rejects unbounded viewport authority before hidden reads',()=>{
+  withSeed(1517814,()=>{
+    const s=scene();
+    try {
+      const hidden={id:99103,x:3000,y:3000,
+        get ai(){throw Error('unbounded viewport exposed hidden AI');},
+        get hp(){throw Error('unbounded viewport exposed hidden health');}};
+      const broken={...s.g,__testFair:{
+        ...s.g.__testFair,viewportHalfExtents:()=>({x:Infinity,y:Infinity})
+      }};
+      broken.tanks=[s.observer,hidden];
+      let rays=0;
+      broken.hasLineOfSight=()=>{rays++;return true;};
+      assert.equal(physicalCrowd(broken,s.observer,
+        {x:3000,y:3000},{radius:100}),0);
+      assert.equal(rays,0,'invalid authority cannot trigger terrain queries');
     } finally {s.g.destroy();}
   });
 });
