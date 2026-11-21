@@ -25,7 +25,9 @@ test('natural composed matches bound firing-time witness scans and report incide
      oracleUncachedTerrainChecks:0,oracleReusedMemberships:0,
      fireLOSCalls:0,maxFireLOSCalls:0,crossfireSamples:0,
      crossfireWithLaneEvidence:0,crossfireWithoutLaneEvidence:0,
+     crossfireLaneUnknown:0,
      crossfireWithPhysicalEvidence:0,crossfireWithoutPhysicalEvidence:0,
+     crossfirePhysicalUnknown:0,
      crossfireUnattributed:0,
      geometricComparisons:0,oldOnlyGeometry:0,newOnlyGeometry:0};
     const evidence=new WeakMap();
@@ -64,7 +66,7 @@ test('natural composed matches bound firing-time witness scans and report incide
        stats.observedShotRecords++;
        stats.eligibleVictimMemberships+=count;
        if(count)witnessed=true;
-       let observerLane=0,observerPhysical=0;
+       let observerLane=0,observerPhysical=0,observerLaneUnknown=0,observerPhysicalUnknown=0;
        // Descriptive event-time physical plausibility, not a damage prediction.
        // A victim may move, cover may break and another unit may intercept.
        for(const victim of observers){
@@ -76,7 +78,7 @@ test('natural composed matches bound firing-time witness scans and report incide
         assert.equal(laneOnly.terrainChecks,0,'geometry-only arm must add zero terrain rays');
         if(laneOnly.possible){stats.laneOnlyPossibleMemberships++;observerLane++;}
         else if(laneOnly.known)stats.laneOnlyKnownMissMemberships++;
-        else stats.laneOnlyUnknownMemberships++;
+        else{stats.laneOnlyUnknownMemberships++;observerLaneUnknown++;}
         let oracle=physicalByVictim.get(victim);
         if(oracle){stats.oracleReusedMemberships++;}
         else{
@@ -87,7 +89,7 @@ test('natural composed matches bound firing-time witness scans and report incide
         stats.oracleUncachedTerrainChecks+=oracle.terrainChecks||0;
         if(oracle.possible){stats.oraclePossibleMemberships++;observerPhysical++;}
         else if(oracle.known)stats.oracleKnownMissMemberships++;
-        else stats.oracleUnknownMemberships++;
+        else{stats.oracleUnknownMemberships++;observerPhysicalUnknown++;}
         let aligned=false,clear=false;
         for(const b of emitted){
          const speed=Math.hypot(b.vx,b.vy);
@@ -112,7 +114,8 @@ test('natural composed matches bound firing-time witness scans and report incide
         else stats.projectileAlignedMemberships++;
        }
        evidence.set(observer,{shotAt:this.time,shotId:shooter.id,
-        lane:observerLane,physical:observerPhysical});
+        lane:observerLane,physical:observerPhysical,
+        laneUnknown:observerLaneUnknown,physicalUnknown:observerPhysicalUnknown});
       }
       if(witnessed)stats.shotsWithAnyVictimWitness++;
      }
@@ -132,8 +135,10 @@ test('natural composed matches bound firing-time witness scans and report incide
            Number.isFinite(at)&&g.time-at>=0&&g.time-at<=1.25&&
            Math.abs(e.shotAt-at)<1e-8){
          if(e.lane)stats.crossfireWithLaneEvidence++;
+         else if(e.laneUnknown)stats.crossfireLaneUnknown++;
          else stats.crossfireWithoutLaneEvidence++;
          if(e.physical)stats.crossfireWithPhysicalEvidence++;
+         else if(e.physicalUnknown)stats.crossfirePhysicalUnknown++;
          else stats.crossfireWithoutPhysicalEvidence++;
         }else stats.crossfireUnattributed++;
        }
@@ -177,10 +182,10 @@ test('natural composed matches bound firing-time witness scans and report incide
      'the legacy approximate lane census must also partition the same witnessed set (seed '+seed+')'
     );
     assert.equal(stats.crossfireWithLaneEvidence+stats.crossfireWithoutLaneEvidence+
-      stats.crossfireUnattributed,stats.crossfireSamples,
+      stats.crossfireLaneUnknown+stats.crossfireUnattributed,stats.crossfireSamples,
      'every crossfire sample must have a recorded evidence provenance or be marked unattributed');
     assert.equal(stats.crossfireWithPhysicalEvidence+stats.crossfireWithoutPhysicalEvidence+
-      stats.crossfireUnattributed,stats.crossfireSamples);
+      stats.crossfirePhysicalUnknown+stats.crossfireUnattributed,stats.crossfireSamples);
     assert.ok(stats.oracleTerrainChecks<=stats.oracleUncachedTerrainChecks,
      'per-shot victim caching must not increase terrain query count');
     assert.ok(stats.oraclePossibleMemberships<=stats.laneOnlyPossibleMemberships,
