@@ -8,6 +8,8 @@ const { bootGame, withSeed } = require('../research/audio-rng-causal-pilot.cjs')
 
 function physicalCrowd(g, observer, destination, options = {}) {
   if (!g || !observer || !destination ||
+      !(observer.hp > 0) || observer.alive === false ||
+      !Number.isFinite(observer.x) || !Number.isFinite(observer.y) ||
       !Number.isFinite(destination.x) || !Number.isFinite(destination.y) ||
       typeof g.hasLineOfSight !== 'function') return 0;
   const radius = options.radius ?? 300;
@@ -388,6 +390,21 @@ test('research public crowd rejects unbounded viewport authority before hidden r
       assert.equal(physicalCrowd(broken,s.observer,
         {x:3000,y:3000},{radius:100}),0);
       assert.equal(rays,0,'invalid authority cannot trigger terrain queries');
+    } finally {s.g.destroy();}
+  });
+});
+
+test('dead or non-finite observers cannot certify public crowd pressure',()=>{
+  withSeed(1517815,()=>{
+    const s=scene();
+    try {
+      s.g.w=2400;s.g.h=1200;s.g.cam={zoom:1};
+      s.others[0].x=s.center.x;s.others[0].y=s.center.y;
+      assert.equal(physicalCrowd(s.g,s.observer,s.center),1);
+      s.observer.hp=0;
+      assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
+      s.observer.hp=100;s.observer.x=NaN;
+      assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
     } finally {s.g.destroy();}
   });
 });
