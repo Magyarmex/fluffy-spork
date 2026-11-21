@@ -22,7 +22,9 @@ function observedApproach() {
       if (!(q.hp>0) || q.alive===false || q.spawnShieldT>0) {
         // Only a currently observable death is public evidence.
         if (Number.isFinite(q.x) && Number.isFinite(q.y) &&
-            F.inGameplayWorldPoint(g,observer,q.x,q.y) &&
+            F.viewportHalfExtents &&
+            Math.abs(q.x-observer.x)<=F.viewportHalfExtents(g).x &&
+            Math.abs(q.y-observer.y)<=F.viewportHalfExtents(g).y &&
             (!g.hasLineOfSight ||
              g.hasLineOfSight(observer.x,observer.y,q.x,q.y,2)))
           records.delete(q.id);
