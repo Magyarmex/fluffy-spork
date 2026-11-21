@@ -177,7 +177,7 @@ test('missing or malformed historical victim memory fails closed rather than tra
  const w=scene();
  try{
   w.third.x=100;w.third.y=0;
-  for(const legacy of [undefined,{},'legacy',42]){
+  for(const legacy of [undefined,{},'legacy',42,{has(){return true;}},new Set([w.third])]){
    w.observer.ai.__v181ObservedShotVictims=legacy;
    assert.equal(w.weight(),0,'untrusted legacy witness memory must not infer a new duel');
    w.third.x=0;w.third.y=100;
