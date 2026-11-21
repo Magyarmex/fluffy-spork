@@ -11,6 +11,7 @@ function physicalCrowd(g, observer, destination, options = {}) {
       !Number.isFinite(destination.x) || !Number.isFinite(destination.y)) return 0;
   const radius = options.radius ?? 300;
   const maxCount = options.maxCount ?? 4;
+  const F = g.__testFair;
   const zoom = Math.max(.1, Number(g.cam && g.cam.zoom) || 1);
   const halfX = (Number(g.w) || 800) / (2 * zoom);
   const halfY = (Number(g.h) || 600) / (2 * zoom);
@@ -21,8 +22,11 @@ function physicalCrowd(g, observer, destination, options = {}) {
         !Number.isFinite(q.x) || !Number.isFinite(q.y)) continue;
     // The candidate deliberately does not inspect __lfEcoKey, private target
     // IDs, unseen world sectors, or the target's actual planned destination.
-    if (Math.abs(q.x - observer.x) > halfX ||
-        Math.abs(q.y - observer.y) > halfY) continue;
+    const seen = F && typeof F.inGameplayViewport === 'function'
+      ? F.inGameplayViewport(g, observer, q)
+      : Math.abs(q.x - observer.x) <= halfX &&
+        Math.abs(q.y - observer.y) <= halfY;
+    if (!seen) continue;
     if (g.hasLineOfSight &&
         !g.hasLineOfSight(observer.x, observer.y, q.x, q.y, 2)) continue;
     if (Math.hypot(q.x - destination.x, q.y - destination.y) > radius) continue;
