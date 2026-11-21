@@ -23,8 +23,10 @@ function observedApproach() {
             !g.hasLineOfSight(observer.x, observer.y, q.x, q.y, 2)) continue;
         const old = records.get(q.id);
         // A reused ID must never inherit the previous body's trajectory.
-        const sameBody = old && old.body === q && now > old.at &&
-          now - old.at <= 1.5;
+        const dt = old ? now - old.at : 0;
+        const travel = old ? Math.hypot(q.x-old.x,q.y-old.y) : 0;
+        const sameBody = old && old.body === q && dt > 0 && dt <= 1.5 &&
+          travel <= 400*dt + 1; // Do not interpret teleports as observed intent.
         records.set(q.id, {
           body:q, at:now, x:q.x, y:q.y,
           vx:sameBody ? (q.x-old.x)/(now-old.at) : 0,
@@ -125,6 +127,23 @@ test('reused IDs, reverse movement, invalid positions and clock reset fail close
       assert.equal(tracker.countToward(s.destination,12),0);
       tracker.sample(s.g,s.observer,[],0);
       assert.equal(tracker.size(),0,'reset simulation time must purge evidence');
+    } finally {s.g.destroy();}
+  });
+});
+
+test('teleport-like displacement cannot masquerade as observed destination approach',()=>{
+  withSeed(102904,()=>{
+    const s=scene(),tracker=observedApproach();
+    try {
+      tracker.sample(s.g,s.observer,[s.rival],10);
+      s.rival.x=150;
+      tracker.sample(s.g,s.observer,[s.rival],10.1);
+      assert.equal(tracker.countToward(s.destination,10.1),0,
+        '4500 units/s between sightings is not a credible witnessed rotation');
+      s.rival.x=170;
+      tracker.sample(s.g,s.observer,[s.rival],10.6);
+      assert.equal(tracker.countToward(s.destination,10.6),1,
+        'later physically plausible motion can establish fresh evidence');
     } finally {s.g.destroy();}
   });
 });
