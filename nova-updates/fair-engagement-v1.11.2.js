@@ -333,18 +333,16 @@ wrap('game/engine',function(engine,require){
     var best=null,bd=max*max,coneOnly=null,coneCount=0,
         ts=this.tanks||[],hw=w/(2*z),hh=h/(2*z);
     for(var i=0;i<ts.length;i++){
-      var t=ts[i];if(!t||!alive(t)||t.id===exclude||
-        !Number.isFinite(t.x)||!Number.isFinite(t.y)||
-        /* Spawn protection is non-damageable. Never redirect a human aim
-         * gesture toward an invulnerable spawn when a live target is visible.
-         * Respect explicit teams, while keeping non-assist nearest queries
-         * (AI, Crashers, drones) on their original owner. */
-        t.spawnShieldT>0||!hostile(this,p,t))continue;
-      /* A partly visible hull is a legitimate aim target; an entirely
-       * hidden one is not. The 32u cap prevents corrupt radius metadata
-       * from turning the viewport into long-range offscreen assistance. */
+      var t=ts[i];if(!t||t.id===exclude||
+        !Number.isFinite(t.x)||!Number.isFinite(t.y))continue;
+      /* Geometry first: an off-camera rival must not expose hidden health,
+       * shield or team status merely because the player asks for aim assist.
+       * Partly visible hulls remain eligible, with a capped radius. */
       var r=clamp(Number(t.r)||0,0,32);
       if(Math.abs(t.x-cam.x)>hw+r||Math.abs(t.y-cam.y)>hh+r)continue;
+      /* Spawn protection is non-damageable. Keep non-assist nearest queries
+       * (AI, Crashers, drones) on their original owner. */
+      if(!alive(t)||t.spawnShieldT>0||!hostile(this,p,t))continue;
       var d=d2(x,y,t.x,t.y);if(!(d<max*max))continue;
       var inCone=false;
       if(aimAngle!==null){
