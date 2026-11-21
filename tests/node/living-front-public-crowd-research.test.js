@@ -287,8 +287,10 @@ test('composed LOCAL farming private-intent counterfactual remains observable',(
 
 test('composed remembered BLOOM private-intent counterfactual remains observable',()=>{
   withSeed(1517809,()=>{
-    const s=scene();
+    const s=scene(),LF=s.g.__testLivingFront,originalQuery=LF.query;
     try {
+      // Isolate the public memory choice from unrelated local shape farming.
+      LF.query=()=>[];
       s.observer.x=-200;s.observer.y=-400;
       s.g.time=11;
       s.g.__lfState.signal=null;
@@ -304,6 +306,6 @@ test('composed remembered BLOOM private-intent counterfactual remains observable
         JSON.stringify({before:baseline.mode,after:hidden.mode}));
       // A corrected shipping planner may legitimately retain memory mode.
       assert.equal(physicalCrowd(s.g,s.observer,s.center),0);
-    } finally {s.g.destroy();}
+    } finally {LF.query=originalQuery;s.g.destroy();}
   });
 });
