@@ -41,8 +41,7 @@ function observedApproach() {
           !Number.isFinite(destination.y) || !Number.isFinite(now)) return 0;
       let count=0;
       for (const r of records.values()) {
-        if (!r.witnessed || now < r.at || now-r.at > 2 ||
-            !(r.body.hp > 0) || r.body.alive === false) continue;
+        if (!r.witnessed || now < r.at || now-r.at > 2) continue;
         const dx=destination.x-r.x, dy=destination.y-r.y;
         const dist=Math.hypot(dx,dy), speed=Math.hypot(r.vx,r.vy);
         // Require real, recent observed progress toward a public destination;
@@ -78,6 +77,11 @@ test('two public position samples establish approach; private ecology intent doe
       s.rival.x=-60;
       tracker.sample(s.g,s.observer,[s.rival],10.5);
       assert.equal(tracker.countToward(s.destination,10.5),1);
+      // Losing a remote rival is not permission to query its live health.
+      // The short public memory remains uncertain until it expires.
+      s.rival.hp=0;s.rival.alive=false;
+      assert.equal(tracker.countToward(s.destination,10.5),1);
+      s.rival.hp=100;s.rival.alive=true;
       s.rival.ai.__lfEcoKey='LOCAL:14';
       assert.equal(tracker.countToward(s.destination,10.5),1);
       s.rival.ai.__lfEcoKey='BLOOM:5';
