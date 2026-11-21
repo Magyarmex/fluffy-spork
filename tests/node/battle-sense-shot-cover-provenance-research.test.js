@@ -30,8 +30,12 @@ function fireScenario(blockShotLane){
  g.tryFire(shooter);
  assert.ok(g.bullets.length>before,'real composed Game must emit a projectile');
  const witnessed=observer.ai.__v181ObservedShotVictims?.has(victim)===true;
+ const birthQueries=shotLaneQueries;
+ // Cover later disappears: current LOS cannot establish whether the old shot was blocked.
+ g.hasLineOfSight=()=>true;
+ g.time=10.5;
  const weight=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__.thirdPartyVector(g,observer,shooter,{}).weight;
- return {g,witnessed,weight,shotLaneQueries};
+ return {g,witnessed,weight,birthQueries};
 }
 test('research characterization: shooter-to-victim wall is absent from event-time witness gate',()=>{
  const clear=fireScenario(false),blocked=fireScenario(true);
@@ -41,8 +45,8 @@ test('research characterization: shooter-to-victim wall is absent from event-tim
   assert.equal(blocked.witnessed,true,
    'KNOWN CANDIDATE DEFECT: blocked shot is still recorded as a victim witness');
   assert.equal(blocked.weight,.62,
-   'KNOWN CANDIDATE DEFECT: cover-blocked historical shot still induces crossfire');
-  assert.equal(blocked.shotLaneQueries,0,
+   'KNOWN CANDIDATE DEFECT: historically blocked shot induces crossfire after cover clears');
+  assert.equal(blocked.birthQueries,0,
    'candidate never checks shooter-to-victim physical reachability at shot birth');
  }finally{clear.g.destroy();blocked.g.destroy();}
 });
