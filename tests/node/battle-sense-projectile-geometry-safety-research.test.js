@@ -182,3 +182,22 @@ test('research projectile provenance: radius coercion cannot fabricate a hit',()
  }
  assert.equal(evaluate({r:null}).possible,true,'missing radius defaults to zero');
 });
+
+test('research projectile provenance: translation and rotation preserve eligibility',()=>{
+ let seed=0x5510cafe;
+ function rand(){seed^=seed<<13;seed^=seed>>>17;seed^=seed<<5;return (seed>>>0)/4294967296;}
+ for(let i=0;i<256;i++){
+  const b={ownerId:7,x:(rand()-.5)*1000,y:(rand()-.5)*1000,
+   vx:(rand()-.5)*1000,vy:(rand()-.5)*1000,ttl:.1+rand()*2,r:2+rand()*6};
+  if(Math.hypot(b.vx,b.vy)<=1)continue;
+  const v={x:(rand()-.5)*1000,y:(rand()-.5)*1000};
+  const original=projectileCandidate({bullets:[b]},shooter,v).possible;
+  const shiftX=100+rand()*100,shiftY=-100-rand()*100;
+  const translated=projectileCandidate({bullets:[{...b,x:b.x+shiftX,y:b.y+shiftY}]},
+   shooter,{x:v.x+shiftX,y:v.y+shiftY}).possible;
+  assert.equal(translated,original,'translation '+i);
+  const rotated=projectileCandidate({bullets:[{...b,x:-b.y,y:b.x,vx:-b.vy,vy:b.vx}]},
+   shooter,{x:-v.y,y:v.x}).possible;
+  assert.equal(rotated,original,'rotation '+i);
+ }
+});
