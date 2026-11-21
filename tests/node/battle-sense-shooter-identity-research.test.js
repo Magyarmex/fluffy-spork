@@ -72,3 +72,19 @@ test('research: a replacement shooter also inherits an observed reload-punish wi
    'negative control: different ID cannot inherit the observed opening');
  }finally{g.destroy();}
 });
+
+test('real engine control: redeploy allocates fresh tank IDs instead of recycling them',()=>{
+ const g=bootGame();
+ try{
+  const priorIds=new Set(g.tanks.map(t=>t.id));
+  const beforeNextId=g.nextId;
+  assert.ok(priorIds.size>0);
+  g.sfx.muted=true;
+  g.sfx.startMusic=()=>{};
+  g.redeploy();
+  assert.ok(g.tanks.length>0);
+  assert.ok(g.nextId>beforeNextId,'redeploy must allocate new entities');
+  assert.ok(g.tanks.every(t=>!priorIds.has(t.id)),
+   'actual ordinary redeploy must not recycle a previous tank ID');
+ }finally{g.destroy();}
+});
