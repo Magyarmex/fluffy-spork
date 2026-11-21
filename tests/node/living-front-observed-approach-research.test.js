@@ -315,9 +315,12 @@ run('invalid observer coordinates revoke previously valid movement evidence',102
   s.rival.x=-85;t.sample(s.g,s.observer,[s.rival],10.15);
   s.rival.x=-70;t.sample(s.g,s.observer,[s.rival],10.3);
   assert.equal(t.countToward(s.destination,10.3),1);
+  const priorX=s.observer.x;
   s.observer.x=NaN;
-  t.sample(s.g,s.observer,[s.rival],10.35);
-  assert.equal(t.countToward(s.destination,10.35),0);
+  try {
+    t.sample(s.g,s.observer,[s.rival],10.35);
+    assert.equal(t.countToward(s.destination,10.35),0);
+  } finally {s.observer.x=priorX;}
 });
 
 run('non-finite sample time revokes prior sightings rather than preserving recency',102916,(s,t)=>{
