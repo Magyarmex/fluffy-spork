@@ -293,7 +293,18 @@ test('research A/B/C matched-world: projectile lane removes cone errors but only
     a.__v181ObservedShotVictims=qualifies?new WeakSet([victim]):null;
     const crossfire=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__
      .thirdPartyVector(g,observer,shooter,{}).weight;
-    return {mode,qualifies,crossfire,terrainChecks:mode==='C'?physical.terrainChecks:0};
+    shooter.spawnShieldT=0;
+    observer.hp=observer.maxHp;
+    a.__v181Think=0;
+    const ai=g.__testWindow.__novaMakeRequire('')('game/ai');
+    const oldMove=g.moveTank;let commanded=null;
+    g.moveTank=function(t,vx,vy,dt){
+     if(t===observer)commanded=[vx,vy];
+     return oldMove.apply(this,arguments);
+    };
+    ai.updateAI(observer,g,1/60);
+    return {mode,qualifies,crossfire,aiMode:a.__v181Mode,commanded,
+     terrainChecks:mode==='C'?physical.terrainChecks:0};
    }finally{g.destroy();}
   });
  }
@@ -301,6 +312,11 @@ test('research A/B/C matched-world: projectile lane removes cone errors but only
  assert.equal(A.crossfire,.62,'cone falsely certifies a covered firing event');
  assert.equal(B.crossfire,.62,'geometry-only arm still cannot see permanent cover');
  assert.equal(C.crossfire,0,'physical event-time gate rejects covered shot');
+ assert.equal(A.aiMode,'crossfire','A cone changes the actual composed AI planning mode');
+ assert.equal(B.aiMode,'crossfire','B lane-only still changes the actual AI mode behind cover');
+ assert.notEqual(C.aiMode,'crossfire','C terrain gate removes the false strategic mode');
+ assert.ok(A.commanded&&B.commanded&&C.commanded,
+  'all three matched worlds must reach the actual movement owner');
  assert.equal(B.terrainChecks,0,'cheap lane arm adds no terrain queries');
  assert.equal(C.terrainChecks,1);
  console.log('NOVA_CROSSFIRE_ABC_COVER_RESEARCH '+JSON.stringify({A,B,C}));
