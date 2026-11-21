@@ -14,6 +14,8 @@ test('natural composed matches bound firing-time witness scans and report incide
     g.status='playing';g.paused=false;
     const stats={seed,frames:0,playingFrames:0,successfulFireCalls:0,observedShotRecords:0,
      eligibleVictimMemberships:0,shotsWithAnyVictimWitness:0,
+     projectileAlignedMemberships:0,projectileBlockedMemberships:0,
+     noProjectileLaneMemberships:0,
      fireLOSCalls:0,maxFireLOSCalls:0,crossfireSamples:0,
      geometricComparisons:0,oldOnlyGeometry:0,newOnlyGeometry:0};
     const originalLOS=g.hasLineOfSight,originalFire=g.tryFire;
@@ -30,6 +32,9 @@ test('natural composed matches bound firing-time witness scans and report incide
       stats.fireLOSCalls+=shotRays;
       stats.maxFireLOSCalls=Math.max(stats.maxFireLOSCalls,shotRays);
       const observers=this.__novaFairShotWitnesses||this.tanks||[];
+      const emitted=this.bullets.slice(before).filter(b=>b&&b.ownerId===shooter.id&&
+       Number.isFinite(b.x)&&Number.isFinite(b.y)&&
+       Number.isFinite(b.vx)&&Number.isFinite(b.vy));
       let witnessed=false;
       for(const observer of observers){
        if(!observer||!observer.ai||observer===shooter)continue;
@@ -45,6 +50,31 @@ test('natural composed matches bound firing-time witness scans and report incide
        stats.observedShotRecords++;
        stats.eligibleVictimMemberships+=count;
        if(count)witnessed=true;
+       // Descriptive event-time physical plausibility, not a damage prediction.
+       // A victim may move, cover may break and another unit may intercept.
+       for(const victim of observers){
+        if(!victim||victim===shooter||victim===observer||
+           candidates?.has(victim)!==true)continue;
+        let aligned=false,clear=false;
+        for(const b of emitted){
+         const speed=Math.hypot(b.vx,b.vy);
+         if(!(speed>1))continue;
+         const ux=b.vx/speed,uy=b.vy/speed;
+         const dx=victim.x-b.x,dy=victim.y-b.y;
+         const along=dx*ux+dy*uy;
+         const maxTravel=speed*Math.max(0,b.ttl||0);
+         const lateral=Math.abs(dx*uy-dy*ux);
+         if(!(along>=0&&along<=maxTravel&&lateral<=20+(b.r||0)))continue;
+         aligned=true;
+         const hit=typeof this.firstTerrainHit==='function'?
+          this.firstTerrainHit(b.x,b.y,b.x+ux*along,b.y+uy*along,
+           Math.max(0,(b.r||0)*.45)):null;
+         if(!hit){clear=true;break;}
+        }
+        if(!aligned)stats.noProjectileLaneMemberships++;
+        else if(!clear)stats.projectileBlockedMemberships++;
+        else stats.projectileAlignedMemberships++;
+       }
       }
       if(witnessed)stats.shotsWithAnyVictimWitness++;
      }
