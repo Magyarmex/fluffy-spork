@@ -148,6 +148,8 @@ test('natural composed matches bound firing-time witness scans and report incide
      stats.eligibleVictimMemberships,
      'the legacy approximate lane census must also partition the same witnessed set (seed '+seed+')'
     );
+    assert.ok(stats.oraclePossibleMemberships<=stats.laneOnlyPossibleMemberships,
+     'adding terrain occlusion cannot create a projectile lane (seed '+seed+')');
     assert.ok(stats.successfulFireCalls>=0);
     assert.ok(stats.fireLOSCalls>=0);
     console.log('NOVA_EVENT_TIME_WITNESS_NATURAL_RESEARCH '+JSON.stringify(stats));
