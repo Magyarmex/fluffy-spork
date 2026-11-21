@@ -92,6 +92,7 @@ test('Battle Sense witnessed crossfire keeps its event-time firing origin after 
  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,0,
   'moving the shooter west must not retroactively redirect the witnessed shot');
  observer.ai.__v181ObservedShotX=-200;
+ observer.ai.__v181ObservedShotVictims=new WeakSet([target]);
  assert.equal(helper.thirdPartyVector(g,observer,target,{}).weight,.62,
   'a genuinely west-origin eastbound witnessed shot can establish crossfire');
  observer.ai.__v181ObservedShotX=NaN;
@@ -118,8 +119,12 @@ test('actual Battle Sense tryFire witness stores firing origin only on real proj
  assert.equal(observer.ai.__v181ObservedShotY,40);
  const noShot=loadBattleSense(),empty=new noShot.Game();
  const other={...tank(3,undefined,10,10),ai:{}};
- Object.assign(empty,{bullets:[],tanks:[shooter,other],time:10,hasLineOfSight:()=>true});
+ let rejectedHostilityReads=0;
+ Object.assign(empty,{bullets:[],tanks:[shooter,other],time:10,hasLineOfSight:()=>true,
+  areHostile:()=>{rejectedHostilityReads++;return true;}});
  empty.tryFire(shooter);
+ assert.equal(rejectedHostilityReads,0,
+  'cooldown/no-projectile attempt must not trigger new tactical roster scans');
  assert.equal(other.ai.__v181ObservedShotX,undefined,
   'failed/no-projectile fire attempt cannot create an observed origin');
  const blocked=new helper.Game(),hidden={...tank(4,undefined,80,40),ai:{}};
@@ -137,7 +142,8 @@ test('missing witnessed shot timestamp cannot become a time-zero crossfire',()=>
  const target=tank(2,undefined,0,0);
  const third=tank(3,undefined,100,0);
  observer.ai={__v181ObservedShotId:target.id,
-  __v181ObservedShotAngle:0,__v181ObservedShotX:0,__v181ObservedShotY:0};
+  __v181ObservedShotAngle:0,__v181ObservedShotX:0,__v181ObservedShotY:0,
+  __v181ObservedShotVictims:new WeakSet([third])};
  const g={tanks:[observer,target,third],
   __novaFairVisibleTanks:[observer,target,third],
   time:0,hasLineOfSight:()=>true};
@@ -183,8 +189,10 @@ test('missing or coerced shot bearing cannot invent an eastbound duel',()=>{
  const helper=loadBattleSense();
  const observer={...tank(1,undefined,-200,0),ai:{
   __v181ObservedShotId:2,__v181ObservedShotAt:0,
-  __v181ObservedShotX:0,__v181ObservedShotY:0}};
+  __v181ObservedShotX:0,__v181ObservedShotY:0,
+  __v181ObservedShotVictims:new WeakSet()}};
  const target=tank(2,undefined,0,0),third=tank(3,undefined,100,0);
+ observer.ai.__v181ObservedShotVictims.add(third);
  const g={time:0,tanks:[observer,target,third],
   __novaFairVisibleTanks:[observer,target,third],hasLineOfSight:()=>true};
  for(const bad of [undefined,null,'0',NaN,Infinity]){

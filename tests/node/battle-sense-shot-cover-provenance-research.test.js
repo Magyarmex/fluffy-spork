@@ -1,0 +1,324 @@
+'use strict';
+// RESEARCH ONLY: characterize an unsafe inference in PR #1085.
+// These assertions describe the current candidate, NOT desired production behavior.
+// Never merge as gameplay acceptance goldens; invert when projectile-path provenance is implemented.
+process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+const test=require('node:test'),assert=require('node:assert/strict');
+const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+const {projectileCandidate}=require('../research/battle-sense-projectile-candidate.cjs');
+function unit(id,x,y,ai){return {id,x,y,alive:true,hp:100,maxHp:100,cls:'twin',ai};}
+function fireScenario(blockShotLane){
+ const g=bootGame();
+ const shooter=g.player,observer=g.tanks.find(t=>t!==shooter&&t.ai);
+ assert.ok(shooter&&observer);
+ const victim=unit(9003,100,0,{});
+ g.time=10;g.status='playing';g.paused=false;
+ shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
+ observer.x=-100;observer.y=0;
+ g.tanks=[observer,shooter,victim];
+ g.__novaFairVisibleTanks=g.tanks;
+ g.__novaFairShotWitnesses=g.tanks;
+ g.areHostile=()=>true;g.areAllies=()=>false;
+ let shotLaneQueries=0;
+ g.hasLineOfSight=(ax,ay,bx,by)=>{
+  if(ax===shooter.x&&ay===shooter.y&&bx===victim.x&&by===victim.y){
+   shotLaneQueries++;
+   return !blockShotLane;
+  }
+  return true; // Both observer contacts remain publicly visible.
+ };
+ const before=g.bullets.length;
+ g.tryFire(shooter);
+ assert.ok(g.bullets.length>before,'real composed Game must emit a projectile');
+ const witnessed=observer.ai.__v181ObservedShotVictims?.has(victim)===true;
+ const birthQueries=shotLaneQueries;
+ // Cover later disappears: current LOS cannot establish whether the old shot was blocked.
+ g.hasLineOfSight=()=>true;
+ g.time=10.5;
+ const weight=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__.thirdPartyVector(g,observer,shooter,{}).weight;
+ return {g,witnessed,weight,birthQueries};
+}
+test('research characterization: shooter-to-victim wall is absent from event-time witness gate',()=>{
+ const clear=fireScenario(false),blocked=fireScenario(true);
+ try{
+  assert.equal(clear.witnessed,true,'unblocked control should witness an eastbound shot');
+  assert.equal(clear.weight,.62);
+  assert.equal(blocked.witnessed,true,
+   'KNOWN CANDIDATE DEFECT: blocked shot is still recorded as a victim witness');
+  assert.equal(blocked.weight,.62,
+   'KNOWN CANDIDATE DEFECT: historically blocked shot induces crossfire after cover clears');
+  assert.equal(blocked.birthQueries,0,
+   'candidate never checks shooter-to-victim physical reachability at shot birth');
+ }finally{clear.g.destroy();blocked.g.destroy();}
+});
+
+test('research characterization: real Battlefield wall blocks shot lane but not observer contacts',()=>{
+ const g=bootGame();
+ try{
+  const shooter=g.player,observer=g.tanks.find(t=>t!==shooter&&t.ai);
+  const victim=g.tanks.find(t=>t!==shooter&&t!==observer&&t.ai);
+  assert.ok(shooter&&observer&&victim,'use real composed tank objects for physical contact');
+  victim.x=100;victim.y=0;
+  victim.spawnShieldT=0;victim.shieldT=0;victim.bulwarkT=0;
+  g.time=10;g.status='playing';g.paused=false;
+  shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
+  observer.x=0;observer.y=100;
+  g.tanks=[observer,shooter,victim];
+  g.__novaFairVisibleTanks=g.tanks;
+  g.__novaFairShotWitnesses=g.tanks;
+  g.areHostile=()=>true;g.areAllies=()=>false;
+  // Real Battlefield rect: shot travels through x=50,y=0; the
+  // observer-to-victim diagonal crosses x=50,y=50 above the wall.
+  const wall={id:-9003,kind:'terrain',shape:'rect',type:'wall',
+   x:50,y:0,w:20,h:36,solid:true,destructible:false,hp:0};
+  g.__novaTerrain=[wall];
+  delete g.__novaBattlefieldIndex;
+  delete g.__novaPerfTerrainIndex;
+  assert.equal(g.hasLineOfSight(shooter.x,shooter.y,victim.x,victim.y,2),false,
+   'actual Battlefield geometry must occlude the shot corridor');
+  assert.equal(g.hasLineOfSight(observer.x,observer.y,shooter.x,shooter.y,2),true);
+  assert.equal(g.hasLineOfSight(observer.x,observer.y,victim.x,victim.y,2),true,
+   'the observer legitimately sees both combatants around the wall');
+  assert.ok(g.firstTerrainHit(0,0,100,0,2),
+   'physical swept projectile segment must intersect the same permanent wall');
+  const before=g.bullets.length;
+  g.tryFire(shooter);
+  assert.ok(g.bullets.length>before,'composed Game must emit a real projectile');
+  assert.equal(observer.ai.__v181ObservedShotVictims?.has(victim),true,
+   'KNOWN CANDIDATE DEFECT: event-time witness ignores physical shot obstruction');
+  // Advance the actual Battlefield swept-bullet owner before removing cover.
+  // Isolate the physical contact from unrelated spawned shapes and bots.
+  g.shapes=[];g.drones=[];g.powerups=[];
+  if(g.hash?.clear){g.hash.clear();for(const t of g.tanks)g.hash.insert(t);}
+  const born=g.bullets.slice(before),hpBefore=victim.hp;
+  const blockedProvenance=projectileCandidate(g,shooter,victim,before);
+  assert.equal(blockedProvenance.known,true,'real permanent wall is a known physical veto');
+  assert.equal(blockedProvenance.possible,false,
+   'research projectile oracle must reject the same blocked shot');
+  g.updateBullets(.2);
+  assert.equal(victim.hp,hpBefore,'the real permanent wall must prevent victim HP contact');
+  assert.ok(born.every(b=>b.dead||!g.bullets.includes(b)||b.x<=wall.x-wall.w/2+2),
+   'permanent Battlefield wall must stop the actual swept projectile before the victim');
+  wall.solid=false;
+  assert.equal(g.hasLineOfSight(0,0,100,0,2),true,
+   'removing cover should make the current corridor clear');
+  g.time=10.5;
+  assert.equal(g.__testWindow.__NOVA_BATTLE_SENSE_TEST__
+   .thirdPartyVector(g,observer,shooter,{}).weight,.62,
+   'KNOWN CANDIDATE DEFECT: a historically obstructed shot creates later crossfire');
+  // Positive physical control: with the wall gone, the same real weapon
+  // corridor must reach the real tank. Otherwise the blocked arm is vacuous.
+  shooter.fireCd=0;victim.spawnShieldT=0;
+  g.bullets=[];
+  if(g.hash?.clear){g.hash.clear();for(const t of g.tanks)g.hash.insert(t);}
+  g.tryFire(shooter);
+  const clearShot=g.bullets.find(b=>b.ownerId===shooter.id&&b.vx>1);
+  const clearProvenance=projectileCandidate(g,shooter,victim,0);
+  assert.equal(clearProvenance.known,true,'clear real projectile must be classifiable');
+  assert.equal(clearProvenance.possible,true,
+   'research projectile oracle must accept the real unblocked corridor');
+  assert.ok(clearShot,'unblocked control must emit a forward projectile');
+  const travel=(victim.x-clearShot.x)/clearShot.vx;
+  assert.ok(travel>0&&travel<clearShot.ttl,
+   'unblocked control must reach victim within the real projectile lifetime');
+  g.updateBullets(travel);
+  assert.ok(clearShot.hits>0,
+   'real unblocked projectile must register physical contact with victim');
+ }finally{g.destroy();}
+});
+
+test('research characterization: shotgun hull cone can witness a lane with no pellet',()=>{
+ const g=bootGame();
+ try{
+  const shooter=g.player,observer=g.tanks.find(t=>t!==shooter&&t.ai);
+  assert.ok(shooter&&observer);
+  g.setClass(shooter,'shotgun');
+  const victim=unit(9003,100,55,{});
+  g.time=10;g.status='playing';g.paused=false;
+  shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
+  observer.x=0;observer.y=100;
+  g.tanks=[observer,shooter,victim];
+  g.__novaFairVisibleTanks=g.tanks;
+  g.__novaFairShotWitnesses=g.tanks;
+  g.areHostile=()=>true;g.areAllies=()=>false;
+  g.hasLineOfSight=()=>true;
+  const before=g.bullets.length;
+  g.tryFire(shooter);
+  const pellets=g.bullets.slice(before).filter(b=>b&&
+   Number.isFinite(b.vx)&&Number.isFinite(b.vy)&&Math.hypot(b.vx,b.vy)>1);
+  assert.ok(pellets.length>=3,'real shotgun must emit a multi-pellet volley');
+  const toward=Math.atan2(victim.y-shooter.y,victim.x-shooter.x);
+  const nearest=Math.min(...pellets.map(b=>
+   Math.abs(Math.atan2(Math.sin(Math.atan2(b.vy,b.vx)-toward),
+                      Math.cos(Math.atan2(b.vy,b.vx)-toward)))));
+  assert.ok(nearest>.15,
+   'fixture must place the victim outside every real pellet direction');
+  const laneOnly=projectileCandidate(g,shooter,victim,before,{terrain:false});
+  assert.equal(laneOnly.known,true);
+  assert.equal(laneOnly.possible,false,
+   'B projectile-only arm must reject the broad Shotgunner cone without terrain rays');
+  assert.equal(laneOnly.terrainChecks,0);
+  const pelletProvenance=projectileCandidate(g,shooter,victim,before);
+  assert.equal(pelletProvenance.known,true,
+   'real composed Shotgunner pellet geometry should be classifiable');
+  assert.equal(pelletProvenance.possible,false,
+   'pellet-lane oracle must reject the broad hull-cone false candidate');
+  assert.equal(observer.ai.__v181ObservedShotVictims?.has(victim),true,
+   'KNOWN CANDIDATE DEFECT: a hull-cone candidate lacks projectile-bearing provenance');
+ }finally{g.destroy();}
+});
+
+test('research characterization: dense witnessed volleys expose quadratic LOS growth',()=>{
+ const g=bootGame();
+ try{
+  const shooter=g.player;
+  assert.ok(shooter);
+  g.time=10;g.status='playing';g.paused=false;
+  shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
+  const bots=Array.from({length:12},(_,i)=>
+   unit(9100+i,80+i*9,(i%3-1)*9,{}));
+  g.tanks=[shooter,...bots];
+  g.__novaFairVisibleTanks=g.tanks;
+  g.__novaFairShotWitnesses=g.tanks;
+  g.areHostile=()=>true;g.areAllies=()=>false;
+  let rays=0;
+  g.hasLineOfSight=()=>{rays++;return true;};
+  const before=g.bullets.length;
+  g.tryFire(shooter);
+  assert.ok(g.bullets.length>before,'real composed Game must fire');
+  const memories=bots.map(t=>t.ai.__v181ObservedShotVictimCount);
+  assert.ok(memories.every(n=>n===11),
+   'every visible observer should record the other eleven cone candidates');
+  assert.ok(rays>=12*11,
+   'KNOWN COST RISK: dense shots perform observer-by-candidate visibility checks');
+  console.log('NOVA_EVENT_TIME_DENSE_RAY_RESEARCH '+JSON.stringify({
+   tanks:g.tanks.length,rays,observedMemberships:memories.reduce((a,b)=>a+b,0)}));
+ }finally{g.destroy();}
+});
+
+test('research matched-world control: false witness changes composed AI strategic mode',()=>{
+ function run(withWitness){
+  return withSeed(1517800,()=>{
+   const g=bootGame();
+   try{
+    const shooter=g.player;
+    const [observer,third]=g.tanks.filter(t=>t!==shooter&&t.ai).slice(0,2);
+    assert.ok(shooter&&observer&&third);
+    g.status='playing';g.paused=false;g.time=10.5;
+    shooter.x=0;shooter.y=0;shooter.cls='twin';shooter.spawnShieldT=0;
+    observer.x=-200;observer.y=0;observer.hp=observer.maxHp;
+    third.x=100;third.y=0;
+    g.tanks=[observer,shooter,third];
+    g.__novaFairVisibleTanks=g.tanks;
+    g.areHostile=()=>true;g.areAllies=()=>false;
+    g.hasLineOfSight=()=>true;
+    g.powerups=[];g.shapes=[];g.drones=[];
+    const ai=g.__testWindow.__novaMakeRequire('')('game/ai');
+    assert.equal(typeof ai.updateAI,'function');
+    const a=observer.ai;
+    a.__v1112TargetId=shooter.id;
+    a.__v1112NextThink=10.6; // hold one fair, visible target
+    a.__v180TargetId=shooter.id;
+    a.__v181ObservedShotId=shooter.id;
+    a.__v181ObservedShotAt=10;
+    a.__v181ObservedShotAngle=0;
+    a.__v181ObservedShotX=0;
+    a.__v181ObservedShotY=0;
+    a.__v181ObservedShotVictims=withWitness?new WeakSet([third]):null;
+    a.__v181Think=0;
+    const oldMove=g.moveTank;let commanded=null;
+    g.moveTank=function(t,vx,vy,dt){if(t===observer)commanded=[vx,vy];return oldMove.apply(this,arguments);};
+    ai.updateAI(observer,g,1/60);
+    return {mode:a.__v181Mode,commanded};
+   }finally{g.destroy();}
+  });
+ }
+ const falseWitness=run(true),noWitness=run(false);
+ assert.equal(falseWitness.mode,'crossfire',
+  'KNOWN CANDIDATE DEFECT: false witness reaches the actual AI planning owner');
+ assert.notEqual(noWitness.mode,'crossfire',
+  'identical seeded world without false witness must not choose crossfire');
+ console.log('NOVA_FALSE_WITNESS_MOVE_RESEARCH '+JSON.stringify({falseWitness,noWitness}));
+});
+
+test('research A/B/C matched-world: projectile lane removes cone errors but only terrain arm rejects covered shot',()=>{
+ function arm(mode){
+  return withSeed(1517800,()=>{
+   const g=bootGame();
+   try{
+    const shooter=g.player;
+    const [observer,victim]=g.tanks.filter(t=>t!==shooter&&t.ai).slice(0,2);
+    assert.ok(shooter&&observer&&victim);
+    g.status='playing';g.paused=false;g.time=10;
+    shooter.x=0;shooter.y=0;shooter.angle=0;shooter.fireCd=0;
+    // The observer-to-victim diagonal must clear the real wall padding.
+    observer.x=0;observer.y=100;
+    victim.x=100;victim.y=0;
+    g.tanks=[observer,shooter,victim];
+    g.__novaFairVisibleTanks=g.tanks;
+    g.__novaFairShotWitnesses=g.tanks;
+    g.areHostile=()=>true;g.areAllies=()=>false;
+    g.powerups=[];g.shapes=[];g.drones=[];
+    const wall={id:-9801,kind:'terrain',shape:'rect',type:'wall',
+     x:50,y:0,w:20,h:36,solid:true,destructible:false,hp:0};
+    g.__novaTerrain=[wall];
+    delete g.__novaBattlefieldIndex;
+    delete g.__novaPerfTerrainIndex;
+    assert.equal(g.hasLineOfSight(observer.x,observer.y,shooter.x,shooter.y,2),true);
+    assert.equal(g.hasLineOfSight(observer.x,observer.y,victim.x,victim.y,2),true);
+    const before=g.bullets.length;
+    g.tryFire(shooter);
+    assert.ok(g.bullets.length>before);
+    const cone=observer.ai.__v181ObservedShotVictims?.has(victim)===true;
+    const lane=projectileCandidate(g,shooter,victim,before,{terrain:false});
+    const physical=projectileCandidate(g,shooter,victim,before);
+    assert.equal(cone,true);
+    assert.equal(lane.known,true);
+    assert.equal(lane.possible,true);
+    assert.equal(lane.terrainChecks,0);
+    assert.equal(physical.known,true);
+    assert.equal(physical.possible,false);
+    // Historical cover disappears; only the event-time evidence differs.
+    wall.solid=false;
+    g.time=10.5;
+    const a=observer.ai;
+    a.__v1112TargetId=shooter.id;
+    a.__v1112NextThink=10.6;
+    a.__v180TargetId=shooter.id;
+    a.__v181ObservedShotId=shooter.id;
+    a.__v181ObservedShotAt=10;
+    a.__v181ObservedShotAngle=0;
+    a.__v181ObservedShotX=0;
+    a.__v181ObservedShotY=0;
+    const qualifies=mode==='A'?cone:mode==='B'?lane.possible:physical.possible;
+    a.__v181ObservedShotVictims=qualifies?new WeakSet([victim]):null;
+    const crossfire=g.__testWindow.__NOVA_BATTLE_SENSE_TEST__
+     .thirdPartyVector(g,observer,shooter,{}).weight;
+    shooter.spawnShieldT=0;
+    observer.hp=observer.maxHp;
+    a.__v181Think=0;
+    const ai=g.__testWindow.__novaMakeRequire('')('game/ai');
+    const oldMove=g.moveTank;let commanded=null;
+    g.moveTank=function(t,vx,vy,dt){
+     if(t===observer)commanded=[vx,vy];
+     return oldMove.apply(this,arguments);
+    };
+    ai.updateAI(observer,g,1/60);
+    return {mode,qualifies,crossfire,aiMode:a.__v181Mode,commanded,
+     terrainChecks:mode==='C'?physical.terrainChecks:0};
+   }finally{g.destroy();}
+  });
+ }
+ const A=arm('A'),B=arm('B'),C=arm('C');
+ assert.equal(A.crossfire,.62,'cone falsely certifies a covered firing event');
+ assert.equal(B.crossfire,.62,'geometry-only arm still cannot see permanent cover');
+ assert.equal(C.crossfire,0,'physical event-time gate rejects covered shot');
+ assert.equal(A.aiMode,'crossfire','A cone changes the actual composed AI planning mode');
+ assert.equal(B.aiMode,'crossfire','B lane-only still changes the actual AI mode behind cover');
+ assert.notEqual(C.aiMode,'crossfire','C terrain gate removes the false strategic mode');
+ assert.ok(A.commanded&&B.commanded&&C.commanded,
+  'all three matched worlds must reach the actual movement owner');
+ assert.equal(B.terrainChecks,0,'cheap lane arm adds no terrain queries');
+ assert.equal(C.terrainChecks,1);
+ console.log('NOVA_CROSSFIRE_ABC_COVER_RESEARCH '+JSON.stringify({A,B,C}));
+});
