@@ -136,3 +136,12 @@ test('research projectile provenance: seeded segment-circle oracle agrees for 51
   assert.equal(result.possible,hit,'seeded lane '+i);
  }
 });
+
+test('research projectile provenance: malformed penetration cannot certify a lane',()=>{
+ for(const pen of [Infinity,-Infinity,NaN,-1,'3']){
+  const r=evaluate({pen});
+  assert.equal(r.known,false,'pen='+String(pen));
+  assert.equal(r.possible,false,'pen='+String(pen));
+  assert.equal(r.unsupported,1,'pen='+String(pen));
+ }
+});
