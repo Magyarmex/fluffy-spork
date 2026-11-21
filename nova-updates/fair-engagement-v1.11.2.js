@@ -112,7 +112,7 @@ function saturationSnapshot(g,selfId){
   return counts;
 }
 function scoreTarget(g,classes,observer,a,target,now,satCache){
-  if(!alive(target)||!hostile(g,observer,target)||target.spawnShieldT>0||!canPerceive(g,classes,observer,target))return-Infinity;
+  if(!canPerceive(g,classes,observer,target)||!alive(target)||!hostile(g,observer,target)||target.spawnShieldT>0)return-Infinity;
   var dist=Math.hypot(target.x-observer.x,target.y-observer.y),near=1/(1+dist/720);
   var hp=clamp(Number(target.hp)/Math.max(1,Number(target.maxHp)||Number(target.hp)||1),0,1);
   var score=near*1.16+(1-hp)*.48+targetDanger(classes,target)*.30;
@@ -140,7 +140,7 @@ function replanDelay(t){return (t&&t.ai&&t.ai.isElite?ELITE_REPLAN:NORMAL_REPLAN
 function fairTarget(g,classes,t,now){
   var a=t.ai||{},previousId=a.__v1112TargetId;
   var cur=previousId>=0&&g.getTank?g.getTank(previousId):null;
-  var valid=cur&&alive(cur)&&hostile(g,t,cur)&&canPerceive(g,classes,t,cur)&&!(cur.spawnShieldT>0);
+  var valid=cur&&canPerceive(g,classes,t,cur)&&alive(cur)&&hostile(g,t,cur)&&!(cur.spawnShieldT>0);
   /* An empty target slot is not permission to rescan every tank every frame.
    * When nobody is perceptible, keep the normal bounded reaction cadence.
    * A formerly valid target that dies, hides or gains spawn protection must
