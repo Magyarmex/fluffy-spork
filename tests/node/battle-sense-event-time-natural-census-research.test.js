@@ -5,6 +5,7 @@
 process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const test=require('node:test'),assert=require('node:assert/strict');
 const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+const {projectileCandidate}=require('../research/battle-sense-projectile-candidate.cjs');
 test('natural composed matches bound firing-time witness scans and report incidence',()=>{
  for(const seed of [1517800,1517802,1517810]){
   withSeed(seed,()=>{
@@ -17,6 +18,8 @@ test('natural composed matches bound firing-time witness scans and report incide
      eligibleVictimMemberships:0,shotsWithAnyVictimWitness:0,
      projectileAlignedMemberships:0,projectileBlockedMemberships:0,
      noProjectileLaneMemberships:0,
+     oraclePossibleMemberships:0,oracleKnownMissMemberships:0,
+     oracleUnknownMemberships:0,oracleTerrainChecks:0,
      fireLOSCalls:0,maxFireLOSCalls:0,crossfireSamples:0,
      geometricComparisons:0,oldOnlyGeometry:0,newOnlyGeometry:0};
     const originalLOS=g.hasLineOfSight,originalFire=g.tryFire;
@@ -56,6 +59,11 @@ test('natural composed matches bound firing-time witness scans and report incide
        for(const victim of observers){
         if(!victim||victim===shooter||victim===observer||
            candidates?.has(victim)!==true)continue;
+        const oracle=projectileCandidate(this,shooter,victim,before);
+        stats.oracleTerrainChecks+=oracle.terrainChecks||0;
+        if(oracle.possible)stats.oraclePossibleMemberships++;
+        else if(oracle.known)stats.oracleKnownMissMemberships++;
+        else stats.oracleUnknownMemberships++;
         let aligned=false,clear=false;
         for(const b of emitted){
          const speed=Math.hypot(b.vx,b.vy);
