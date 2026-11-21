@@ -13,14 +13,19 @@ function physicalCrowd(g, observer, destination, options = {}) {
   const radius = options.radius ?? 300;
   const maxCount = options.maxCount ?? 4;
   const F = g.__testFair;
-  if (!F || typeof F.inGameplayViewport !== 'function') return 0;
+  // Fair Engagement's tank predicate reads target health before geometry.
+  // Use its exported point-only extents to avoid inspecting unseen rivals.
+  const ext = F && typeof F.viewportHalfExtents === 'function'
+    ? F.viewportHalfExtents(g) : null;
+  if (!ext || !(ext.x > 0) || !(ext.y > 0)) return 0;
   let count = 0;
   for (const q of g.tanks || []) {
     if (!q || q === observer || q.id === observer.id ||
         !Number.isFinite(q.x) || !Number.isFinite(q.y)) continue;
     // The candidate deliberately does not inspect __lfEcoKey, private target
     // IDs, unseen world sectors, or the target's actual planned destination.
-    const seen = F.inGameplayViewport(g, observer, q);
+    const seen = Math.abs(q.x-observer.x) <= ext.x &&
+      Math.abs(q.y-observer.y) <= ext.y;
     if (!seen) continue;
     // Cheap public geometry first: do not spend a terrain ray on a visible
     // bot that is nowhere near the public opportunity.
