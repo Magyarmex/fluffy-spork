@@ -59,15 +59,15 @@ function liveRelay(g,owner,target){
     /* Remote health belongs only to the actual, still-live observed contact. */
     owner.__novaSpotterContactId!==target.id||
     !(Number(owner.__novaSpotterContactUntil)>Number(g.time||0))||
-    target.alive===false||(target.hp!=null&&!(target.hp>0))||
-    !Array.isArray(g.drones)||
+    target.alive===false||!Array.isArray(g.drones)||
     Number(owner.__novaSpotterDownUntil)>Number(g.time||0))return false;
  var id=owner.__novaSpotterDroneId;
  if(id==null||id<0)return false;
  for(var i=0;i<g.drones.length;i++){
   var d=g.drones[i];
-  if(d&&d.id===id&&d.ownerId===owner.id&&d.__novaSpotter&&d.hp>0)
-   return knownContact(g,owner,d)===target;
+  if(d&&d.id===id&&d.ownerId===owner.id&&d.__novaSpotter&&d.hp>0&&
+    knownContact(g,owner,d)===target)
+   return target.hp==null||target.hp>0;
  }
  return false;
 }
