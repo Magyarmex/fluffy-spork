@@ -29,3 +29,40 @@ test('research projectile provenance: no other shooter and no invalid victim can
   shooter,{x:Infinity,y:0});
  assert.equal(r.possible,false);assert.equal(r.known,false);
 });
+
+test('research projectile provenance: cover blocks a geometrically aligned shot',()=>{
+ let calls=0;
+ const blocked=projectileCandidate({
+  bullets:[{ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3}],
+  firstTerrainHit(x1,y1,x2,y2,r){calls++;assert.equal(x1,0);assert.equal(y1,0);assert.ok(x2>0&&x2<=100);assert.equal(y2,0);assert.ok(r>=0);return {x:40,y:0};}
+ },shooter,victim);
+ assert.equal(blocked.known,true);assert.equal(blocked.possible,false);
+ assert.equal(blocked.terrainChecks,1);assert.equal(calls,1);
+ const clear=projectileCandidate({
+  bullets:[{ownerId:7,x:0,y:0,vx:100,vy:0,ttl:2,r:3}],
+  firstTerrainHit(){return null;}
+ },shooter,victim);
+ assert.equal(clear.known,true);assert.equal(clear.possible,true);
+});
+test('research projectile provenance: finite misses, insufficient range, and foreign shots do not certify',()=>{
+ for(const patch of [
+  {vx:0,vy:100},{vx:100,vy:0,ttl:.2},{ownerId:8}
+ ]){
+  const r=evaluate(patch);
+  assert.equal(r.possible,false,JSON.stringify(patch));
+ }
+ const spread=projectileCandidate({bullets:[
+  {ownerId:7,x:0,y:0,vx:100,vy:70,ttl:2,r:3},
+  {ownerId:7,x:0,y:0,vx:100,vy:-70,ttl:2,r:3}
+ ]},shooter,victim);
+ assert.equal(spread.known,true);assert.equal(spread.possible,false);
+ assert.equal(spread.checked,2);
+});
+test('research projectile provenance: explosive and malformed lanes remain explicitly unknown',()=>{
+ for(const patch of [{shell:true},{splash:30},{cluster:true},{vx:0,vy:0}]){
+  const r=evaluate(patch);
+  assert.equal(r.known,false,JSON.stringify(patch));
+  assert.equal(r.possible,false,JSON.stringify(patch));
+  assert.equal(r.unsupported,1,JSON.stringify(patch));
+ }
+});
