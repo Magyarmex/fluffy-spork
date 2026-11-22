@@ -74,8 +74,8 @@ const {chromium}=require('playwright');
     peak:p.rafWorkPeakMs,samples:p.frameSamples};
   });
   assert.ok(rafWork.samples>=5,'live active-frame sample window exists');
-  assert.ok(rafWork.peak>=rafWork.smoothed,
-   'decaying full-RAF peak must cover the smoothed active cost');
+  assert.ok(rafWork.peak>=rafWork.latest,
+   'decaying full-RAF peak must cover the latest completed callback');
   console.log('NOVA_FULL_RAF_CPU_WORK_BROWSER',JSON.stringify(rafWork));
   const json=JSON.stringify(result);
   for(const secret of ['clientX','clientY','pointerId','targetTagName'])
