@@ -32,10 +32,24 @@ function recordShot(g,fair,ledger,shooter,metrics){
      !g.hasLineOfSight(observer.x,observer.y,shooter.x,shooter.y,3))continue;
   let events=ledger.get(observer.id);
   if(!events){events=new Map();ledger.set(observer.id,events);}
+  // Certify potential victims AT the firing event. A target walking into
+  // the old lane later must never become a retroactive witnessed attack.
+  // This is a directional commitment, not a certified projectile hit.
+  const targets=[];
+  for(const candidate of witnesses){
+   metrics.eventTargetChecks=(metrics.eventTargetChecks||0)+1;
+   if(!candidate||candidate.id===observer.id||candidate.id===shooter.id||
+      !alive(candidate)||!hostile(g,shooter,candidate)||
+      !fair.inGameplayViewport(g,observer,candidate))continue;
+   if(typeof g.hasLineOfSight==='function'&&
+      !g.hasLineOfSight(shooter.x,shooter.y,candidate.x,candidate.y,3))continue;
+   const bearing=Math.atan2(candidate.y-shooter.y,candidate.x-shooter.x);
+   if(Math.cos(shooter.angle-bearing)>=CONE)targets.push(candidate.id);
+  }
   events.delete(shooter.id);
   events.set(shooter.id,Object.freeze({
    shooterId:shooter.id,x:shooter.x,y:shooter.y,
-   angle:shooter.angle,at:now
+   angle:shooter.angle,at:now,targets:Object.freeze(targets)
   }));
   if(events.size>MAX_SHOOTERS)events.delete(events.keys().next().value);
   metrics.witnesses++;
@@ -57,12 +71,9 @@ function publicPressure(g,fair,ledger,observer,target,metrics){
   // This conservative prototype drops such memories instead of inspecting HP.
   if(!shooter||!fair.inGameplayViewport(g,observer,shooter)||
      !alive(shooter)||!hostile(g,shooter,target))continue;
-  // This is a current-position geometric proxy, NOT an event-time
-  // certification that the target was in the actual projectile lane.
-  if(typeof g.hasLineOfSight==='function'&&
-     !g.hasLineOfSight(ev.x,ev.y,target.x,target.y,3))continue;
-  const bearing=Math.atan2(target.y-ev.y,target.x-ev.x);
-  if(Math.cos(ev.angle-bearing)>=CONE)n++;
+  // A public event-time target certificate survives target movement,
+  // but never grows retroactively from a later target position.
+  if(ev.targets.includes(target.id))n++;
  }
  return n;
 }
@@ -119,10 +130,9 @@ test('negative control: a target entering the old shot lane is not a certified e
  recordShot(g,fair,ledger,shooter,m);
  assert.equal(publicPressure(g,fair,ledger,observer,target,m),0);
  target.y=0;
- assert.equal(publicPressure(g,fair,ledger,observer,target,m),1,
-  'falsifier: current target position can retroactively create a false witness');
- // Do not promote this proxy without event-time victim or actual projectile
- // lane evidence; preserving the firing origin alone is insufficient.
+ assert.equal(publicPressure(g,fair,ledger,observer,target,m),0,
+  'a target entering an old firing lane cannot create a retroactive witness');
+ // The event-time certificate records aim commitment, not projectile impact.
 });
 test('ledger retains at most four distinct shooter events per observer',()=>{
  const fair={inGameplayViewport:()=>true};
@@ -140,7 +150,7 @@ function run(seed,instrument){
  return withSeed(seed,draws=>{
   const g=bootGame(),ledger=new Map(),fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
   const metrics={seed,shots:0,witnesses:0,witnessChecks:0,candidateChecks:0,
-   visiblePairs:0,privatePositive:0,publicPositive:0,bothPositive:0,
+   visiblePairs:0,privatePositive:0,publicPositive:0,bothPositive:0,eventTargetChecks:0,
    maxLedgerSize:0,frames:0};
   try{
    g.sfx.muted=true;g.sfx.startMusic=()=>{};
