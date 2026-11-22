@@ -21,7 +21,7 @@ function frames(mode){
  throw Error('unknown presentation schedule');
 }
 function run(seed,cls,reload,mode,maxSteps=3,inputPolicy='held',nativePresentation=false){
- assert.ok(['held','firstFrameTap','firstFrameTapBuffered'].includes(inputPolicy));
+ assert.ok(['held','firstFrameTap','firstFrameTapBuffered','firstFrameTapBufferedNoAim'].includes(inputPolicy));
  return withSeed(seed,()=>{
   const g=bootGame();
   if(!g.player)g.redeploy();
@@ -59,16 +59,19 @@ function run(seed,cls,reload,mode,maxSteps=3,inputPolicy='held',nativePresentati
   try{
    for(const frame of frames(mode)){
     g.input.firing=inputPolicy==='held'||frameIndex===0;
-    if(inputPolicy==='firstFrameTapBuffered'&&frameIndex===0)pendingPress=true;
+    if(inputPolicy.startsWith('firstFrameTapBuffered')&&frameIndex===0)pendingPress=true;
+    if(inputPolicy==='firstFrameTapBufferedNoAim'&&frameIndex>0){
+     g.input.aim.active=false;g.input.aim.dx=0;g.input.aim.dy=0;
+    }
     frameIndex++;
     wall+=frame;acc+=frame;
     let used=0;
     if(nativePresentation){
      g.update(frame);updates++;used=1;acc=0;
     }else while(acc+EPS>=STEP&&used<maxSteps){
-     if(inputPolicy==='firstFrameTapBuffered'&&pendingPress)g.input.firing=true;
+     if(inputPolicy.startsWith('firstFrameTapBuffered')&&pendingPress)g.input.firing=true;
      g.update(STEP);
-     if(inputPolicy==='firstFrameTapBuffered'){pendingPress=false;g.input.firing=false;}
+     if(inputPolicy.startsWith('firstFrameTapBuffered')){pendingPress=false;g.input.firing=false;}
      acc-=STEP;
      if(Math.abs(acc)<EPS)acc=0;
      used++;updates++;
@@ -121,6 +124,7 @@ test('fixed60 without input-edge buffering can lose a one-frame 120Hz tap',()=>{
  const native=run(1517800,'minigun',1,'uniform120',3,'firstFrameTap',true);
  const fixed=run(1517800,'minigun',1,'uniform120',3,'firstFrameTap');
  const buffered=run(1517800,'minigun',1,'uniform120',3,'firstFrameTapBuffered');
+ const noAim=run(1517800,'minigun',1,'uniform120',3,'firstFrameTapBufferedNoAim');
  assert.equal(native.updates,480,'current variable-step 120Hz can sample every presentation');
  assert.equal(native.volleys,1,'a legal first-frame press fires in current 120Hz Game');
  assert.equal(fixed.updates,240);
@@ -129,7 +133,9 @@ test('fixed60 without input-edge buffering can lose a one-frame 120Hz tap',()=>{
  assert.equal(buffered.volleys,1,'one pending press consumed by the next Game tick restores the tap');
  assert.equal(buffered.updates,240);
  assert.equal(buffered.zeroUpdateFrames,240);
- console.log('GUNNER_FIXED60_SHORT_TAP_FALSIFIER '+JSON.stringify({native,fixed,buffered}));
+ assert.equal(noAim.volleys,0,
+  'press-only buffering cannot fire after the touch aim vector is released');
+ console.log('GUNNER_FIXED60_SHORT_TAP_FALSIFIER '+JSON.stringify({native,fixed,buffered,noAim}));
 });
 test('bounded whole-Game scheduler recovers one 100ms stall without changing the 60Hz weapon timeline',()=>{
  const rows=[];
