@@ -385,3 +385,39 @@ test('rounded wall corners are not mistaken for fully opaque health-bar cover',(
   assert.equal(T.healthBarCovered(g,C,target),false,
     'a rectangle bounding box is not enough to prove full bar occlusion');
 });
+
+test('viewport-edge hull contact cannot score HP when its entire bar is offscreen',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C=classes();C.CLASSES.basic={size:14};
+  const g=game(1000,700,1),observer=tank(1,0,0),target=tank(2,0,-342);
+  g.tanks=[observer,target];g.__novaTerrain=[];
+  assert.equal(T.inGameplayViewport(g,observer,target),true,
+    'hull center is still a public contact');
+  const healthy=T.scoreTarget(g,C,observer,observer.ai,target,g.time);
+  target.hp=20;
+  assert.equal(T.scoreTarget(g,C,observer,observer.ai,target,g.time),healthy,
+    'entirely clipped health strip must not reveal a private wound');
+  assert.ok(Number.isFinite(healthy),'contact remains selectable');
+  target.y=-325;target.hp=100;
+  const visible=T.scoreTarget(g,C,observer,observer.ai,target,g.time);
+  target.hp=20;
+  assert.ok(Math.abs(T.scoreTarget(g,C,observer,observer.ai,target,g.time)-visible-.384)<1e-8,
+    'health strip inside viewport must retain normal vulnerability scoring');
+});
+
+test('horizontal partial clipping retains visible HP and zoom updates strip bounds',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C=classes();C.CLASSES.basic={size:14};
+  const g=game(1000,700,1),observer=tank(1,0,0),target=tank(2,495,0);
+  g.tanks=[observer,target];g.__novaTerrain=[];
+  const full=T.scoreTarget(g,C,observer,observer.ai,target,g.time);
+  target.hp=20;
+  assert.ok(Math.abs(T.scoreTarget(g,C,observer,observer.ai,target,g.time)-full-.384)<1e-8,
+    'partly visible horizontal strip must not be suppressed');
+  g.cam.zoom=2;target.x=0;target.y=-173;target.hp=100;
+  assert.equal(T.inGameplayViewport(g,observer,target),true);
+  const hidden=T.scoreTarget(g,C,observer,observer.ai,target,g.time);
+  target.hp=20;
+  assert.equal(T.scoreTarget(g,C,observer,observer.ai,target,g.time),hidden,
+    'zoomed viewport edge must hide a wholly clipped bar');
+});
