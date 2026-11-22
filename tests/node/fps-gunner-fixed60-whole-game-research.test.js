@@ -154,6 +154,10 @@ test('shipping Input clears right-stick aim on pointerup, so a press-only latch 
   assert.equal(input.aim.active,false);
   assert.equal(input.aim.dx,0);
   assert.equal(input.firing,false);
+  input.move.active=true;input.move.dx=0;input.move.dy=40;
+  const fallback=input.aimVec(input.moveVec());
+  assert.ok(fallback&&fallback.y>0.99&&Math.abs(fallback.x)<1e-9,
+   'after right-stick release, a buffered shot could use movement direction instead');
  }finally{input.canvas=canvas;g.destroy();}
 });
 test('bounded whole-Game scheduler recovers one 100ms stall without changing the 60Hz weapon timeline',()=>{
