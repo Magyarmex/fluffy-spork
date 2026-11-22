@@ -385,3 +385,93 @@ test('rounded wall corners are not mistaken for fully opaque health-bar cover',(
   assert.equal(T.healthBarCovered(g,C,target),false,
     'a rectangle bounding box is not enough to prove full bar occlusion');
 });
+
+test('viewport-edge hull contact cannot score HP when its entire bar is offscreen',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C=classes();C.CLASSES.basic={size:14};
+  const g=game(1000,700,1),observer=tank(1,0,0),target=tank(2,0,-342);
+  g.tanks=[observer,target];g.__novaTerrain=[];
+  assert.equal(T.inGameplayViewport(g,observer,target),true,
+    'hull center is still a public contact');
+  const healthy=T.scoreTarget(g,C,observer,observer.ai,target,g.time);
+  target.hp=20;
+  assert.equal(T.scoreTarget(g,C,observer,observer.ai,target,g.time),healthy,
+    'entirely clipped health strip must not reveal a private wound');
+  assert.ok(Number.isFinite(healthy),'contact remains selectable');
+  target.y=-325;target.hp=100;
+  const visible=T.scoreTarget(g,C,observer,observer.ai,target,g.time);
+  target.hp=20;
+  assert.ok(Math.abs(T.scoreTarget(g,C,observer,observer.ai,target,g.time)-visible-.384)<1e-8,
+    'health strip inside viewport must retain normal vulnerability scoring');
+});
+
+test('horizontal partial clipping retains visible HP and zoom updates strip bounds',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C=classes();C.CLASSES.basic={size:14};
+  const g=game(1000,700,1),observer=tank(1,0,0),target=tank(2,495,0);
+  g.tanks=[observer,target];g.__novaTerrain=[];
+  const full=T.scoreTarget(g,C,observer,observer.ai,target,g.time);
+  target.hp=20;
+  assert.ok(Math.abs(T.scoreTarget(g,C,observer,observer.ai,target,g.time)-full-.384)<1e-8,
+    'partly visible horizontal strip must not be suppressed');
+  g.cam.zoom=2;target.x=0;target.y=-173;target.hp=100;
+  assert.equal(T.inGameplayViewport(g,observer,target),true);
+  const hidden=T.scoreTarget(g,C,observer,observer.ai,target,g.time);
+  target.hp=20;
+  assert.equal(T.scoreTarget(g,C,observer,observer.ai,target,g.time),hidden,
+    'zoomed viewport edge must hide a wholly clipped bar');
+});
+
+test('live Sniper Observer relay may legitimately reveal an offscreen health strip',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C=classes();C.CLASSES.basic={size:14};
+  const g=game(1000,700,1),observer=tank(1,0,0,{cls:'marksman',
+    __novaSpotterContactId:2,__novaSpotterContactUntil:10}),target=tank(2,0,-342);
+  g.tanks=[observer,target];g.__novaTerrain=[];
+  window.__NOVA_SPOTTER_LIVE_RELAY__=(_g,owner,t)=>
+    owner===observer&&t===target;
+  const full=T.scoreTarget(g,C,observer,observer.ai,target,g.time);
+  target.hp=20;
+  assert.ok(Math.abs(T.scoreTarget(g,C,observer,observer.ai,target,g.time)-full-.384)<1e-8,
+    'a live legitimate relay remains an explicit health-information exception');
+  delete window.__NOVA_SPOTTER_LIVE_RELAY__;
+  target.hp=100;
+  const hidden=T.scoreTarget(g,C,observer,observer.ai,target,g.time);
+  target.hp=20;
+  assert.equal(T.scoreTarget(g,C,observer,observer.ai,target,g.time),hidden,
+    'revoking relay immediately restores viewport health privacy');
+});
+
+test('320px portrait viewport keeps contact while hiding fully clipped HP',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C=classes();C.CLASSES.basic={size:14};
+  // Shipping resize uses zoom=min(width/640,height/520), clamped to .45..1.2.
+  // At 320x700 CSS px, zoom=.5 and the vertical half-extent is 700 world units.
+  const g=game(320,700,.5),observer=tank(1,0,0),target=tank(2,0,-692);
+  g.tanks=[observer,target];g.__novaTerrain=[];
+  assert.equal(T.inGameplayViewport(g,observer,target),true);
+  const healthy=T.scoreTarget(g,C,observer,observer.ai,target,g.time);
+  target.hp=20;
+  assert.equal(T.scoreTarget(g,C,observer,observer.ai,target,g.time),healthy);
+  target.y=-670;target.hp=100;
+  const open=T.scoreTarget(g,C,observer,observer.ai,target,g.time);
+  target.hp=20;
+  assert.ok(Math.abs(T.scoreTarget(g,C,observer,observer.ai,target,g.time)-open-.384)<1e-8);
+});
+
+test('wholly clipped low HP cannot lure AI away from a closer healthy visible rival',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C=classes();C.CLASSES.basic={size:14};
+  const g=game(1000,700,1),observer=tank(1,0,0);
+  const edge=tank(2,0,-342,{hp:20}),closer=tank(3,250,0,{hp:100});
+  g.tanks=[observer,edge,closer];g.__novaTerrain=[];
+  assert.equal(T.inGameplayViewport(g,observer,edge),true);
+  assert.equal(T.chooseTarget(g,C,observer,observer.ai,g.time).id,closer.id,
+    'private clipped HP must not overpower the visible closer rival');
+  edge.hp=100;
+  assert.equal(T.chooseTarget(g,C,observer,observer.ai,g.time).id,closer.id,
+    'changing hidden HP must not change the chosen target');
+  edge.y=-325;edge.hp=20;
+  assert.equal(T.chooseTarget(g,C,observer,observer.ai,g.time).id,edge.id,
+    'when the bar enters view, a visible low-health rival may legitimately win');
+});

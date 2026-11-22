@@ -119,8 +119,30 @@ const {chromium}=require('playwright');
      Object.assign(g.cam,drawSaved.cam);
      wall.solid=true;
     }
+    // Composed viewport-edge negative/positive controls: hull contact remains
+    // legal while a wholly offscreen bar no longer leaks live HP.
+    const edgeSaved={observerY:observer.y,targetY:covered.y,zoom:g.cam.zoom};
+    let edgeDelta,interiorDelta;
+    try{
+     observer.y=0;covered.y=-342;g.cam.zoom=1;wall.solid=false;
+     if(!F.canPerceive(g,C,observer,covered))
+      throw Error('viewport-edge hull lost public contact');
+     covered.hp=100;
+     const edgeFull=F.scoreTarget(g,C,observer,observer.ai,covered,g.time);
+     covered.hp=20;
+     edgeDelta=F.scoreTarget(g,C,observer,observer.ai,covered,g.time)-edgeFull;
+     covered.y=-325;covered.hp=100;
+     const interiorFull=F.scoreTarget(g,C,observer,observer.ai,covered,g.time);
+     covered.hp=20;
+     interiorDelta=F.scoreTarget(g,C,observer,observer.ai,covered,g.time)-interiorFull;
+     if(Math.abs(edgeDelta)>1e-7||Math.abs(interiorDelta-.384)>1e-7)
+      throw Error('composed viewport HP edge policy drift '+JSON.stringify({edgeDelta,interiorDelta}));
+    }finally{
+     observer.y=edgeSaved.observerY;covered.y=edgeSaved.targetY;
+     g.cam.zoom=edgeSaved.zoom;wall.solid=true;
+    }
     return {hullSize,bar,wall,barFullyOverpainted,scoreDelta:delta,visibleDelta,coveredChoiceA,coveredChoiceB,visibleChoiceA,visibleChoiceB,
-     pixelEvidence,physicalLOS:false,viewportContact:true,
+     pixelEvidence,edgeDelta,interiorDelta,physicalLOS:false,viewportContact:true,
      originalTankCount:originals.tanks.length};
    }finally{
     for(const {t,state,ai} of saved){Object.assign(t,state);t.ai=ai;}
