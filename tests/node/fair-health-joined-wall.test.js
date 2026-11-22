@@ -118,3 +118,14 @@ test('portrait zoom uses CSS viewport world extents for clipped HP evidence',()=
  assert.equal(F.inGameplayViewport(g,observer,t),false,
   'the same target is offscreen at portrait zoom 1');
 });
+
+test('collision-clear wall-hugging Twin retains public HP when 0.5-unit bar edge is exposed',()=>{
+ const F=boot(),t=target();
+ t.y=52;
+ const g=world([{shape:'rect',x:0,y:0,w:240,h:70,solid:true}],t);
+ assert.equal(F.healthBarCovered(g,C,t,observer),false);
+ const full=F.scoreTarget(g,C,observer,observer.ai,t,g.time);
+ t.hp=20;
+ assert.ok(Math.abs(F.scoreTarget(g,C,observer,observer.ai,t,g.time)-full-.384)<1e-8,
+  'the conservative full-strip policy must not hide partially exposed HP');
+});
