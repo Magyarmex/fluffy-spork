@@ -80,3 +80,23 @@ test('CONTROL: open sight and opaque sight share contact legality but not health
  assert.equal(F.canPerceive(g,C,observer,covered),true);
  assert.equal(F.canPerceive(g,C,observer,clear),true);
 });
+
+test('REACHABILITY: real Battlefield collision leaves only a 0.5-unit health-bar sliver at a straight wall',()=>{
+ const {Game}=boot(),g=new Game(),target=tank(2,0,50);
+ const wall=g.__novaTerrain[0],size=CLASSES.basic.size,face=wall.y+wall.h/2;
+ g.tanks=[target];
+ // This begins in the previously demonstrated full-strip fixture, which
+ // is hull-clear but NOT collision-radius-clear.
+ assert.ok(target.y<face+size+3);
+ g.moveTank(target,0,0,1/60);
+ assert.equal(target.y,face+size+3,'actual Battlefield resolver must clear radius size+3');
+ const top=target.y-size-6,bottom=target.y-size-2.5;
+ assert.equal(top,face-3);
+ assert.equal(bottom,face+0.5);
+ const coveredHeight=Math.max(0,Math.min(face,bottom)-top);
+ assert.equal(coveredHeight,3);
+ assert.ok(Math.abs(coveredHeight/(bottom-top)-6/7)<1e-12);
+ // The merged full-strip gate cannot trigger here, despite 6/7 of the
+ // bar rectangle being under the solid wall. This is a characterization
+ // of a reachable pose, not a proposed threshold or visibility verdict.
+});
