@@ -247,7 +247,7 @@ canvas {
     <link rel="icon" href="./nova-icon.svg" type="image/svg+xml" />
     <meta name="application-name" content="NOVA TANKS" />
     <script defer src="./pwa-register.js"></script>
-      <meta name="nova-runtime-build" content="ab4f841bbe83460d3500eb02" />
+      <meta name="nova-runtime-build" content="6ba51c7708d0bb87c57ba341" />
   </head>
   <body>
     <div id="root"></div>
@@ -2435,6 +2435,15 @@ class Game {
             }
             earlierWork = priorWork;
             priorWork = performance.now() - workStart;
+            if (!this.paused && this.status === 'playing') {
+                this.__novaRafWorkMs = priorWork;
+                this.__novaRafWorkEmaMs = this.__novaRafWorkEmaMs == null ? priorWork : this.__novaRafWorkEmaMs * .9 + priorWork * .1;
+                this.__novaRafWorkPeakMs = Math.max(priorWork, (this.__novaRafWorkPeakMs || 0) * .995);
+            } else {
+                this.__novaRafWorkMs = null;
+                this.__novaRafWorkEmaMs = null;
+                this.__novaRafWorkPeakMs = null;
+            }
         };
         this.raf = requestAnimationFrame(loop);
     }
