@@ -433,8 +433,8 @@ mods['game/engine']=function(module,exports,require){
  var classes;try{classes=require('./classes');}catch(ignore){return;}
  Game.prototype.__novaDeathInsightInstalled=true;
  var oldKill=Game.prototype.killTank,oldUpdate=Game.prototype.update,
-  oldRedeploy=Game.prototype.redeploy,oldUnregister=Game.prototype.unregisterTank,
-  oldDamage=Game.prototype.damageTank;
+  oldRedeploy=Game.prototype.redeploy,oldDestroy=Game.prototype.destroy,
+  oldUnregister=Game.prototype.unregisterTank,oldDamage=Game.prototype.damageTank;
  /* A rival's live bullet can kill the player after that rival has been
   * unregistered. Preserve only a bounded class snapshot for Fieldcraft,
   * never posthumous XP, kill credit, AI targeting or tank resurrection. */
@@ -490,6 +490,12 @@ mods['game/engine']=function(module,exports,require){
   this.__novaFieldcraftDeadOwners=null;
   this.__novaFieldcraftActiveSource=undefined;
   return out;
+ };
+ if(typeof oldDestroy==='function')Game.prototype.destroy=function(){
+  // A pending death-panel observer must not paint a previous match's note
+  // into a replacement Game's UI after the original owner is destroyed.
+  try{cleanup(this);}catch(ignore){this.__novaDeathInsight=null;}
+  return oldDestroy.apply(this,arguments);
  };
 };
 window.__NOVA_DEATH_INSIGHT_TEST__={choose:choose,paint:paint,cleanup:cleanup};
