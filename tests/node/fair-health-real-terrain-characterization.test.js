@@ -141,7 +141,7 @@ test('RESEARCH CENSUS: real 49-overlay AI motion samples reachable partially hid
      counts.maxFraction=Math.max(counts.maxFraction,maxFraction);
      if(maxFraction>=.5)counts.partialOverHalf++;
      if(maxFraction>=.75)counts.partialOverThreeQuarters++;
-     if(g.__testFair.healthBarCovered(g,classes,t))counts.fullStripGate++;
+     if(typeof g.__testFair.healthBarCovered==='function'&&g.__testFair.healthBarCovered(g,classes,t))counts.fullStripGate++;
      if(maxFraction>=.5&&g.player&&g.__testFair.inGameplayViewport(g,g.player,t))
       counts.viewportPartial++;
     }
