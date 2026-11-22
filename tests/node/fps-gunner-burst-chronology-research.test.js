@@ -97,6 +97,21 @@ function run(seed,cls,reload,steps,policy){
   }finally{g.destroy();}
  });
 }
+test('input event boundaries preserve exactly matched held/release time across all schedules',()=>{
+ const policies=[[held,8],[longBurst,6.5],[shortBurst,4]];
+ for(const [policy,expectedOn] of policies)
+  for(const steps of [schedule(30),schedule(60),schedule(120),irregular()]){
+   const split=splitAtInputEdges(steps,policy);
+   let time=0,onTime=0;
+   for(const dt of split){
+    assert.ok(dt>0&&dt<=1/30+1e-9,'no negative or oversized update');
+    if(policy(time))onTime+=dt;
+    time+=dt;
+   }
+   assert.ok(Math.abs(time-SECONDS)<1e-8,'exact matched wall-clock duration');
+   assert.ok(Math.abs(onTime-expectedOn)<1e-8,'same physical fire duration');
+  }
+});
 test('legal rotary builds: matched held and burst policies expose cadence sensitivity without invented goldens',()=>{
  const policies={held,longBurst,shortBurst};
  const rows=[];
