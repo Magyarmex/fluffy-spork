@@ -16,6 +16,7 @@ function frames(mode){
  if(mode==='alternating60p15')return Array.from({length:240},(_,i)=>(i%2?0.85:1.15)*STEP);
  if(mode==='alternating40_120')return Array.from({length:120},()=>[1/40,1/120]).flat();
  if(mode==='uniform20')return Array.from({length:80},()=>1/20);
+ if(mode==='cluster30Harsh')return Array.from({length:30},()=>[.085,.04,.005,1/300]).flat();
  if(mode==='overload10')return Array.from({length:40},()=>0.1);
  if(mode==='single100msStall')return [0.1,...Array.from({length:234},()=>STEP)];
  throw Error('unknown presentation schedule');
@@ -101,7 +102,7 @@ test('bounded whole-Game fixed60 preserves held rotary fire across ordinary pres
   for(const seed of [1517800,1517802]){
    const baseline=run(seed,cls,reload,'uniform60');
    assert.equal(baseline.updates,240);
-   for(const mode of ['uniform30','uniform120','alternating60p15','alternating40_120','uniform20']){
+   for(const mode of ['uniform30','uniform120','alternating60p15','alternating40_120','uniform20','cluster30Harsh']){
     const row=run(seed,cls,reload,mode);
     assert.deepEqual(run(seed,cls,reload,mode),row,'same schedule and seed reproduce');
     assert.equal(row.updates,240,'ordinary presentation schedule must repay all 60Hz ticks');
@@ -110,14 +111,18 @@ test('bounded whole-Game fixed60 preserves held rotary fire across ordinary pres
     assert.equal(row.spin,baseline.spin,'same Game tick history must preserve spin');
     assert.equal(row.heat,baseline.heat,'same Game tick history must preserve heat');
     assert.ok(row.maxUsed<=3,'strict per-frame update budget');
-    assert.equal(row.backloggedFrames,0,'no ordinary frame should leave whole ticks behind');
+    if(mode==='cluster30Harsh'){
+     assert.ok(row.backloggedFrames>0,'clustered 85ms frames create temporary debt');
+     assert.ok(Math.abs(row.remainingDebt)<1e-7,'short following frames must repay clustered debt');
+    }else assert.equal(row.backloggedFrames,0,
+     'regular presentation schedules should leave no whole-tick backlog');
     if(mode==='uniform120')assert.equal(row.zeroUpdateFrames,240,
      '120Hz rendering would repeat the same simulation pose on half its frames without interpolation');
     rows.push({cls,reload,seed,mode,volleys:row.volleys,updates:row.updates,maxUsed:row.maxUsed});
    }
   }
  }
- assert.equal(rows.length,30);
+ assert.equal(rows.length,36);
  console.log('GUNNER_FIXED60_WHOLE_GAME_PRESENTATION_PILOT '+JSON.stringify(rows));
 });
 test('fixed60 without input-edge buffering can lose a one-frame 120Hz tap',()=>{
