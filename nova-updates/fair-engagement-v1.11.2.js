@@ -166,12 +166,18 @@ function healthBarCovered(g,classes,target){
   }
   return false;
 }
+/* Shared public-health evidence rule for scoring and tactical ability intent. */
+function healthPublicTo(g,classes,observer,target){
+  if(!g||!observer||!target)return false;
+  return (healthBarInViewport(g,classes,observer,target)&&!healthBarCovered(g,classes,target))||
+    hasSpotterRelay(g,classes,observer,target);
+}
 function scoreTarget(g,classes,observer,a,target,now,satCache){
   if(!canPerceive(g,classes,observer,target)||!alive(target)||!hostile(g,observer,target)||target.spawnShieldT>0)return-Infinity;
   var dist=Math.hypot(target.x-observer.x,target.y-observer.y),near=1/(1+dist/720);
   /* A covered health strip does not grant omniscient execution priority. The
    * target remains a legal public contact for navigation and combat planning. */
-  var healthPublic=(healthBarInViewport(g,classes,observer,target)&&!healthBarCovered(g,classes,target))||hasSpotterRelay(g,classes,observer,target);
+  var healthPublic=healthPublicTo(g,classes,observer,target);
   var hp=healthPublic?clamp(Number(target.hp)/Math.max(1,Number(target.maxHp)||Number(target.hp)||1),0,1):1;
   var score=near*1.16+(1-hp)*.48+targetDanger(classes,target)*.30;
   if(a&&a.__v1112TargetId===target.id)score+=.16;
@@ -250,6 +256,7 @@ window.__NOVA_VERSION=VERSION;
 window.__NOVA_FAIR_ENGAGEMENT__={
   version:VERSION,codename:CODENAME,date:'2026-08-30',closeNodeRescues:0,targetReplans:0,
   inGameplayViewport:inGameplayViewport,inGameplayWorldPoint:inGameplayWorldPoint,gameplayViewportFilter:gameplayViewportFilter,
+  healthPublicTo:healthPublicTo,
   contract:{gameplayViewportParity:true,adaptiveWidthHeight:true,adaptiveRotation:true,adaptiveZoom:true,globalMinimapRadar:false,spotterRelayException:true,playerPriorityBonus:false,saturationIsSoft:true,closeHeldAimRemainsCommand:true,releaseStillRecalls:true}
 };
 window.__NOVA_FAIR_ENGAGEMENT_TEST__={
