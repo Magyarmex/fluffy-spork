@@ -19,6 +19,8 @@ function frames(mode){
  if(mode==='native61')return Array.from({length:366},()=>1/61);
  if(mode==='cluster30')return Array.from({length:180},()=>1/30);
  if(mode==='alternating40_120')return Array.from({length:180},()=>[1/40,1/120]).flat();
+ if(mode==='alternating60p15')return Array.from({length:360},(_,i)=>
+  (i%2===0?1.15:.85)/60);
  throw Error('unknown presentation mode');
 }
 function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhase=0,drainSeconds=0,playerMoveY=0,playerMotion='constant'){
@@ -407,4 +409,36 @@ test('61Hz rotary cliff is measured against real moving-target HP, not just voll
  }
  assert.equal(rows.length,4);
  console.log('GUNNER_60_61_REAL_MOVING_TARGET_HP '+JSON.stringify(rows));
+});
+
+/* #799: the no-target equal-mean ±15% jitter cliff must be checked against
+ * real moving-target HP, not promoted from emitted volleys alone.
+ * This isolates one deterministic synthetic frame schedule, not a device
+ * trace, win-rate claim, or intended damage golden. */
+test('equal-mean alternating 60Hz jitter measures real moving-target HP after projectile drain',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+  for(const seed of [1517800,1517802]){
+   for(const motionPhase of [.03,.715]){
+    const args=[seed,cls,reload];
+    const uniform=trial(...args,'native60',.007,26,1.37,motionPhase,2);
+    const jitter=trial(...args,'alternating60p15',.007,26,1.37,motionPhase,2);
+    assert.equal(uniform.onTime,jitter.onTime,
+     'both schedules must honor the same physical fire/release duration');
+    assert.ok(uniform.travel>50&&jitter.travel>50,
+     'the real target must traverse the projectile corridor');
+    assert.ok(uniform.damage>0&&jitter.damage>0,
+     'real projectile hits must produce applied target HP loss');
+    assert.ok(Math.abs(uniform.peakOffset-jitter.peakOffset)<.1,
+     'both schedules must preserve the same physical target excursion');
+    rows.push({cls,reload,seed,motionPhase,
+     uniform:{volleys:uniform.volleys,hits:uniform.hits,damage:uniform.damage,
+      windowDamage:uniform.windowDamage,drainDamage:uniform.drainDamage},
+     jitter:{volleys:jitter.volleys,hits:jitter.hits,damage:jitter.damage,
+      windowDamage:jitter.windowDamage,drainDamage:jitter.drainDamage}});
+   }
+  }
+ }
+ assert.equal(rows.length,8);
+ console.log('GUNNER_ALTERNATING_JITTER_MOVING_HP '+JSON.stringify(rows));
 });
