@@ -452,7 +452,7 @@ test('equal-mean alternating 60Hz jitter measures real moving-target HP after pr
  * claimed phone trace, gameplay fix, or permanent damage golden. */
 test('held-fire equal-mean jitter measures real moving and stationary HP after projectile drain',()=>{
  const rows=[];
- for(const [cls,reload] of [['minigun',1],['needlestorm',3],['needlestorm',5]]{
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3],['needlestorm',5]]){
   for(const seed of [1517800,1517802]){
    for(const phase of [.03,.715]){
     const arms={};
@@ -488,6 +488,6 @@ test('held-fire equal-mean jitter measures real moving and stationary HP after p
    }
   }
  }
- assert.equal(rows.length,8);
+ assert.equal(rows.length,12);
  console.log('GUNNER_HELD_JITTER_REAL_MOVING_HP '+JSON.stringify(rows));
 });
