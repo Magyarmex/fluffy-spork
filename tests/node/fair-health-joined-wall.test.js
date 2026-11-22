@@ -70,3 +70,12 @@ test('public-health contract used by Phase agrees with the joined-wall scorer',(
  g.__novaTerrain[1].solid=false;
  assert.equal(publicHealth(g,C,observer,t),true);
 });
+
+test('unrelated distant wall cannot reuse the prior opaque interval',()=>{
+ const F=boot(),t=target();
+ const a=wall(-12),b=wall(12);b.y=1000;
+ const g=world([a,b],t);
+ assert.equal(F.healthBarCovered(g,C,t),false);
+ b.y=32;
+ assert.equal(F.healthBarCovered(g,C,t),true);
+});
