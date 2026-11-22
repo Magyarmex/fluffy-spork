@@ -142,6 +142,7 @@ function healthBarCovered(g,classes,target){
   var spec=defs&&target&&defs[target.cls],size=Number(spec&&spec.size);
   if(!Array.isArray(terrain)||!(size>0)||!target)return false;
   var x0=target.x-17,x1=target.x+17,y0=target.y-size-6,y1=target.y-size-2.5;
+  var intervals=[];
   for(var i=0;i<terrain.length;i++){
     var t=terrain[i];
     if(!t||t.solid===false||(t.destructible&&!(t.hp>0)))continue;
@@ -156,6 +157,16 @@ function healthBarCovered(g,classes,target){
         (x1<=t.x+hw-round||y0>=t.y-hh+round)&&
         (x0>=t.x-hw+round||y1<=t.y+hh-round)&&
         (x1<=t.x+hw-round||y1<=t.y+hh-round))return true;
+      /* Reuse the existing terrain pass to collect only guaranteed-opaque
+       * full-height intervals. Do not rescan every wall per AI candidate. */
+      var left,right;
+      if(y0>=t.y-hh+round&&y1<=t.y+hh-round){
+        left=t.x-hw;right=t.x+hw;
+      }else if(y0>=t.y-hh&&y1<=t.y+hh){
+        left=t.x-hw+round;right=t.x+hw-round;
+      }
+      if(right>left&&right>x0&&left<x1)
+        intervals.push([Math.max(x0,left),Math.min(x1,right)]);
     }else if(t.shape==='circle'){
       var rr=Number(t.r);
       if(!(rr>0))continue;
@@ -164,26 +175,8 @@ function healthBarCovered(g,classes,target){
          d2(t.x,t.y,x1,y0)<=rr2&&d2(t.x,t.y,x1,y1)<=rr2)return true;
     }
   }
-  /* Multiple opaque wall faces can hide the entire strip even when no one
-   * wall contains it. Prove coverage using only rectangular interior bands:
-   * rounded corners and circles cannot produce false opaque pixels. Each
-   * interval covers the strip's full height; gaps remain public. */
-  var intervals=[];
-  for(var j=0;j<terrain.length;j++){
-    var w=terrain[j];
-    if(!w||w.shape!=='rect'||w.solid===false||
-       (w.destructible&&!(w.hp>0)))continue;
-    var wx=Number(w.w)*.5,wy=Number(w.h)*.5;
-    if(!(wx>0&&wy>0))continue;
-    var inset=Math.min(12,Math.min(wx,wy)*.32);
-    var a,b;
-    if(y0>=w.y-wy+inset&&y1<=w.y+wy-inset){
-      a=w.x-wx;b=w.x+wx;
-    }else if(y0>=w.y-wy&&y1<=w.y+wy){
-      a=w.x-wx+inset;b=w.x+wx-inset;
-    }else continue;
-    if(b>a&&b>x0&&a<x1)intervals.push([Math.max(x0,a),Math.min(x1,b)]);
-  }
+  /* Multiple opaque wall faces can hide a strip even if no one wall does.
+   * Only rounded-rectangle interior bands are certified; gaps stay visible. */
   if(intervals.length<2)return false;
   intervals.sort(function(a,b){return a[0]-b[0];});
   var reach=x0;
