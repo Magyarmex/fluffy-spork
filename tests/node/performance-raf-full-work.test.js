@@ -73,6 +73,6 @@ test('copied Debug diagnostics expose RAF work without claiming GPU latency',()=
   return window.__snap();
  }
  assert.equal(debug({rafWorkEmaMs:12.5,rafWorkPeakMs:24.2})['RAF CPU WORK'],
-  '12.5 ms avg / 24.2 ms peak');
+  '12.5 ms smoothed / 24.2 ms peak');
  assert.equal(debug({})['RAF CPU WORK'],'n/a');
 });
