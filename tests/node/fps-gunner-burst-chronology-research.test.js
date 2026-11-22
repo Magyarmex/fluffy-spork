@@ -12,14 +12,14 @@ function schedule(hz){
  for(let i=0;i<SECONDS*hz;i++)steps.push(1/hz);
  return steps;
 }
-function irregular(){
+function irregular(phase=0){
  // Deliberately nonuniform presentation cadence; identical 8s simulated time.
  // Four intervals sum to 1/15s: same mean 60Hz as native60,
  // but includes a 30Hz stall and two 120Hz catch-up slices.
  const pattern=[1/30,1/120,1/60,1/120];
  const steps=[];let elapsed=0,i=0;
  while(elapsed<SECONDS-1e-10){
-  const dt=Math.min(pattern[i++%pattern.length],SECONDS-elapsed);
+  const dt=Math.min(pattern[(i+++phase)%pattern.length],SECONDS-elapsed);
   steps.push(dt);elapsed+=dt;
  }
  return steps;
@@ -157,4 +157,25 @@ test('legal rotary builds: matched held and burst policies expose cadence sensit
   }
  }
  console.log('GUNNER_BURST_CHRONOLOGY_RESEARCH '+JSON.stringify(rows));
+});
+
+test('equal-mean jitter phase is a separate causal variable for held rotary fire',()=>{
+ // Rotating the same four interval lengths preserves the total time, mean
+ // cadence, and interval histogram. Only their ordering relative to gun
+ // cooldown/spin history changes. This is not a device trace.
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+  for(let phase=0;phase<4;phase++){
+   const steps=irregular(phase);
+   assert.equal(steps.length,480);
+   assert.ok(Math.abs(steps.reduce((sum,dt)=>sum+dt,0)-SECONDS)<1e-8);
+   const a=run(1517800,cls,reload,steps,held);
+   const b=run(1517802,cls,reload,steps,held);
+   assert.deepEqual(a,b,'no-target jitter-phase result must be seed-invariant');
+   assert.equal(a.restVolleys,0);
+   rows.push({cls,reload,phase,volleys:a.volleys,spinMean:a.spinMean,
+    spin:a.spin,heatMean:a.heatMean,firstBirths:a.births.slice(0,8)});
+  }
+ }
+ console.log('GUNNER_JITTER_PHASE_RESEARCH '+JSON.stringify(rows));
 });
