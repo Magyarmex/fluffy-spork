@@ -117,10 +117,47 @@ function saturationSnapshot(g,selfId){
   }
   return counts;
 }
+/* The canonical drawTank health strip is 34 x 3.5 world units, drawn above
+ * the hull and BEFORE Battlefield's nearly opaque terrain pass. Physical LOS
+ * alone is not a health-visibility test: many blocked hulls have readable bars.
+ * Only a bar fully contained by one solid piece of terrain loses the public
+ * vulnerability bonus. Conservative geometry avoids suppressing visible HP. */
+function healthBarCovered(g,classes,target){
+  var terrain=g&&g.__novaTerrain,defs=classes&&classes.CLASSES;
+  var spec=defs&&target&&defs[target.cls],size=Number(spec&&spec.size);
+  if(!Array.isArray(terrain)||!(size>0)||!target)return false;
+  var x0=target.x-17,x1=target.x+17,y0=target.y-size-6,y1=target.y-size-2.5;
+  for(var i=0;i<terrain.length;i++){
+    var t=terrain[i];
+    if(!t||t.solid===false||(t.destructible&&!(t.hp>0)))continue;
+    if(t.shape==='rect'){
+      var hw=Number(t.w)*.5,hh=Number(t.h)*.5;
+      if(!(hw>0&&hh>0))continue;
+      /* Rounded corners are not opaque. Require the bar to lie in the
+       * rectangle's central band, not merely its corner bounding box. */
+      var round=Math.min(12,Math.min(hw,hh)*.32);
+      if(x0>=t.x-hw&&x1<=t.x+hw&&y0>=t.y-hh&&y1<=t.y+hh&&
+        (x0>=t.x-hw+round||y0>=t.y-hh+round)&&
+        (x1<=t.x+hw-round||y0>=t.y-hh+round)&&
+        (x0>=t.x-hw+round||y1<=t.y+hh-round)&&
+        (x1<=t.x+hw-round||y1<=t.y+hh-round))return true;
+    }else if(t.shape==='circle'){
+      var rr=Number(t.r);
+      if(!(rr>0))continue;
+      var rr2=rr*rr;
+      if(d2(t.x,t.y,x0,y0)<=rr2&&d2(t.x,t.y,x0,y1)<=rr2&&
+         d2(t.x,t.y,x1,y0)<=rr2&&d2(t.x,t.y,x1,y1)<=rr2)return true;
+    }
+  }
+  return false;
+}
 function scoreTarget(g,classes,observer,a,target,now,satCache){
   if(!canPerceive(g,classes,observer,target)||!alive(target)||!hostile(g,observer,target)||target.spawnShieldT>0)return-Infinity;
   var dist=Math.hypot(target.x-observer.x,target.y-observer.y),near=1/(1+dist/720);
-  var hp=clamp(Number(target.hp)/Math.max(1,Number(target.maxHp)||Number(target.hp)||1),0,1);
+  /* A covered health strip does not grant omniscient execution priority. The
+   * target remains a legal public contact for navigation and combat planning. */
+  var healthPublic=!healthBarCovered(g,classes,target)||hasSpotterRelay(g,classes,observer,target);
+  var hp=healthPublic?clamp(Number(target.hp)/Math.max(1,Number(target.maxHp)||Number(target.hp)||1),0,1):1;
   var score=near*1.16+(1-hp)*.48+targetDanger(classes,target)*.30;
   if(a&&a.__v1112TargetId===target.id)score+=.16;
   if(a&&a.__v180LastAttacker===target.id&&now-Number(a.__v180HitAt||-99)<2.2)score+=.34;
@@ -202,7 +239,7 @@ window.__NOVA_FAIR_ENGAGEMENT__={
 };
 window.__NOVA_FAIR_ENGAGEMENT_TEST__={
   viewportHalfExtents:viewportHalfExtents,inGameplayViewport:inGameplayViewport,canPerceive:canPerceive,
-  saturation:saturation,scoreTarget:scoreTarget,chooseTarget:chooseTarget,closeAimVector:closeAimVector,
+  saturation:saturation,scoreTarget:scoreTarget,chooseTarget:chooseTarget,healthBarCovered:healthBarCovered,closeAimVector:closeAimVector,
   closeAimMagnitude:CLOSE_AIM_MAG,saturationPenalty:SATURATION_PENALTY
 };
 if(window.__NOVA_SHARED_BATTLEFIELD_VIEW__){
