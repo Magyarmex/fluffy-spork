@@ -2,7 +2,7 @@ name: NOVA Browser Smoke
 
 on:
   push:
-    branches: [main]
+    branches: [main, research/fair-health-occlusion-witness-20261122]
     paths:
       - 'nova-updates/**'
       - 'index.html'
