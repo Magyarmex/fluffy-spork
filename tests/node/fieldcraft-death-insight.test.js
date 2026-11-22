@@ -177,7 +177,7 @@ test('a stale observer cannot adopt a replacement Game note before teardown',()=
  assert.ok(newNote);
  oldObserver.notify();
  assert.equal(panel.note,newNote,'old observer cannot replace the new note');
- assert.equal(old.__novaDeathInsightNode,null,'old Game cannot claim a foreign note');
+ assert.equal(old.__novaDeathInsightNode??null,null,'old Game cannot claim a foreign note');
  old.destroy();
  assert.equal(panel.note,newNote,'old Game teardown cannot remove foreign note');
  assert.match(panel.note.children[0].textContent,/GUARD/);
