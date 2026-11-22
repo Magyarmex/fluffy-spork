@@ -98,10 +98,24 @@ const {chromium}=require('playwright');
      const reachableOpen=rows();
      wall.solid=true;renderer.render(g,1000,700);
      const reachableCovered=rows();
-     pixelEvidence.reachableBoundary={resolvedY,barBottom:resolvedY-hullSize-2.5,
-       open:reachableOpen,covered:reachableCovered,
-       coveredByFullStrip:reachableCovered.length>0&&
-        (resolvedY-hullSize-2.5)<=wall.y+wall.h/2};
+     const barBottom=resolvedY-hullSize-2.5;
+     // Ordinary movement must place the hull outside the solid collision
+     // radius. This is the crucial negative control for the earlier y=50
+     // manually injected, potentially unreachable full-bar witness.
+     const nearFace=wall.y+wall.h/2;
+     if(!(resolvedY>=nearFace+hullSize+3-0.01))
+       throw Error('reachable wall separation violated: '+JSON.stringify({resolvedY,nearFace,hullSize}));
+     if(!(barBottom>nearFace))
+       throw Error('full bar unexpectedly inside wall at legal collision boundary: '+JSON.stringify({barBottom,nearFace}));
+     const visibleRows=reachableOpen.map((entry,i)=>({
+       y:entry.y,
+       openRed:entry.rgba[0],
+       coveredRed:reachableCovered[i].rgba[0],
+       redDelta:entry.rgba[0]-reachableCovered[i].rgba[0]
+     }));
+     pixelEvidence.reachableBoundary={resolvedY,barBottom,nearFace,
+       fullStripGeometricallyCovered:barBottom<=nearFace,
+       visibleRows,open:reachableOpen,covered:reachableCovered};
     }finally{
      Object.assign(g, {shapes:drawSaved.shapes,drones:drawSaved.drones,
       bullets:drawSaved.bullets,powerups:drawSaved.powerups,
