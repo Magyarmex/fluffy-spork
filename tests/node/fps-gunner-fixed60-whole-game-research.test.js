@@ -17,6 +17,7 @@ function frames(mode){
  if(mode==='alternating40_120')return Array.from({length:120},()=>[1/40,1/120]).flat();
  if(mode==='uniform20')return Array.from({length:80},()=>1/20);
  if(mode==='overload10')return Array.from({length:40},()=>0.1);
+ if(mode==='single100msStall')return [0.1,...Array.from({length:234},()=>STEP)];
  throw Error('unknown presentation schedule');
 }
 function run(seed,cls,reload,mode,maxSteps=3){
@@ -106,6 +107,23 @@ test('bounded whole-Game fixed60 preserves held rotary fire across ordinary pres
  }
  assert.equal(rows.length,30);
  console.log('GUNNER_FIXED60_WHOLE_GAME_PRESENTATION_PILOT '+JSON.stringify(rows));
+});
+test('bounded whole-Game scheduler recovers one 100ms stall without changing the 60Hz weapon timeline',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',5]]){
+  const baseline=run(1517800,cls,reload,'uniform60');
+  const stalled=run(1517800,cls,reload,'single100msStall');
+  assert.equal(stalled.updates,240,'one stall must not permanently lose game time');
+  assert.equal(stalled.volleys,baseline.volleys);
+  assert.equal(stalled.spin,baseline.spin);
+  assert.equal(stalled.heat,baseline.heat);
+  assert.ok(stalled.backloggedFrames>0,'stalled presentation must expose temporary debt');
+  assert.ok(stalled.peakDebt>=0.05-1e-7,'100ms frame exceeds the three-tick budget');
+  assert.ok(Math.abs(stalled.remainingDebt)<1e-7,'debt must be cleared after recovery');
+  assert.equal(stalled.maxUsed,3);
+  rows.push({cls,reload,stalled});
+ }
+ console.log('GUNNER_FIXED60_SINGLE_STALL_RECOVERY '+JSON.stringify(rows));
 });
 test('bounded fixed60 refuses to claim parity when 10Hz frames exceed the update budget',()=>{
  const rows=[];
