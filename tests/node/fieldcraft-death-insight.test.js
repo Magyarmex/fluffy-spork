@@ -46,6 +46,7 @@ function boot(){
   killTank(victim){if(victim.alive===false)return;victim.alive=false;this.status='dying';}
   update(){if(this.status==='dying')this.status='dead';}
   redeploy(){this.status='playing';this.redeploys=(this.redeploys||0)+1;}
+  destroy(){this.destroyed=true;}
  }
  const classes={
   CLASSES:{marksman:{name:'Marksman'},carrier:{name:'Carrier'},
@@ -134,6 +135,27 @@ test('redeploy removes old insight and accepts a new authoritative killer',()=>{
  assert.match(p.note.children[0].textContent,/GUARD/);
  assert.match(p.note.children[1].textContent,/frontal trade/);
  assert.equal(observers.length,0);
+});
+test('destroying a Game revokes a pending death insight observer before a new UI mounts',()=>{
+ const {Game,addPanel,observers,timeouts}=boot(),g=new Game();
+ g.killTank(victim(),killer('marksman'));g.update();
+ assert.equal(observers.length,1);
+ assert.equal(timeouts.size,1);
+ g.destroy();
+ assert.equal(g.destroyed,true,'original Game teardown must still run');
+ assert.equal(observers[0].disconnected,true,'old Game observer is disconnected');
+ assert.equal(timeouts.size,0,'old Game timeout is cancelled');
+ const panel=addPanel();observers[0].notify();
+ assert.equal(panel.note,null,'stale observer cannot paint old killer into new UI');
+ assert.equal(g.__novaDeathInsight,null);
+});
+test('destroying a Game removes only its mounted death insight before replacement',()=>{
+ const {Game,addPanel}=boot(),g=new Game(),panel=addPanel();
+ g.killTank(victim(),killer('guard'));g.update();
+ assert.ok(panel.note,'old note exists before teardown');
+ g.destroy();
+ assert.equal(panel.note,null,'old note must not survive Game destruction');
+ assert.equal(g.destroyed,true);
 });
 test('missing React panel times out rather than observing forever',()=>{
  const {Game,observers,timeouts}=boot(),g=new Game();
