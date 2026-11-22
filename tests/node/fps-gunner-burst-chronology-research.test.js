@@ -204,3 +204,35 @@ test('matched 60Hz-mean alternating jitter probes the rotary spin-up threshold',
  }
  console.log('GUNNER_ALTERNATING_JITTER_RESEARCH '+JSON.stringify(rows));
 });
+
+test('same irregular interval histogram with shuffled ordering tests periodicity confound',()=>{
+ // Exactly 120 30Hz, 120 60Hz and 240 120Hz intervals in 8s.
+ // A local deterministic shuffle must not consume the Game RNG.
+ // This is a synthetic counterfactual, not a captured browser RAF trace.
+ function shuffled(seed){
+  const steps=[...Array(120).fill(1/30),...Array(120).fill(1/60),
+   ...Array(240).fill(1/120)];
+  let state=seed>>>0;
+  for(let i=steps.length-1;i>0;i--){
+   state=(Math.imul(state,1664525)+1013904223)>>>0;
+   const j=state%(i+1);
+   [steps[i],steps[j]]=[steps[j],steps[i]];
+  }
+  return steps;
+ }
+ const rows=[];
+ for(const shuffleSeed of [799,1517800,1517802]){
+  const steps=shuffled(shuffleSeed);
+  assert.equal(steps.length,480);
+  assert.ok(Math.abs(steps.reduce((a,b)=>a+b,0)-SECONDS)<1e-8);
+  for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+   const a=run(1517800,cls,reload,steps,held);
+   const b=run(1517802,cls,reload,steps,held);
+   assert.deepEqual(a,b,'shuffled no-target cadence must be seed-invariant');
+   assert.equal(a.restVolleys,0);
+   rows.push({cls,reload,shuffleSeed,volleys:a.volleys,
+    spinMean:a.spinMean,spin:a.spin,heatMean:a.heatMean});
+  }
+ }
+ console.log('GUNNER_SHUFFLED_HISTOGRAM_RESEARCH '+JSON.stringify(rows));
+});
