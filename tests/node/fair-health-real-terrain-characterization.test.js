@@ -16,7 +16,7 @@ function boot(){
   constructor(){
    this.time=1;this.w=800;this.h=600;this.cam={zoom:1};this.zoom=1;
    this.tanks=[];this.shapes=[];this.drones=[];this.bullets=[];
-   this.__novaTerrain=[{id:-1000,kind:'terrain',shape:'rect',x:70,y:0,w:25,h:240,
+   this.__novaTerrain=[{id:-1000,kind:'terrain',shape:'rect',x:0,y:0,w:240,h:70,
     type:'wall',destructible:false,hp:0,maxHp:0,solid:true}];
   }
   getTank(id){return this.tanks.find(t=>t.id===id)||null;}
@@ -49,11 +49,22 @@ function tank(id,x,y,hp=100){return {id,x,y,hp,maxHp:100,alive:true,
  spawnShieldT:0,cls:'basic',tier:1,isPlayer:false,
  ai:{state:'hunt',targetId:-1}};}
 const C={CLASSES,lineageForClass:()=> 'gunner'};
-test('CHARACTERIZATION: a permanent opaque wall blocks fire sight but not hidden-HP scoring',()=>{
- const {Game,F}=boot(),g=new Game(),observer=tank(1,0,0),covered=tank(2,150,0);
+test('CHARACTERIZATION: a wall fully overpaints the health bar but not private HP scoring',()=>{
+ const {Game,F}=boot(),g=new Game(),observer=tank(1,0,-150),covered=tank(2,0,50);
  g.tanks=[observer,covered];
  assert.equal(F.inGameplayViewport(g,observer,covered),true);
  assert.equal(g.hasLineOfSight(observer.x,observer.y,covered.x,covered.y,4),false);
+ // Shipping drawTank: a non-player health bar is 34x3.5 at
+ // [x-17,x+17] x [y-size-6,y-size-2.5].
+ // Tank hull begins at y=35, exactly outside this permanent wall,
+ // but its entire bar lies inside the wall's [-35,+35] vertical span.
+ const wall=g.__novaTerrain[0],size=CLASSES.basic.size;
+ const bar={left:covered.x-17,right:covered.x+17,
+  top:covered.y-size-6,bottom:covered.y-size-2.5};
+ assert.ok(covered.y-size>=wall.y+wall.h/2,'tank hull stays outside solid wall');
+ assert.ok(bar.left>=wall.x-wall.w/2&&bar.right<=wall.x+wall.w/2);
+ assert.ok(bar.top>=wall.y-wall.h/2&&bar.bottom<=wall.y+wall.h/2,
+  'the wall overpaints the entire health bar in the shipping render order');
  const full=F.scoreTarget(g,C,observer,observer.ai,covered,g.time);
  covered.hp=20;
  const weak=F.scoreTarget(g,C,observer,observer.ai,covered,g.time);
@@ -61,11 +72,11 @@ test('CHARACTERIZATION: a permanent opaque wall blocks fire sight but not hidden
   'shipping scorer uses private covered HP; invert when fixing #1106');
 });
 test('CONTROL: open sight and opaque sight share contact legality but not health visibility',()=>{
- const {Game,F}=boot(),g=new Game(),observer=tank(1,0,0),
-  covered=tank(2,150,0),clear=tank(3,-150,0);
+ const {Game,F}=boot(),g=new Game(),observer=tank(1,0,-150),
+  covered=tank(2,0,50),clear=tank(3,-150,-150);
  g.tanks=[observer,covered,clear];
- assert.equal(g.hasLineOfSight(0,0,covered.x,covered.y,4),false);
- assert.equal(g.hasLineOfSight(0,0,clear.x,clear.y,4),true);
+ assert.equal(g.hasLineOfSight(observer.x,observer.y,covered.x,covered.y,4),false);
+ assert.equal(g.hasLineOfSight(observer.x,observer.y,clear.x,clear.y,4),true);
  assert.equal(F.canPerceive(g,C,observer,covered),true);
  assert.equal(F.canPerceive(g,C,observer,clear),true);
 });
