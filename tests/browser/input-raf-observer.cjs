@@ -59,6 +59,24 @@ const {chromium}=require('playwright');
   assert.equal(result.before.metric,'DOM delivery to next RAF callback');
   assert.equal(result.after.status,'manual');
   assert.equal(result.after.pendingEvents,0);
+  // #799: real composed React/Game + final RAF instrumentation witness.
+  // This is browser synchronous CPU work, not GPU completion or physical
+  // touch-to-photon latency. Do not infer a safe scheduler budget from it.
+  await page.waitForFunction(()=>{
+   const p=window.__NOVA_PERF_LAST__;
+   return p&&Number.isFinite(p.rafWorkMs)&&
+    Number.isFinite(p.rafWorkEmaMs)&&Number.isFinite(p.rafWorkPeakMs)&&
+    p.rafWorkMs>=0&&p.rafWorkEmaMs>0&&p.rafWorkPeakMs>0;
+  },null,{timeout:12000});
+  const rafWork=await page.evaluate(()=>{
+   const p=window.__NOVA_PERF_LAST__;
+   return {latest:p.rafWorkMs,smoothed:p.rafWorkEmaMs,
+    peak:p.rafWorkPeakMs,samples:p.frameSamples};
+  });
+  assert.ok(rafWork.samples>=5,'live active-frame sample window exists');
+  assert.ok(rafWork.peak>=rafWork.latest,
+   'decaying full-RAF peak must cover the latest completed callback');
+  console.log('NOVA_FULL_RAF_CPU_WORK_BROWSER',JSON.stringify(rafWork));
   const json=JSON.stringify(result);
   for(const secret of ['clientX','clientY','pointerId','targetTagName'])
    assert.equal(json.includes(secret),false,
