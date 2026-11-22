@@ -23,8 +23,8 @@ function irregular(){
  return steps;
 }
 function held(t){return true;}
-function longBurst(t){return (t%1.25)<1-1e-9;}
-function shortBurst(t){return (t%.8)<.4-1e-9;}
+function longBurst(t){return ((t+1e-8)%1.25)<1;}
+function shortBurst(t){return ((t+1e-8)%.8)<.4;}
 // Input changes must occur at the same physical times in every cadence.
 // Split simulation intervals at input edges rather than allowing 30Hz to
 // observe a release up to 33ms later than 120Hz.
