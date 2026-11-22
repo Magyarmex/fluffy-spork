@@ -458,3 +458,20 @@ test('320px portrait viewport keeps contact while hiding fully clipped HP',()=>{
   target.hp=20;
   assert.ok(Math.abs(T.scoreTarget(g,C,observer,observer.ai,target,g.time)-open-.384)<1e-8);
 });
+
+test('wholly clipped low HP cannot lure AI away from a closer healthy visible rival',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C=classes();C.CLASSES.basic={size:14};
+  const g=game(1000,700,1),observer=tank(1,0,0);
+  const edge=tank(2,0,-342,{hp:20}),closer=tank(3,250,0,{hp:100});
+  g.tanks=[observer,edge,closer];g.__novaTerrain=[];
+  assert.equal(T.inGameplayViewport(g,observer,edge),true);
+  assert.equal(T.chooseTarget(g,C,observer,observer.ai,g.time).id,closer.id,
+    'private clipped HP must not overpower the visible closer rival');
+  edge.hp=100;
+  assert.equal(T.chooseTarget(g,C,observer,observer.ai,g.time).id,closer.id,
+    'changing hidden HP must not change the chosen target');
+  edge.y=-325;edge.hp=20;
+  assert.equal(T.chooseTarget(g,C,observer,observer.ai,g.time).id,edge.id,
+    'when the bar enters view, a visible low-health rival may legitimately win');
+});
