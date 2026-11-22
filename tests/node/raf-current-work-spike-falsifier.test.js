@@ -16,7 +16,7 @@ assert.equal(shipping.split(guard).length-1,1,'shipping historical work gate');
 const guarded=shipping.replace(guard,
   guard+' && performance.now() - workStart < 18');
 function run(source,{firstSpikeMs=40,secondSpikeMs=12}={}){
- let now=0,work=0,raf=null,frame=0,step=0,sim=0;
+ let now=0,work=0,raf=null,frame=0,step=0,sim=0,previousEnd=0;
  const rows=[];
  const start=new Function('performance','requestAnimationFrame','render_1',
   'return ({'+source+'}).start')({now:()=>now+work},
@@ -31,11 +31,12 @@ function run(source,{firstSpikeMs=40,secondSpikeMs=12}={}){
   },drawMinimap(){}};
  start.call(game);
  for(frame=1;frame<=8;frame++){
-  now+=50;step=0;
-  const before=work,callback=raf;raf=null;
+  now=Math.max(frame*50,previousEnd);work=0;step=0;
+  const callback=raf;raf=null;
   assert.equal(typeof callback,'function');
   callback(now);
-  rows.push({frame,steps:step,workMs:work-before,simSec:sim});
+  previousEnd=now+work;
+  rows.push({frame,atMs:now,steps:step,workMs:work,simSec:sim});
  }
  return rows;
 }
@@ -47,11 +48,13 @@ test('historical CPU gate admits an over-budget second update after a current-fr
  assert.equal(candidate[1].steps,1,'current-work gate rejects the second update');
  assert.ok(baseline[1].workMs>50,'shipping frame overruns synthetic 20Hz budget');
  assert.ok(candidate[1].workMs<50,'candidate avoids this particular overrun');
+ assert.ok(baseline[2].atMs>150,'an overrun delays the next browser callback');
+ assert.equal(candidate[2].atMs,150,'non-overrun remains on the scheduled frame');
  assert.ok(candidate[1].simSec<baseline[1].simSec,
   'the CPU safeguard sacrifices immediate simulation recovery');
  for(const row of [...baseline,...candidate]){
   assert.ok(row.steps<=2,'never exceed shipping two-update bound');
-  assert.ok(row.simSec<=row.frame*.05+1e-8,'no unearned simulated time');
+  assert.ok(row.simSec<=row.atMs/1000+1e-8,'no unearned simulated time');
  }
  console.log('NOVA_RAF_CURRENT_WORK_SPIKE_RESEARCH '+JSON.stringify({
   baseline,candidate,caveat:'synthetic work; no device/thermal/latency claim; not a production fix'
