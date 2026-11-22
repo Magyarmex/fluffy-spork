@@ -43,16 +43,18 @@ function run(cls,seed,mode,pattern){return withSeed(seed,draws=>{
   if(t===g.player&&this.bullets.length>before)volleys++;
   return result;};
  g.update=function(dt){
-  const phase=ticks%pattern;
+  const sampledTick=mode==='60'?Math.floor(ticks/2):ticks;
+  const phase=sampledTick%pattern;
   this.input.firing=phase<Math.floor(pattern*3/4);
   this.input.aim.active=true;
-  this.input.aim.dx=(Math.floor(ticks/15)%2===0)?40:0;
+  this.input.aim.dx=(Math.floor(sampledTick/15)%2===0)?40:0;
   this.input.aim.dy=this.input.aim.dx===0?40:0;
   ticks++;
   return update.call(this,dt);
  };
  try{
   if(mode==='30')for(let i=0;i<60;i++)g.update(1/30);
+  else if(mode==='60')for(let i=0;i<120;i++)g.update(1/60);
   else{
    const start=factory({now:()=>now},fn=>{raf=fn;return 1;},
     {render:()=>drawsCount++});
@@ -84,4 +86,22 @@ test('burst/release and rotating aim preserve composed Game state at recovered 2
      assert.deepEqual(b[key],a[key],label+' '+key);
     samePhysical(b.physical,a.physical,label+' physical');
    }
+});
+// Research witness only: do not freeze 30Hz cadence deficits as desired goldens.
+// Compare identical two-second input windows at native 30/60Hz; collisions,
+// target damage, and physical-device timing remain separate acceptance gates.
+test('research: burst cadence under native 30Hz versus 60Hz simulation',()=>{
+ for(const cls of ['tempest','minigun','needlestorm'])
+  for(const pattern of [8,15]){
+   const a=run(cls,1517800,'30',pattern);
+   const b=run(cls,1517800,'60',pattern);
+   assert.equal(a.ticks,60);
+   assert.equal(b.ticks,120);
+   assert.ok(Math.abs(a.time-b.time)<1e-8,'equal simulated world time');
+   assert.ok(Number.isFinite(a.heat)&&Number.isFinite(b.heat));
+   console.log('NOVA_BURST_CADENCE_RESEARCH '+JSON.stringify({
+    cls,pattern,volley30:a.volleys,volley60:b.volleys,
+    heat30:a.heat,heat60:b.heat
+   }));
+  }
 });
