@@ -31,7 +31,9 @@ function recordShot(g,fair,ledger,shooter,metrics){
   if(typeof g.hasLineOfSight==='function'&&
      !g.hasLineOfSight(observer.x,observer.y,shooter.x,shooter.y,3))continue;
   let events=ledger.get(observer.id);
-  if(!events){events=new Map();ledger.set(observer.id,events);}
+  if(!events||events.observerRef!==observer){
+   events=new Map();events.observerRef=observer;ledger.set(observer.id,events);
+  }
   // Certify potential victims AT the firing event. A target walking into
   // the old lane later must never become a retroactive witnessed attack.
   // This is a directional commitment, not a certified projectile hit.
@@ -72,7 +74,7 @@ function publicPressure(g,fair,ledger,observer,target,metrics){
  if(!observer||!target||!fair.inGameplayViewport(g,observer,target)||
     !alive(target))return 0;
  const events=ledger.get(observer.id);
- if(!events)return 0;
+ if(!events||events.observerRef!==observer)return 0;
  const now=Number(g.time);
  let n=0;
  for(const ev of events.values()){
@@ -194,6 +196,24 @@ test('recycled target ID cannot inherit a historical firing certificate',()=>{
  tanks[2]=replacement;
  assert.equal(publicPressure(g,fair,ledger,observer,replacement,metrics),0,
   'a new object with a reused ID cannot inherit old shot pressure');
+});
+test('reused observer ID cannot inherit another life\'s public memory',()=>{
+ const observer={id:1,x:0,y:0,hp:100,alive:true,ai:{}};
+ const shooter={id:2,x:-100,y:0,angle:0,hp:100,alive:true,ai:{}};
+ const target={id:3,x:100,y:0,hp:100,alive:true};
+ const tanks=[observer,shooter,target],ledger=new Map();
+ const g={time:10,tanks,getTank:id=>tanks.find(t=>t.id===id),
+  hasLineOfSight:()=>true};
+ const fair={inGameplayViewport:()=>true},metrics={witnesses:0,candidateChecks:0};
+ recordShot(g,fair,ledger,shooter,metrics);
+ assert.equal(publicPressure(g,fair,ledger,observer,target,metrics),1);
+ const replacement={id:1,x:0,y:0,hp:100,alive:true,ai:{}};
+ tanks[0]=replacement;
+ assert.equal(publicPressure(g,fair,ledger,replacement,target,metrics),0,
+  'replacement observer with same numeric ID has no old witness');
+ recordShot(g,fair,ledger,shooter,metrics);
+ assert.equal(publicPressure(g,fair,ledger,replacement,target,metrics),1,
+  'new observer can independently witness a new real firing event');
 });
 test('ledger retains at most four distinct shooter events per observer',()=>{
  const fair={inGameplayViewport:()=>true};
