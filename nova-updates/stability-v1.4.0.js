@@ -110,9 +110,13 @@
     t.__novaAIWarnStage = 0;
     t.__novaRailTargetId = -1;
   }
-  function collapseUpgradeTraySoon() {
+  function collapseUpgradeTraySoon(owner) {
     if (typeof document === 'undefined') return;
+    var player=owner&&owner.player;
     setTimeout(function () {
+      // The owner may have been destroyed, or redeployed with a new player.
+      // Neither old life may minimize the current life's upgrade UI.
+      if (!owner || owner.__novaDestroyed || owner.player!==player) return;
       var bs = document.querySelectorAll('button[data-ui]');
       for (var i=0;i<bs.length;i++) {
         if ((bs[i].textContent || '').trim() === 'MINIMIZE') {
@@ -407,7 +411,7 @@
       g.player.hitFlash=0;
       if(g.input){g.input.firing=false;g.input.abilityQueued=false;}
       clearEnemyFocus(g);
-      collapseUpgradeTraySoon();
+      collapseUpgradeTraySoon(g);
     }
 
     var oldTryOffer=Game.prototype.tryOffer;
@@ -431,7 +435,7 @@
             if(this.__novaCapGraceOwner===this.player&&this.__novaCapGraceTier===deferred){
               // Resume safely without minting another shield or erasing focus.
               if(this.input){this.input.firing=false;this.input.abilityQueued=false;}
-              collapseUpgradeTraySoon();
+              collapseUpgradeTraySoon(this);
               return out;
             }
             this.__novaCapGraceOwner=this.player;
