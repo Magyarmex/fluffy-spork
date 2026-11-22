@@ -66,6 +66,7 @@ function run(seed,cls,reload,steps,policy){
    g.input.autofire=false;g.input.aim.active=true;
    g.input.aim.dx=40;g.input.aim.dy=0;
    let volleys=0,spinSum=0,heatPeak=0,spinPeak=0,t=0;
+   const initialGameTime=g.time;
    const births=[],original=g.tryFire;
    g.tryFire=function(tank){
     const before=this.bullets.length;
@@ -87,6 +88,8 @@ function run(seed,cls,reload,steps,policy){
     assert.equal(g.tanks.length,1);
    }
    assert.ok(Math.abs(t-SECONDS)<1e-8,'all arms simulate the same 8 seconds');
+   assert.ok(Math.abs((g.time-initialGameTime)-SECONDS)<1e-6,
+    'composed Game time must advance by exactly the matched duration');
    return {volleys,births,spin:+(p.fireSpin||0).toFixed(5),
     spinMean:+(spinSum/steps.length).toFixed(5),
     spinPeak:+spinPeak.toFixed(5),
