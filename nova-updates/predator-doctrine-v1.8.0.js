@@ -276,8 +276,8 @@ function planAbility(g,classes,C,t,a,target,seen,risk,now){
       /* The execution dash cannot use HP that Fair Engagement hides from
        * target scoring. Geometry and legitimate Spotter relay are shared. */
       var fair=window.__NOVA_FAIR_ENGAGEMENT__;
-      var publicHp=!fair||typeof fair.healthPublicTo!=='function'||
-        fair.healthPublicTo(g,classes,t,target);
+      var publicHp=!fair||(typeof fair.healthPublicTo==='function'&&
+        fair.healthPublicTo(g,classes,t,target));
       if(publicHp&&target.hp<target.maxHp*.32){
         ang=Math.atan2(target.y-t.y,target.x-t.x)+(a.__v180FlankSide||1)*.34;due=true;
       }
