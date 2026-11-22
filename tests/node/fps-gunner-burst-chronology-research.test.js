@@ -57,7 +57,12 @@ function run(seed,cls,reload,steps,policy){
   steps=splitAtInputEdges(steps,policy);
   try{
    g.sfx.muted=true;g.sfx.startMusic=()=>{};
-   g.setClass(p,cls);g.tanks=[p];g.tankById=new Map([[p.id,p]]);
+   g.setClass(p,cls);
+   // Normalize aim and recoil geometry so seeded spawn orientation/terrain
+   // cannot masquerade as a cadence-dependent projectile-quality difference.
+   Object.assign(p,{x:0,y:0,vx:0,vy:0,angle:0});
+   g.__novaTerrain=[];g.__novaBattlefieldIndex=null;
+   g.tanks=[p];g.tankById=new Map([[p.id,p]]);
    g.shapes=[];g.drones=[];g.powerups=[];g.bullets=[];
    if(g.shapeById)g.shapeById.clear();
    if(g.hash&&g.hash.clear)g.hash.clear();
