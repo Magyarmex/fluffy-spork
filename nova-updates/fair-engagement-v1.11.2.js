@@ -159,7 +159,7 @@ function healthBarCovered(g,classes,target){
         (x1<=t.x+hw-round||y1<=t.y+hh-round))return true;
       /* Reuse the existing terrain pass to collect only guaranteed-opaque
        * full-height intervals. Do not rescan every wall per AI candidate. */
-      var left,right;
+      var left=NaN,right=NaN;
       if(y0>=t.y-hh+round&&y1<=t.y+hh-round){
         left=t.x-hw;right=t.x+hw;
       }else if(y0>=t.y-hh&&y1<=t.y+hh){
