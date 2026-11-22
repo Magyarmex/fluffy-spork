@@ -23,8 +23,9 @@ function frames(mode){
   (i%2===0?1.15:.85)/60);
  throw Error('unknown presentation mode');
 }
-function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhase=0,drainSeconds=0,playerMoveY=0,playerMotion='constant'){
+function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhase=0,drainSeconds=0,playerMoveY=0,playerMotion='constant',firePolicy='burst'){
  assert.ok(motionPeriod>0&&Number.isFinite(motionPhase),'valid independent target motion');
+ assert.ok(['burst','held'].includes(firePolicy),'known firing policy');
  return withSeed(seed,()=>{
   const g=bootGame();if(!g.player)g.redeploy();
   const p=g.player;g.sfx.muted=true;g.setClass(p,cls);
@@ -114,8 +115,8 @@ function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhas
      // from frame zero so input events actually split presentation frames.
      const cycle=Math.floor((now+offset+EPS)/.8);
      const phase=now+offset-cycle*.8;
-     const firing=phase<.5-EPS;
-     const boundary=cycle*.8+(firing?.5:.8)-offset;
+     const firing=firePolicy==='held'||phase<.5-EPS;
+     const boundary=firePolicy==='held'?end:cycle*.8+(firing?.5:.8)-offset;
      const next=Math.min(end,boundary);
      const dt=next-now;
      assert.ok(dt>EPS,'input-event split must progress');
@@ -144,7 +145,8 @@ function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhas
    }
    assert.ok(Math.abs(now-SECONDS)<1e-7,'same wall time');
    assert.ok(Math.abs(g.time-initialTime-SECONDS)<1e-6,'same simulated time');
-   assert.ok(Math.abs(onTime-3.9)<1e-7,'same exact fire duty');
+   assert.ok(Math.abs(onTime-(firePolicy==='held'?SECONDS:3.9))<1e-7,
+    'same exact fire duty');
    assert.equal(g.tanks.length,2,'no extra tanks');
    assert.equal(g.shapes.length+g.drones.length+g.powerups.length,0,'no ecology contamination');
    assert.equal(targetMoveSteps,updates,'each Game update must integrate one real target movement');
@@ -153,6 +155,7 @@ function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhas
    assert.ok(hits<=volleys,'ordinary single-target rotary shots');
    assert.ok(Number.isFinite(damage)&&damage<=1000000);
    const windowDamage=damage,windowHits=hits,windowBullets=g.bullets.length;
+   const windowSpin=p.fireSpin||0,windowHeat=p.__v17Heat||0;
    // Resolve already-born rounds without allowing another shot. Continue
    // the same prescribed moving-body path through the real Battlefield owner
    // rather than freezing the Scout at an artificially favorable hit position.
@@ -172,7 +175,7 @@ function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhas
     assert.ok(damage>=windowDamage&&hits>=windowHits,
      'no-fire drain cannot undo applied target damage');
    }
-   return {seed,cls,reload,mode,offset,amplitude,motionPeriod,motionPhase,updates,edges,volleys,hits,
+   return {seed,cls,reload,mode,offset,amplitude,motionPeriod,motionPhase,firePolicy,updates,edges,volleys,hits,
     targetMoveSteps,
     ...(playerMoveY?{playerMoveY,playerMotion,playerEndY:+p.y.toFixed(5),
      playerTravel:+playerTravel.toFixed(5),playerMovingTicks}:{}),
@@ -180,7 +183,8 @@ function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhas
     travel:+travel.toFixed(4),peakOffset:+peakOffset.toFixed(4),
     damage:+damage.toFixed(4),
     ...(drainSeconds?{windowDamage:+windowDamage.toFixed(4),
-     windowHits,windowBullets,drainDamage:+(damage-windowDamage).toFixed(4),
+     windowHits,windowBullets,windowSpin:+windowSpin.toFixed(5),
+     windowHeat:+windowHeat.toFixed(5),drainDamage:+(damage-windowDamage).toFixed(4),
      drainHits:hits-windowHits,remainingBullets:g.bullets.length}:{}),
     onTime:+onTime.toFixed(5),firstBirths,firstHits,
     heat:+(p.__v17Heat||0).toFixed(5),spin:+(p.fireSpin||0).toFixed(5)};
@@ -441,4 +445,52 @@ test('equal-mean alternating 60Hz jitter measures real moving-target HP after pr
  }
  assert.equal(rows.length,8);
  console.log('GUNNER_ALTERNATING_JITTER_MOVING_HP '+JSON.stringify(rows));
+});
+
+/* #799: the existing .5s-on/.3s-off moving-target arm can erase the
+ * spin-up cliff that continuous fire exhibits. This held-fire counterfactual
+ * uses the same real moving-body owner, exact six-second wall time, actual
+ * projectile hits, and two-second no-fire drain. It is research only: no
+ * claimed phone trace, gameplay fix, or permanent damage golden. */
+test('held-fire equal-mean jitter measures real moving and stationary HP after projectile drain',()=>{
+ const rows=[];
+ for(const [cls,reload] of [['minigun',1],['needlestorm',3],['needlestorm',5]]){
+  for(const seed of [1517800,1517802]){
+   for(const phase of [.03,.715]){
+    const arms={};
+    for(const mode of ['native60','alternating60p15']){
+     const moving=trial(seed,cls,reload,mode,.007,26,1.37,phase,2,0,'constant','held');
+     const repeat=trial(seed,cls,reload,mode,.007,26,1.37,phase,2,0,'constant','held');
+     const stationary=trial(seed,cls,reload,mode,.007,0,1.37,phase,2,0,'constant','held');
+     assert.deepEqual(moving,repeat,'held-fire Game and damage must reproduce');
+     assert.equal(moving.onTime,6,'held fire must cover the entire firing window');
+     assert.equal(stationary.onTime,6,'stationary arm must share exact held duty');
+     assert.equal(moving.updates,stationary.updates,'same frame chronology');
+     assert.equal(moving.volleys,stationary.volleys,
+      'moving the target must not alter player weapon fire chronology');
+     const shooterBirths=rows=>rows.map(({targetY,...birth})=>birth);
+     assert.deepEqual(shooterBirths(moving.firstBirths),shooterBirths(stationary.firstBirths),
+      'target movement cannot rewrite the same shooter muzzle chronology');
+     assert.ok(moving.travel>50&&moving.peakOffset>25,'moving target must cross shot lane');
+     assert.equal(stationary.travel,0,'stationary control must remain still');
+     assert.ok(moving.damage>0&&stationary.damage>0,'actual HP damage is required');
+     assert.ok(Math.abs(moving.windowDamage+moving.drainDamage-moving.damage)<.00011,
+      'window and tail HP must reconcile');
+     assert.equal(moving.remainingBullets<=moving.windowBullets,true,
+      'no-fire tail must not create projectiles');
+     arms[mode]={movingDamage:moving.damage,stationaryDamage:stationary.damage,
+      movingHits:moving.hits,stationaryHits:stationary.hits,
+      volleys:moving.volleys,windowDamage:moving.windowDamage,
+      drainDamage:moving.drainDamage,windowSpin:moving.windowSpin,
+      windowHeat:moving.windowHeat,spinAfterDrain:moving.spin,heatAfterDrain:moving.heat,
+      firstBirths:moving.firstBirths,firstHits:moving.firstHits};
+    }
+    rows.push({cls,reload,seed,phase,arms,
+     movingDamageDelta:+(arms.alternating60p15.movingDamage-arms.native60.movingDamage).toFixed(4),
+     stationaryDamageDelta:+(arms.alternating60p15.stationaryDamage-arms.native60.stationaryDamage).toFixed(4)});
+   }
+  }
+ }
+ assert.equal(rows.length,12);
+ console.log('GUNNER_HELD_JITTER_REAL_MOVING_HP '+JSON.stringify(rows));
 });
