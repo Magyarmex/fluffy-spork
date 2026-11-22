@@ -66,7 +66,8 @@ function run(cls,seed,mode,pattern){return withSeed(seed,draws=>{
    }
   }
   return {ticks,volleys,rng:draws(),time:g.time,
-   heat:g.player.__v17Heat||0,fireCd:g.player.fireCd,
+   heat:g.player.__v17Heat||0,spin:g.player.fireSpin||0,
+   fireCd:g.player.fireCd,
    physical:physical(g),drawsCount};
  }finally{g.destroy();}
 });}
@@ -84,7 +85,7 @@ test('burst/release and rotating aim preserve composed Game state at recovered 2
     assert.equal(a.ticks,60,label+' baseline steps');
     assert.equal(b.ticks,60,label+' recovered steps');
     assert.equal(b.drawsCount,40,label+' presentation frames');
-    for(const key of ['volleys','rng','time','heat','fireCd'])
+    for(const key of ['volleys','rng','time','heat','spin','fireCd'])
      assert.deepEqual(b[key],a[key],label+' '+key);
     samePhysical(b.physical,a.physical,label+' physical');
    }
@@ -103,7 +104,7 @@ test('research: burst cadence under native 30Hz versus 60Hz simulation',()=>{
    assert.ok(Number.isFinite(a.heat)&&Number.isFinite(b.heat));
    console.log('NOVA_BURST_CADENCE_RESEARCH '+JSON.stringify({
     cls,pattern,volley30:a.volleys,volley60:b.volleys,
-    heat30:a.heat,heat60:b.heat
+    heat30:a.heat,heat60:b.heat,spin30:a.spin,spin60:b.spin
    }));
   }
 });
