@@ -51,3 +51,30 @@ test('composed 49-overlay Game exposes the same public HP evidence used by Phase
   g.__novaTerrain=oldTerrain;
  }finally{g.destroy();}
 }));
+
+test('real composed AI Phase execution respects clipped versus visible HP evidence',()=>withSeed(1096,()=>{
+ function attempt(targetY){
+  const g=bootGame();
+  try{
+   const bots=g.tanks.filter(t=>t&&t.ai&&!t.isPlayer);
+   assert.ok(bots.length>=2);
+   const hunter=bots[0],target=bots[1];
+   for(const q of g.tanks){if(q!==hunter&&q!==target){q.x=2500;q.y=2500;}}
+   hunter.cls='ghost';hunter.x=0;hunter.y=0;hunter.hp=100;hunter.maxHp=100;
+   hunter.abilityCd=0;hunter.alive=true;
+   hunter.ai.state='hunt';hunter.ai.__v180PlanT=0;
+   target.cls='twin';target.x=0;target.y=targetY;target.hp=20;target.maxHp=100;
+   target.spawnShieldT=0;target.alive=true;
+   g.time=10;g.w=800;g.h=600;g.cam.zoom=1;
+   g.__novaTerrain=[];
+   g.hasLineOfSight=()=>true;
+   let abilities=0;
+   g.useAbility=()=>{abilities++;};
+   const ai=g.__testWindow.__novaMakeRequire('')('game/ai');
+   ai.updateAI(hunter,g,1/60);
+   return abilities;
+  }finally{g.destroy();}
+ }
+ assert.equal(attempt(-290),0,'offscreen HP bar cannot trigger execution Phase');
+ assert.equal(attempt(-250),1,'readable low HP retains execution Phase');
+}));
