@@ -117,6 +117,21 @@ function saturationSnapshot(g,selfId){
   }
   return counts;
 }
+/* A target's hull center can be inside the gameplay rectangle while its
+ * health strip is entirely above or beside the viewport. Keep the contact
+ * selectable, but do not score a wound the observer cannot see. This is an
+ * exact all-outside test, not a threshold for partly readable bars. Unknown
+ * class sizes preserve legacy behavior rather than hiding valid evidence. */
+function healthBarInViewport(g,classes,observer,target){
+  var spec=classes&&classes.CLASSES&&target&&classes.CLASSES[target.cls];
+  var size=Number(spec&&spec.size);
+  if(!(size>0)||!observer||!target)return true;
+  var e=viewportHalfExtents(g);
+  var left=observer.x-e.x,right=observer.x+e.x;
+  var top=observer.y-e.y,bottom=observer.y+e.y;
+  return target.x+17>left&&target.x-17<right&&
+    target.y-size-2.5>top&&target.y-size-6<bottom;
+}
 /* The canonical drawTank health strip is 34 x 3.5 world units, drawn above
  * the hull and BEFORE Battlefield's nearly opaque terrain pass. Physical LOS
  * alone is not a health-visibility test: many blocked hulls have readable bars.
@@ -156,7 +171,7 @@ function scoreTarget(g,classes,observer,a,target,now,satCache){
   var dist=Math.hypot(target.x-observer.x,target.y-observer.y),near=1/(1+dist/720);
   /* A covered health strip does not grant omniscient execution priority. The
    * target remains a legal public contact for navigation and combat planning. */
-  var healthPublic=!healthBarCovered(g,classes,target)||hasSpotterRelay(g,classes,observer,target);
+  var healthPublic=(healthBarInViewport(g,classes,observer,target)&&!healthBarCovered(g,classes,target))||hasSpotterRelay(g,classes,observer,target);
   var hp=healthPublic?clamp(Number(target.hp)/Math.max(1,Number(target.maxHp)||Number(target.hp)||1),0,1):1;
   var score=near*1.16+(1-hp)*.48+targetDanger(classes,target)*.30;
   if(a&&a.__v1112TargetId===target.id)score+=.16;
