@@ -79,3 +79,26 @@ test('unrelated distant wall cannot reuse the prior opaque interval',()=>{
  b.y=32;
  assert.equal(F.healthBarCovered(g,C,t),true);
 });
+
+test('viewport-clipped strip concealed by one wall does not reveal private HP',()=>{
+ const F=boot(),t=target();
+ t.x=-495;
+ const g=world([{shape:'rect',x:-480,y:30,w:60,h:70,solid:true}],t);
+ const publicHealth=(()=>{
+  const window={__novaModules:{}};
+  vm.runInNewContext(source,{window,console});
+  return window.__NOVA_FAIR_ENGAGEMENT__.healthPublicTo;
+ })();
+ assert.equal(F.inGameplayViewport(g,observer,t),true);
+ assert.equal(F.healthBarCovered(g,C,t),false,'full world strip extends beyond wall');
+ assert.equal(F.healthBarCovered(g,C,t,observer),true,'visible intersection is covered');
+ assert.equal(publicHealth(g,C,observer,t),false);
+ const healthy=F.scoreTarget(g,C,observer,observer.ai,t,g.time);
+ t.hp=20;
+ assert.equal(F.scoreTarget(g,C,observer,observer.ai,t,g.time),healthy);
+ g.__novaTerrain[0].solid=false;
+ const exposed=F.scoreTarget(g,C,observer,observer.ai,t,g.time);
+ t.hp=100;
+ const exposedHealthy=F.scoreTarget(g,C,observer,observer.ai,t,g.time);
+ assert.ok(Math.abs(exposed-exposedHealthy-.384)<1e-8,'visible clipped HP remains actionable');
+});
