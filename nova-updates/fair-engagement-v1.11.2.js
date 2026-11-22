@@ -164,6 +164,34 @@ function healthBarCovered(g,classes,target){
          d2(t.x,t.y,x1,y0)<=rr2&&d2(t.x,t.y,x1,y1)<=rr2)return true;
     }
   }
+  /* Multiple opaque wall faces can hide the entire strip even when no one
+   * wall contains it. Prove coverage using only rectangular interior bands:
+   * rounded corners and circles cannot produce false opaque pixels. Each
+   * interval covers the strip's full height; gaps remain public. */
+  var intervals=[];
+  for(var j=0;j<terrain.length;j++){
+    var w=terrain[j];
+    if(!w||w.shape!=='rect'||w.solid===false||
+       (w.destructible&&!(w.hp>0)))continue;
+    var wx=Number(w.w)*.5,wy=Number(w.h)*.5;
+    if(!(wx>0&&wy>0))continue;
+    var inset=Math.min(12,Math.min(wx,wy)*.32);
+    var a,b;
+    if(y0>=w.y-wy+inset&&y1<=w.y+wy-inset){
+      a=w.x-wx;b=w.x+wx;
+    }else if(y0>=w.y-wy&&y1<=w.y+wy){
+      a=w.x-wx+inset;b=w.x+wx-inset;
+    }else continue;
+    if(b>a&&b>x0&&a<x1)intervals.push([Math.max(x0,a),Math.min(x1,b)]);
+  }
+  if(intervals.length<2)return false;
+  intervals.sort(function(a,b){return a[0]-b[0];});
+  var reach=x0;
+  for(var k=0;k<intervals.length;k++){
+    if(intervals[k][0]>reach+1e-8)return false;
+    reach=Math.max(reach,intervals[k][1]);
+    if(reach>=x1-1e-8)return true;
+  }
   return false;
 }
 /* Shared public-health evidence rule for scoring and tactical ability intent. */
