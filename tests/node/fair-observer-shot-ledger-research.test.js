@@ -135,6 +135,24 @@ test('negative control: a target entering the old shot lane is not a certified e
   'a target entering an old firing lane cannot create a retroactive witness');
  // The event-time certificate records aim commitment, not projectile impact.
 });
+test('event-time certificate excludes allied and unobserved victims',()=>{
+ const observer={id:1,x:0,y:0,hp:100,alive:true,ai:{},teamId:1};
+ const shooter={id:2,x:-100,y:0,angle:0,hp:100,alive:true,ai:{},teamId:2};
+ const enemy={id:3,x:100,y:0,hp:100,alive:true,teamId:3};
+ const ally={id:4,x:120,y:0,hp:100,alive:true,teamId:2};
+ const offscreen={id:5,x:500,y:0,hp:100,alive:true,teamId:3};
+ const tanks=[observer,shooter,enemy,ally,offscreen],ledger=new Map();
+ const g={time:10,tanks,getTank:id=>tanks.find(t=>t.id===id),
+  hasLineOfSight:()=>true};
+ const fair={inGameplayViewport:(_g,o,t)=>Math.abs(t.x-o.x)<=300};
+ const metrics={witnesses:0,candidateChecks:0};
+ recordShot(g,fair,ledger,shooter,metrics);
+ const event=ledger.get(observer.id).get(shooter.id);
+ assert.deepEqual(event.targets,[enemy.id],
+  'public commitment must exclude allies and victims outside observer sight');
+ assert.equal(publicPressure(g,fair,ledger,observer,ally,metrics),0);
+ assert.equal(publicPressure(g,fair,ledger,observer,offscreen,metrics),0);
+});
 test('ledger retains at most four distinct shooter events per observer',()=>{
  const fair={inGameplayViewport:()=>true};
  const observer={id:1,x:0,y:0,hp:100,alive:true,ai:{}};
@@ -164,7 +182,10 @@ function run(seed,instrument){
      // Successful projectile birth certifies an active shooter; do not read
      // hidden live HP before each observer's public-geometry sight gate.
      const fired=shooter?{id:shooter.id,x:shooter.x,y:shooter.y,
-      angle:shooter.angle,hp:1,alive:true}:null;
+      angle:shooter.angle,hp:1,alive:true,
+      teamId:shooter.teamId,team:shooter.team,
+      factionId:shooter.factionId,faction:shooter.faction,
+      side:shooter.side}:null;
      const out=oldFire.apply(this,arguments);
      if(this.bullets.length>before){
       metrics.shots++;
