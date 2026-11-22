@@ -97,8 +97,9 @@ test('event-time public shot ledger ignores hidden private assignments and shoot
  shooter.x=200;shooter.y=120;
  assert.equal(publicPressure(g,fair,ledger,observer,target,m),1,
   'historical shot origin does not follow a moving shooter');
- target.x=-250;
- assert.equal(publicPressure(g,fair,ledger,observer,target,m),0);
+ target.x=500;
+ assert.equal(publicPressure(g,fair,ledger,observer,target,m),0,
+  'a target outside the observer viewport is not current public pressure');
  g.time=11.26;target.x=100;
  assert.equal(publicPressure(g,fair,ledger,observer,target,m),0,
   'expired evidence cannot become permanent saturation');
