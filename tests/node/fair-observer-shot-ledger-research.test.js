@@ -179,7 +179,11 @@ function run(seed,instrument){
     for(const events of ledger.values())
      metrics.maxLedgerSize=Math.max(metrics.maxLedgerSize,events.size);
    }
-   return {hash:digest(physical(g)),draws:draws(),metrics};
+   const privateHash=digest((g.tanks||[]).map(t=>t&&t.ai?[
+    t.id,t.ai.state,t.ai.__v180Posture,t.ai.__v1112TargetId,
+    t.ai.__v1105TargetId,t.ai.__v180TargetId,t.ai.targetId,
+    t.ai.__v1112NextThink,t.ai.__v181Mode]:null));
+   return {hash:digest(physical(g)),privateHash,draws:draws(),metrics};
   }finally{g.destroy();}
  });
 }
@@ -188,6 +192,8 @@ test('two seeded composed games: observer-owned ledger measures evidence without
   const control=run(seed,false),research=run(seed,true);
   assert.equal(research.hash,control.hash,'read-only research changed physical game');
   assert.equal(research.draws,control.draws,'research consumed gameplay RNG');
+  assert.equal(research.privateHash,control.privateHash,
+   'read-only witness sampling changed private AI state');
   assert.equal(research.metrics.frames,720);
   assert.ok(research.metrics.visiblePairs>0);
   assert.ok(research.metrics.maxLedgerSize<=MAX_SHOOTERS);
