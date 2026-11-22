@@ -466,6 +466,9 @@ test('held-fire equal-mean jitter measures real moving and stationary HP after p
      assert.equal(moving.updates,stationary.updates,'same frame chronology');
      assert.equal(moving.volleys,stationary.volleys,
       'moving the target must not alter player weapon fire chronology');
+     const shooterBirths=rows=>rows.map(({targetY,...birth})=>birth);
+     assert.deepEqual(shooterBirths(moving.firstBirths),shooterBirths(stationary.firstBirths),
+      'target movement cannot rewrite the same shooter muzzle chronology');
      assert.ok(moving.travel>50&&moving.peakOffset>25,'moving target must cross shot lane');
      assert.equal(stationary.travel,0,'stationary control must remain still');
      assert.ok(moving.damage>0&&stationary.damage>0,'actual HP damage is required');
@@ -476,7 +479,8 @@ test('held-fire equal-mean jitter measures real moving and stationary HP after p
      arms[mode]={movingDamage:moving.damage,stationaryDamage:stationary.damage,
       movingHits:moving.hits,stationaryHits:stationary.hits,
       volleys:moving.volleys,windowDamage:moving.windowDamage,
-      drainDamage:moving.drainDamage,spin:moving.spin,heat:moving.heat};
+      drainDamage:moving.drainDamage,spin:moving.spin,heat:moving.heat,
+      firstBirths:moving.firstBirths,firstHits:moving.firstHits};
     }
     rows.push({cls,reload,seed,phase,arms,
      movingDamageDelta:+(arms.alternating60p15.movingDamage-arms.native60.movingDamage).toFixed(4),
