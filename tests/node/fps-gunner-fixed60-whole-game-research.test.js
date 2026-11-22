@@ -21,7 +21,7 @@ function frames(mode){
  throw Error('unknown presentation schedule');
 }
 function run(seed,cls,reload,mode,maxSteps=3,inputPolicy='held',nativePresentation=false){
- assert.ok(['held','firstFrameTap'].includes(inputPolicy));
+ assert.ok(['held','firstFrameTap','firstFrameTapBuffered'].includes(inputPolicy));
  return withSeed(seed,()=>{
   const g=bootGame();
   if(!g.player)g.redeploy();
@@ -55,17 +55,20 @@ function run(seed,cls,reload,mode,maxSteps=3,inputPolicy='held',nativePresentati
   };
   const initial=g.time;
   let wall=0,acc=0,updates=0,maxUsed=0,backloggedFrames=0,peakDebt=0;
-  let peakStepBudget=0,zeroUpdateFrames=0,frameIndex=0;
+  let peakStepBudget=0,zeroUpdateFrames=0,frameIndex=0,pendingPress=false;
   try{
    for(const frame of frames(mode)){
     g.input.firing=inputPolicy==='held'||frameIndex===0;
+    if(inputPolicy==='firstFrameTapBuffered'&&frameIndex===0)pendingPress=true;
     frameIndex++;
     wall+=frame;acc+=frame;
     let used=0;
     if(nativePresentation){
      g.update(frame);updates++;used=1;acc=0;
     }else while(acc+EPS>=STEP&&used<maxSteps){
+     if(inputPolicy==='firstFrameTapBuffered'&&pendingPress)g.input.firing=true;
      g.update(STEP);
+     if(inputPolicy==='firstFrameTapBuffered'){pendingPress=false;g.input.firing=false;}
      acc-=STEP;
      if(Math.abs(acc)<EPS)acc=0;
      used++;updates++;
@@ -117,12 +120,16 @@ test('bounded whole-Game fixed60 preserves held rotary fire across ordinary pres
 test('fixed60 without input-edge buffering can lose a one-frame 120Hz tap',()=>{
  const native=run(1517800,'minigun',1,'uniform120',3,'firstFrameTap',true);
  const fixed=run(1517800,'minigun',1,'uniform120',3,'firstFrameTap');
+ const buffered=run(1517800,'minigun',1,'uniform120',3,'firstFrameTapBuffered');
  assert.equal(native.updates,480,'current variable-step 120Hz can sample every presentation');
  assert.equal(native.volleys,1,'a legal first-frame press fires in current 120Hz Game');
  assert.equal(fixed.updates,240);
  assert.equal(fixed.volleys,0,'unbuffered fixed60 misses a press released before its first tick');
  assert.equal(fixed.zeroUpdateFrames,240);
- console.log('GUNNER_FIXED60_SHORT_TAP_FALSIFIER '+JSON.stringify({native,fixed}));
+ assert.equal(buffered.volleys,1,'one pending press consumed by the next Game tick restores the tap');
+ assert.equal(buffered.updates,240);
+ assert.equal(buffered.zeroUpdateFrames,240);
+ console.log('GUNNER_FIXED60_SHORT_TAP_FALSIFIER '+JSON.stringify({native,fixed,buffered}));
 });
 test('bounded whole-Game scheduler recovers one 100ms stall without changing the 60Hz weapon timeline',()=>{
  const rows=[];
