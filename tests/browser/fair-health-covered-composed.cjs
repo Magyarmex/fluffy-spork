@@ -62,7 +62,7 @@ const {chromium}=require('playwright');
     const low=F.scoreTarget(g,C,observer,observer.ai,covered,g.time);
     const delta=low-high;
     if(!F.healthBarCovered(g,C,covered))throw Error('real bar should be covered');
-    covered.y=80;const visibleFull=F.scoreTarget(g,C,observer,observer.ai,covered,g.time);
+    covered.y=80;covered.hp=100;const visibleFull=F.scoreTarget(g,C,observer,observer.ai,covered,g.time);
     covered.hp=20;const visibleLow=F.scoreTarget(g,C,observer,observer.ai,covered,g.time);
     const visibleDelta=visibleLow-visibleFull;
     if(F.healthBarCovered(g,C,covered)||Math.abs(visibleDelta-.384)>1e-7)
