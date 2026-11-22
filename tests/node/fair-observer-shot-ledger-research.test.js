@@ -57,7 +57,7 @@ function recordShot(g,fair,ledger,shooter,metrics){
   }
   events.delete(shooter.id);
   events.set(shooter.id,Object.freeze({
-   shooterId:shooter.id,x:shooter.x,y:shooter.y,
+   shooterId:shooter.id,shooterRef:(g.getTank&&g.getTank(shooter.id))||shooter,x:shooter.x,y:shooter.y,
    angle:shooter.angle,at:now,targets:Object.freeze(targets),
    // Object identity prevents an unrelated respawn/replacement reusing an ID.
    targetRefs
@@ -80,7 +80,7 @@ function publicPressure(g,fair,ledger,observer,target,metrics){
   const shooter=g.getTank&&g.getTank(ev.shooterId);
   // Current offscreen shooter state is not public, even after a witnessed shot.
   // This conservative prototype drops such memories instead of inspecting HP.
-  if(!shooter||!fair.inGameplayViewport(g,observer,shooter)||
+  if(!shooter||shooter!==ev.shooterRef||!fair.inGameplayViewport(g,observer,shooter)||
      !alive(shooter)||!hostile(g,shooter,target))continue;
   // A public event-time target certificate survives target movement,
   // but never grows retroactively from a later target position.
@@ -193,6 +193,23 @@ test('recycled target ID cannot inherit a historical firing certificate',()=>{
  tanks[2]=replacement;
  assert.equal(publicPressure(g,fair,ledger,observer,replacement,metrics),0,
   'a new object with a reused ID cannot inherit old shot pressure');
+});
+test('recycled shooter ID cannot inherit a historical firing certificate',()=>{
+ const observer={id:1,x:0,y:0,hp:100,alive:true,ai:{}};
+ const shooter={id:2,x:-100,y:0,angle:0,hp:100,alive:true,ai:{}};
+ const target={id:3,x:100,y:0,hp:100,alive:true};
+ const tanks=[observer,shooter,target],ledger=new Map();
+ const g={time:10,tanks,getTank:id=>tanks.find(t=>t.id===id),hasLineOfSight:()=>true};
+ const fair={inGameplayViewport:()=>true},metrics={witnesses:0,candidateChecks:0};
+ recordShot(g,fair,ledger,shooter,metrics);
+ assert.equal(publicPressure(g,fair,ledger,observer,target,metrics),1);
+ const replacement={id:2,x:-100,y:0,angle:0,hp:100,alive:true,ai:{}};
+ tanks[1]=replacement;
+ assert.equal(publicPressure(g,fair,ledger,observer,target,metrics),0,
+  'new shooter with reused numeric ID must not inherit prior-life shot');
+ recordShot(g,fair,ledger,replacement,metrics);
+ assert.equal(publicPressure(g,fair,ledger,observer,target,metrics),1,
+  'new shooter can create its own witnessed firing evidence');
 });
 test('reused observer ID cannot inherit another life\'s public memory',()=>{
  const observer={id:1,x:0,y:0,hp:100,alive:true,ai:{}};
