@@ -144,8 +144,11 @@ const {chromium}=require('playwright');
      try{
        const open55=healthPixels(55,false),open30=healthPixels(30,false);
        const wall55=healthPixels(55,true),wall30=healthPixels(30,true);
+       const open55Again=healthPixels(55,false),wall55Again=healthPixels(55,true);
        pixelEvidence.reachableSameTierContrast={
          sample:{x:480,y:378,width:40,height:10},
+         openSameHpAA:compare(open55,open55Again),
+         wallSameHpAA:compare(wall55,wall55Again),
          openHp55vs30:compare(open55,open30),
          wallHp55vs30:compare(wall55,wall30),
          wallSuppressionAt55:compare(open55,wall55),
