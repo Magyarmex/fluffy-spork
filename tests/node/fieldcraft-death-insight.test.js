@@ -157,6 +157,17 @@ test('destroying a Game removes only its mounted death insight before replacemen
  assert.equal(panel.note,null,'old note must not survive Game destruction');
  assert.equal(g.destroyed,true);
 });
+test('destroying an old Game cannot remove a replacement Game death note',()=>{
+ const {Game,addPanel}=boot(),old=new Game(),replacement=new Game();
+ old.killTank(victim(),killer('marksman'));old.update();
+ const panel=addPanel();
+ replacement.killTank(victim(),killer('guard'));replacement.update();
+ assert.ok(panel.note);
+ assert.match(panel.note.children[0].textContent,/GUARD/);
+ old.destroy();
+ assert.ok(panel.note,'replacement note must survive old Game teardown');
+ assert.match(panel.note.children[0].textContent,/GUARD/);
+});
 test('missing React panel times out rather than observing forever',()=>{
  const {Game,observers,timeouts}=boot(),g=new Game();
  g.killTank(victim(),killer());g.update();
