@@ -68,6 +68,19 @@ From a live game session, `window.__NOVA_PERF_LAST__` contains a compact rolling
 
 **Current timing boundary:** `renderMs` and `renderP95Ms` measure the inner `game/render` wrapper installed by Frame Budget v1.7.5. Later visual overlays (including IFF halos, contact sparks, Hardlight Foundry finish passes and Signal Discipline cues) draw outside that timer. These numbers are **not end-to-end Canvas/render CPU costs** and should not alone certify a render-bound or render-safe adaptive-resolution decision. Frame-gap distributions still describe presentation cadence; use a final exported-render clock or browser trace to measure the complete drawing chain. See #669 and the source-executed timing-boundary regression.
 
+**Final synchronous RAF work:** The production RAF owner now records
+`rafWorkMs` (latest completed active callback), `rafWorkEmaMs` (smoothed
+callback cost), and `rafWorkPeakMs` (decaying peak) in the existing
+`NovaPerf.snapshot(game)` and `window.__NOVA_PERF_LAST__` diagnostics.
+These measurements include the actual synchronous updates, final Canvas
+render overlay chain, and minimap drawing in the callback, using the
+RAF's already-existing work clock. They reset when paused or outside
+active play. They do **not** measure GPU compositing, asynchronous browser
+work, input-to-photon latency, or physical-device thermal limits; they
+are evidence for profiling, not permission to increase the RAF step
+budget automatically. The historical `renderMs` field remains a narrower
+inner-render timer and is not renamed or silently reinterpreted.
+
 Useful fields:
 
 - `updateMs` / `renderMs`: exponential moving averages
