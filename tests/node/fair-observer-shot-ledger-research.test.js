@@ -230,8 +230,11 @@ test('ledger retains at most four distinct shooter events per observer',()=>{
 function run(seed,instrument){
  return withSeed(seed,draws=>{
   const g=bootGame(),ledger=new Map(),fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const classes=g.__testWindow.__novaMakeRequire('')('game/classes');
   const metrics={seed,shots:0,witnesses:0,witnessChecks:0,candidateChecks:0,
-   visiblePairs:0,privatePositive:0,publicPositive:0,bothPositive:0,eventTargetChecks:0,eventTargetRays:0,
+   visiblePairs:0,privatePositive:0,publicPositive:0,bothPositive:0,
+   choiceSamples:0,choiceChanges:0,playerFocusPrivate:0,playerFocusPublic:0,
+   eventTargetChecks:0,eventTargetRays:0,
    maxLedgerSize:0,frames:0};
   try{
    g.sfx.muted=true;g.sfx.startMusic=()=>{};
@@ -260,15 +263,30 @@ function run(seed,instrument){
     g.update(1/60);metrics.frames++;
     if(!instrument||frame%30!==0)continue;
     const observers=g.tanks.filter(t=>t&&t.ai&&alive(t));
-    for(const observer of observers)for(const target of g.tanks){
-     if(!target||!hostile(g,observer,target)||!alive(target)||
-        !fair.inGameplayViewport(g,observer,target))continue;
-     metrics.visiblePairs++;
-     const priv=fair.saturation(g,target.id,observer.id)>0;
-     const pub=publicPressure(g,fair,ledger,observer,target,metrics)>0;
-     if(priv)metrics.privatePositive++;
-     if(pub)metrics.publicPositive++;
-     if(priv&&pub)metrics.bothPositive++;
+    for(const observer of observers){
+     let privateBest=null,publicBest=null,privateScore=-Infinity,publicScore=-Infinity;
+     let choices=0;
+     for(const target of g.tanks){
+      if(!target||!hostile(g,observer,target)||!alive(target)||
+         !fair.inGameplayViewport(g,observer,target))continue;
+      const p=fair.scoreTarget(g,classes,observer,observer.ai,target,g.time);
+      if(!Number.isFinite(p))continue;
+      metrics.visiblePairs++;choices++;
+      const priv=fair.saturation(g,target.id,observer.id);
+      const pub=publicPressure(g,fair,ledger,observer,target,metrics);
+      if(priv>0)metrics.privatePositive++;
+      if(pub>0)metrics.publicPositive++;
+      if(priv>0&&pub>0)metrics.bothPositive++;
+      const counterfactual=p+.18*(priv-pub);
+      if(p>privateScore){privateScore=p;privateBest=target;}
+      if(counterfactual>publicScore){publicScore=counterfactual;publicBest=target;}
+     }
+     if(choices>=2&&privateBest&&publicBest){
+      metrics.choiceSamples++;
+      if(privateBest.id!==publicBest.id)metrics.choiceChanges++;
+      if(privateBest.isPlayer)metrics.playerFocusPrivate++;
+      if(publicBest.isPlayer)metrics.playerFocusPublic++;
+     }
     }
     for(const events of ledger.values())
      metrics.maxLedgerSize=Math.max(metrics.maxLedgerSize,events.size);
