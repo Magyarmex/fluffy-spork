@@ -374,3 +374,14 @@ test('covered health does not reverse choice between otherwise equal contacts',(
   const second=T.chooseTarget(g,C,observer,observer.ai,g.time);
   assert.equal(first.id,second.id,'hidden HP alone cannot swap target choice');
 });
+
+test('rounded wall corners are not mistaken for fully opaque health-bar cover',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C=classes();C.CLASSES.basic={size:14};
+  const g=game(),target=tank(2,-2,1);
+  // All four strip corners fit the 40x40 bounding box, but its top-left
+  // pixel lies outside the actual rounded wall shape.
+  g.__novaTerrain=[{shape:'rect',x:0,y:0,w:40,h:40,solid:true}];
+  assert.equal(T.healthBarCovered(g,C,target),false,
+    'a rectangle bounding box is not enough to prove full bar occlusion');
+});
