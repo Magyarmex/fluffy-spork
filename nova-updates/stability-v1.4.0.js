@@ -112,10 +112,11 @@
   }
   function collapseUpgradeTraySoon(owner) {
     if (typeof document === 'undefined') return;
+    var player=owner&&owner.player;
     setTimeout(function () {
-      // The old Game may have been destroyed and replaced during this delay.
-      // Never let its evolution callback minimize a new match's upgrade UI.
-      if (!owner || owner.__novaDestroyed) return;
+      // The owner may have been destroyed, or redeployed with a new player.
+      // Neither old life may minimize the current life's upgrade UI.
+      if (!owner || owner.__novaDestroyed || owner.player!==player) return;
       var bs = document.querySelectorAll('button[data-ui]');
       for (var i=0;i<bs.length;i++) {
         if ((bs[i].textContent || '').trim() === 'MINIMIZE') {
