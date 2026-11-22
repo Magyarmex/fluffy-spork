@@ -53,6 +53,8 @@ test('final RAF CPU work is measured after update, render and minimap, and reset
 test('production RAF patch is idempotent with one full-work instrumentation owner',()=>{
  assert.equal(patchRafStepCap(html),html);
  assert.equal(html.split('this.__novaRafWorkMs = priorWork;').length-1,1);
+ assert.throws(()=>patchRafStepCap(html+'\n            priorWork = performance.now() - workStart;'),/owner drift/,
+  'a second uninstrumented RAF timing owner must not pass idempotence');
  assert.equal(html.split('this.__novaRafWorkEmaMs =').length-1,2,
   'one initial EMA assignment and one EMA expression');
 });
