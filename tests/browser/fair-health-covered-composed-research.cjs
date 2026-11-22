@@ -116,6 +116,45 @@ const {chromium}=require('playwright');
      pixelEvidence.reachableBoundary={resolvedY,barBottom,nearFace,
        fullStripGeometricallyCovered:barBottom<=nearFace,
        visibleRows,open:reachableOpen,covered:reachableCovered};
+     // Same-color wounded-health contrast: measure the entire health-bar
+     // raster, not just one cherry-picked red pixel. This is observational
+     // evidence, NOT a claim that a human can/cannot read the remaining strip.
+     // At zoom 1 the legal y=52 Twin bar spans world x=-17..17 and y=32..35.5.
+     // Canvas center is (500,350), so sample a generous 40x9 pixel rectangle.
+     const healthPixels=(hp,solid)=>{
+       covered.hp=hp;wall.solid=solid;
+       renderer.render(g,1000,700);
+       return Array.from(g.ctx.getImageData(480,378,40,10).data);
+     };
+     const compare=(a,b)=>{
+       let changed=0,maxChannelDelta=0,sumDelta=0,rows=[];
+       for(let y=0;y<10;y++){
+         let rowChanged=0;
+         for(let x=0;x<40;x++){
+           const k=(y*40+x)*4;
+           const delta=Math.max(...[0,1,2].map(c=>Math.abs(a[k+c]-b[k+c])));
+           if(delta>5){changed++;rowChanged++;}
+           maxChannelDelta=Math.max(maxChannelDelta,delta);sumDelta+=delta;
+         }
+         rows.push(rowChanged);
+       }
+       return {changed,maxChannelDelta,meanMaxChannelDelta:sumDelta/400,rows};
+     };
+     const oldHp=covered.hp;
+     try{
+       const open55=healthPixels(55,false),open30=healthPixels(30,false);
+       const wall55=healthPixels(55,true),wall30=healthPixels(30,true);
+       pixelEvidence.reachableSameTierContrast={
+         sample:{x:480,y:378,width:40,height:10},
+         openHp55vs30:compare(open55,open30),
+         wallHp55vs30:compare(wall55,wall30),
+         wallSuppressionAt55:compare(open55,wall55),
+         wallSuppressionAt30:compare(open30,wall30)
+       };
+       if(pixelEvidence.reachableSameTierContrast.openHp55vs30.changed===0)
+         throw Error('open health-bar A/B control has no readable raster difference');
+     }finally{covered.hp=oldHp;}
+
     }finally{
      Object.assign(g, {shapes:drawSaved.shapes,drones:drawSaved.drones,
       bullets:drawSaved.bullets,powerups:drawSaved.powerups,
