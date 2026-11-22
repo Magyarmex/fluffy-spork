@@ -137,6 +137,25 @@ test('fixed60 without input-edge buffering can lose a one-frame 120Hz tap',()=>{
   'press-only buffering cannot fire after the touch aim vector is released');
  console.log('GUNNER_FIXED60_SHORT_TAP_FALSIFIER '+JSON.stringify({native,fixed,buffered,noAim}));
 });
+test('shipping Input clears right-stick aim on pointerup, so a press-only latch is insufficient',()=>{
+ const g=bootGame();
+ const input=g.input,canvas=input.canvas;
+ try{
+  input.canvas={getBoundingClientRect:()=>({left:0,top:0,width:800,height:600})};
+  const e={target:{closest:()=>null},pointerType:'touch',pointerId:991,clientX:600,clientY:300};
+  input.pd(e);
+  input.pm({...e,clientX:640});
+  assert.equal(input.stickId.aim,991);
+  assert.equal(input.aim.active,true);
+  assert.ok(input.aim.dx>9,'real right-stick movement must leave deadzone');
+  assert.equal(input.firing,true);
+  input.pu(e);
+  assert.equal(input.stickId.aim,-1);
+  assert.equal(input.aim.active,false);
+  assert.equal(input.aim.dx,0);
+  assert.equal(input.firing,false);
+ }finally{input.canvas=canvas;g.destroy();}
+});
 test('bounded whole-Game scheduler recovers one 100ms stall without changing the 60Hz weapon timeline',()=>{
  const rows=[];
  for(const [cls,reload] of [['minigun',1],['needlestorm',5]]){
