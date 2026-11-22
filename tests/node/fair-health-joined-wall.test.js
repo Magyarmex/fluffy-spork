@@ -43,3 +43,30 @@ test('rounded-corner edge overlap is not falsely certified as fully opaque',()=>
  t.y=43.5;
  assert.equal(F.healthBarCovered(g,C,t),false);
 });
+
+test('joined-wall HP never reverses target choice; uncovered wounds still do',()=>{
+ const F=boot(),a=target(),b=target();
+ b.id=3;
+ const g=world([wall(-12),wall(12)],a);g.tanks=[observer,a,b];
+ a.hp=20;b.hp=100;
+ const concealedA=F.chooseTarget(g,C,observer,observer.ai,g.time).id;
+ a.hp=100;b.hp=20;
+ const concealedB=F.chooseTarget(g,C,observer,observer.ai,g.time).id;
+ assert.equal(concealedA,concealedB,'private wounds cannot reverse covered contact selection');
+ g.__novaTerrain=[];
+ a.hp=20;b.hp=100;
+ const publicA=F.chooseTarget(g,C,observer,observer.ai,g.time).id;
+ a.hp=100;b.hp=20;
+ const publicB=F.chooseTarget(g,C,observer,observer.ai,g.time).id;
+ assert.notEqual(publicA,publicB,'legible HP remains a valid tactical signal');
+});
+test('public-health contract used by Phase agrees with the joined-wall scorer',()=>{
+ const modules={};
+ const window={__novaModules:modules};
+ vm.runInNewContext(source,{window,console});
+ const t=target(),g=world([wall(-12),wall(12)],t);
+ const publicHealth=window.__NOVA_FAIR_ENGAGEMENT__.healthPublicTo;
+ assert.equal(publicHealth(g,C,observer,t),false);
+ g.__novaTerrain[1].solid=false;
+ assert.equal(publicHealth(g,C,observer,t),true);
+});
