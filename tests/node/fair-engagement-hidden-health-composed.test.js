@@ -57,8 +57,8 @@ test('real composed AI Phase execution respects clipped versus visible HP eviden
   const g=bootGame();
   try{
    const bots=g.tanks.filter(t=>t&&t.ai&&!t.isPlayer);
-   assert.ok(bots.length>=2);
-   const hunter=bots[0],target=bots[1];
+   assert.ok(bots.length>=1&&g.player);
+   const hunter=bots[0],target=g.player;
    for(const q of g.tanks){if(q!==hunter&&q!==target){q.x=2500;q.y=2500;}}
    hunter.cls='ghost';hunter.x=0;hunter.y=0;hunter.hp=100;hunter.maxHp=100;
    hunter.abilityCd=0;hunter.alive=true;
