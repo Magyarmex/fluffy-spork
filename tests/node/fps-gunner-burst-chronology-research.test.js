@@ -25,9 +25,33 @@ function irregular(){
 function held(t){return true;}
 function longBurst(t){return (t%1.25)<1-1e-9;}
 function shortBurst(t){return (t%.8)<.4-1e-9;}
+// Input changes must occur at the same physical times in every cadence.
+// Split simulation intervals at input edges rather than allowing 30Hz to
+// observe a release up to 33ms later than 120Hz.
+function splitAtInputEdges(steps,policy){
+ if(policy===held)return steps;
+ const period=policy===longBurst?1.25:.8,on=policy===longBurst?1:.4;
+ const edges=[];
+ for(let base=0;base<SECONDS-1e-9;base+=period){
+  if(base+on<SECONDS-1e-9)edges.push(base+on);
+  if(base+period<SECONDS-1e-9)edges.push(base+period);
+ }
+ const result=[];let time=0,edge=0;
+ for(const dt of steps){
+  const end=time+dt;
+  while(edge<edges.length&&edges[edge]<end-1e-9){
+   if(edges[edge]>time+1e-9)result.push(edges[edge]-time);
+   time=edges[edge++];
+  }
+  if(end>time+1e-9)result.push(end-time);
+  time=end;
+ }
+ return result;
+}
 function run(seed,cls,reload,steps,policy){
  return withSeed(seed,()=>{
   const g=bootGame(),p=g.player;
+  steps=splitAtInputEdges(steps,policy);
   try{
    g.sfx.muted=true;g.sfx.startMusic=()=>{};
    g.setClass(p,cls);g.tanks=[p];g.tankById=new Map([[p.id,p]]);
