@@ -441,3 +441,20 @@ test('live Sniper Observer relay may legitimately reveal an offscreen health str
   assert.equal(T.scoreTarget(g,C,observer,observer.ai,target,g.time),hidden,
     'revoking relay immediately restores viewport health privacy');
 });
+
+test('320px portrait viewport keeps contact while hiding fully clipped HP',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C=classes();C.CLASSES.basic={size:14};
+  // Shipping resize uses zoom=min(width/640,height/520), clamped to .45..1.2.
+  // At 320x700 CSS px, zoom=.5 and the vertical half-extent is 700 world units.
+  const g=game(320,700,.5),observer=tank(1,0,0),target=tank(2,0,-692);
+  g.tanks=[observer,target];g.__novaTerrain=[];
+  assert.equal(T.inGameplayViewport(g,observer,target),true);
+  const healthy=T.scoreTarget(g,C,observer,observer.ai,target,g.time);
+  target.hp=20;
+  assert.equal(T.scoreTarget(g,C,observer,observer.ai,target,g.time),healthy);
+  target.y=-670;target.hp=100;
+  const open=T.scoreTarget(g,C,observer,observer.ai,target,g.time);
+  target.hp=20;
+  assert.ok(Math.abs(T.scoreTarget(g,C,observer,observer.ai,target,g.time)-open-.384)<1e-8);
+});
