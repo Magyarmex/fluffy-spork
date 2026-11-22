@@ -316,3 +316,72 @@ test('untracked or expired Sniper relay never invokes a remote health-reading ow
   assert.equal(T.scoreTarget(g,C,sniper,sniper.ai,remote,g.time),-Infinity);
   assert.equal(calls,0,'expired contact is not live remote authority');
 });
+
+test('covered on-screen HP bar cannot change AI vulnerability priority',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C=classes();C.CLASSES.basic={size:14};
+  const g=game(1000,700),observer=tank(1,0,-150),covered=tank(2,0,50);
+  g.tanks=[observer,covered];
+  g.__novaTerrain=[{shape:'rect',x:0,y:0,w:240,h:70,solid:true,destructible:false}];
+  assert.equal(T.inGameplayViewport(g,observer,covered),true);
+  assert.equal(T.healthBarCovered(g,C,covered),true);
+  const full=T.scoreTarget(g,C,observer,observer.ai,covered,g.time);
+  covered.hp=20;
+  assert.equal(T.scoreTarget(g,C,observer,observer.ai,covered,g.time),full,
+    'private HP changes must not increase target priority behind opaque terrain');
+  assert.ok(Number.isFinite(full),'the viewport contact remains selectable');
+});
+
+test('physically blocked but visible HP remains a legitimate scoring signal',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C=classes();C.CLASSES.basic={size:14};
+  const g=game(1000,700),observer=tank(1,0,-150),covered=tank(2,0,80);
+  g.tanks=[observer,covered];
+  g.__novaTerrain=[{shape:'rect',x:0,y:0,w:240,h:70,solid:true,destructible:false}];
+  g.hasLineOfSight=()=>false;
+  assert.equal(T.healthBarCovered(g,C,covered),false);
+  const full=T.scoreTarget(g,C,observer,observer.ai,covered,g.time);
+  covered.hp=20;
+  assert.ok(Math.abs(T.scoreTarget(g,C,observer,observer.ai,covered,g.time)-full-.384)<1e-8,
+    'physical LOS alone must not suppress an on-screen readable bar');
+});
+
+test('destroyed cover and circle geometry cannot hide public HP',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C=classes();C.CLASSES.basic={size:14};
+  const g=game(),target=tank(2,0,50);
+  const cover={shape:'rect',x:0,y:0,w:240,h:70,solid:true,destructible:true,hp:100};
+  g.__novaTerrain=[cover];
+  assert.equal(T.healthBarCovered(g,C,target),true);
+  cover.hp=0;assert.equal(T.healthBarCovered(g,C,target),false);
+  cover.hp=100;cover.solid=false;assert.equal(T.healthBarCovered(g,C,target),false);
+  g.__novaTerrain=[{shape:'circle',x:0,y:0,r:30,solid:true}];
+  assert.equal(T.healthBarCovered(g,C,target),false,'bar corners are outside circle');
+  g.__novaTerrain[0].r=90;
+  assert.equal(T.healthBarCovered(g,C,target),true,'all bar corners fit inside the pillar');
+});
+
+test('covered health does not reverse choice between otherwise equal contacts',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C=classes();C.CLASSES.basic={size:14};
+  const g=game(1000,700),observer=tank(1,0,-150);
+  const a=tank(2,0,50),b=tank(3,0,50);
+  g.tanks=[observer,a,b];
+  g.__novaTerrain=[{shape:'rect',x:0,y:0,w:240,h:70,solid:true}];
+  a.hp=20;b.hp=100;
+  const first=T.chooseTarget(g,C,observer,observer.ai,g.time);
+  a.hp=100;b.hp=20;
+  const second=T.chooseTarget(g,C,observer,observer.ai,g.time);
+  assert.equal(first.id,second.id,'hidden HP alone cannot swap target choice');
+});
+
+test('rounded wall corners are not mistaken for fully opaque health-bar cover',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C=classes();C.CLASSES.basic={size:14};
+  const g=game(),target=tank(2,-2,1);
+  // All four strip corners fit the 40x40 bounding box, but its top-left
+  // pixel lies outside the actual rounded wall shape.
+  g.__novaTerrain=[{shape:'rect',x:0,y:0,w:40,h:40,solid:true}];
+  assert.equal(T.healthBarCovered(g,C,target),false,
+    'a rectangle bounding box is not enough to prove full bar occlusion');
+});
