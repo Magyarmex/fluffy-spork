@@ -179,3 +179,28 @@ test('equal-mean jitter phase is a separate causal variable for held rotary fire
  }
  console.log('GUNNER_JITTER_PHASE_RESEARCH '+JSON.stringify(rows));
 });
+
+test('matched 60Hz-mean alternating jitter probes the rotary spin-up threshold',()=>{
+ // Two updates always sum to 1/30 second. Varying amplitude changes
+ // frame-to-frame timing without changing update count, total elapsed
+ // time, or held-fire input. These are synthetic schedules, not Android
+ // traces or acceptable balance targets.
+ const rows=[];
+ for(const amplitude of [0,.1,.15,.2,.3,.5,.6,.7]){
+  const slow=(1+amplitude)/60,fast=(1-amplitude)/60;
+  const steps=Array.from({length:480},(_,i)=>i%2===0?slow:fast);
+  assert.ok(steps.every(dt=>dt>0&&dt<=1/30));
+  assert.ok(Math.abs(steps.reduce((a,b)=>a+b,0)-SECONDS)<1e-8);
+  for(const [cls,reload] of [['minigun',1],['needlestorm',3]]){
+   const a=run(1517800,cls,reload,steps,held);
+   const b=run(1517802,cls,reload,steps,held);
+   assert.deepEqual(a,b,'isolated alternating jitter must be seed-invariant');
+   assert.equal(a.nominalFrames,480);
+   assert.equal(a.restVolleys,0);
+   rows.push({cls,reload,amplitude,slowMs:+(slow*1000).toFixed(3),
+    fastMs:+(fast*1000).toFixed(3),volleys:a.volleys,
+    spinMean:a.spinMean,spin:a.spin,heatMean:a.heatMean});
+  }
+ }
+ console.log('GUNNER_ALTERNATING_JITTER_RESEARCH '+JSON.stringify(rows));
+});
