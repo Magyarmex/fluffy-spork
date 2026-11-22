@@ -421,3 +421,23 @@ test('horizontal partial clipping retains visible HP and zoom updates strip boun
   assert.equal(T.scoreTarget(g,C,observer,observer.ai,target,g.time),hidden,
     'zoomed viewport edge must hide a wholly clipped bar');
 });
+
+test('live Sniper Observer relay may legitimately reveal an offscreen health strip',()=>{
+  const {window}=boot(),T=window.__NOVA_FAIR_ENGAGEMENT_TEST__;
+  const C=classes();C.CLASSES.basic={size:14};
+  const g=game(1000,700,1),observer=tank(1,0,0,{cls:'marksman',
+    __novaSpotterContactId:2,__novaSpotterContactUntil:10}),target=tank(2,0,-342);
+  g.tanks=[observer,target];g.__novaTerrain=[];
+  window.__NOVA_SPOTTER_LIVE_RELAY__=(_g,owner,t)=>
+    owner===observer&&t===target;
+  const full=T.scoreTarget(g,C,observer,observer.ai,target,g.time);
+  target.hp=20;
+  assert.ok(Math.abs(T.scoreTarget(g,C,observer,observer.ai,target,g.time)-full-.384)<1e-8,
+    'a live legitimate relay remains an explicit health-information exception');
+  delete window.__NOVA_SPOTTER_LIVE_RELAY__;
+  target.hp=100;
+  const hidden=T.scoreTarget(g,C,observer,observer.ai,target,g.time);
+  target.hp=20;
+  assert.equal(T.scoreTarget(g,C,observer,observer.ai,target,g.time),hidden,
+    'revoking relay immediately restores viewport health privacy');
+});
