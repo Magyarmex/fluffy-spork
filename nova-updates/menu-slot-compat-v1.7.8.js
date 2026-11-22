@@ -367,8 +367,10 @@ function findPanel(){
 function paint(info){
  if(!info)return false;
  var target=findPanel();if(!target)return false;
- if(target.panel.querySelector('[data-nova-death-insight]'))return true;
+ var existing=target.panel.querySelector('[data-nova-death-insight]');
+ if(existing)return existing.__novaDeathInsightInfo===info;
  var box=document.createElement('div');
+ box.__novaDeathInsightInfo=info;
  box.setAttribute('data-nova-death-insight','');
  box.setAttribute('role','note');
  box.style.cssText='margin-top:10px;padding:8px 10px;border:1px solid rgba(125,243,255,.28);border-radius:8px;background:rgba(0,0,0,.42);text-align:left;overflow-wrap:anywhere;';
@@ -382,14 +384,15 @@ function paint(info){
  target.panel.insertBefore(box,target.before);
  return true;
 }
-function cleanup(g){
+function cleanup(g,ownerOnly){
  if(g.__novaDeathInsightObserver){g.__novaDeathInsightObserver.disconnect();g.__novaDeathInsightObserver=null;}
  if(g.__novaDeathInsightTimeout!=null&&typeof clearTimeout==='function'){
   clearTimeout(g.__novaDeathInsightTimeout);g.__novaDeathInsightTimeout=null;
  }
  if(typeof document!=='undefined'&&document.querySelector){
   var node=document.querySelector('[data-nova-death-insight]');
-  if(node&&node.parentNode)node.parentNode.removeChild(node);
+  if(node&&node.parentNode&&(!ownerOnly||node===g.__novaDeathInsightNode))
+   node.parentNode.removeChild(node);
  }
  g.__novaDeathInsight=null;g.__novaDeathInsightAttempted=false;
  g.__novaDeathInsightNode=null;
@@ -433,8 +436,8 @@ mods['game/engine']=function(module,exports,require){
  var classes;try{classes=require('./classes');}catch(ignore){return;}
  Game.prototype.__novaDeathInsightInstalled=true;
  var oldKill=Game.prototype.killTank,oldUpdate=Game.prototype.update,
-  oldRedeploy=Game.prototype.redeploy,oldUnregister=Game.prototype.unregisterTank,
-  oldDamage=Game.prototype.damageTank;
+  oldRedeploy=Game.prototype.redeploy,oldDestroy=Game.prototype.destroy,
+  oldUnregister=Game.prototype.unregisterTank,oldDamage=Game.prototype.damageTank;
  /* A rival's live bullet can kill the player after that rival has been
   * unregistered. Preserve only a bounded class snapshot for Fieldcraft,
   * never posthumous XP, kill credit, AI targeting or tank resurrection. */
@@ -490,6 +493,12 @@ mods['game/engine']=function(module,exports,require){
   this.__novaFieldcraftDeadOwners=null;
   this.__novaFieldcraftActiveSource=undefined;
   return out;
+ };
+ if(typeof oldDestroy==='function')Game.prototype.destroy=function(){
+  // A pending death-panel observer must not paint a previous match's note
+  // into a replacement Game's UI after the original owner is destroyed.
+  try{cleanup(this,true);}catch(ignore){this.__novaDeathInsight=null;}
+  return oldDestroy.apply(this,arguments);
  };
 };
 window.__NOVA_DEATH_INSIGHT_TEST__={choose:choose,paint:paint,cleanup:cleanup};
