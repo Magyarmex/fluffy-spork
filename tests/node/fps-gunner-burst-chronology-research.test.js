@@ -65,7 +65,7 @@ function run(seed,cls,reload,steps,policy){
    g.status='playing';g.paused=false;p.stats.reload=reload;
    g.input.autofire=false;g.input.aim.active=true;
    g.input.aim.dx=40;g.input.aim.dy=0;
-   let volleys=0,spinSum=0,heatPeak=0,spinPeak=0,t=0;
+   let volleys=0,spinSum=0,heatSum=0,heatPeak=0,spinPeak=0,t=0;
    const initialGameTime=g.time;
    const births=[],original=g.tryFire;
    g.tryFire=function(tank){
@@ -82,8 +82,9 @@ function run(seed,cls,reload,steps,policy){
     g.input.firing=policy(t);
     g.update(dt);
     t+=dt;
-    spinSum+=p.fireSpin||0;
+    spinSum+=(p.fireSpin||0)*dt;
     heatPeak=Math.max(heatPeak,p.__v17Heat||0);
+    heatSum+=(p.__v17Heat||0)*dt;
     spinPeak=Math.max(spinPeak,p.fireSpin||0);
     assert.equal(g.tanks.length,1);
    }
@@ -91,9 +92,10 @@ function run(seed,cls,reload,steps,policy){
    assert.ok(Math.abs((g.time-initialGameTime)-SECONDS)<1e-6,
     'composed Game time must advance by exactly the matched duration');
    return {volleys,births,spin:+(p.fireSpin||0).toFixed(5),
-    spinMean:+(spinSum/steps.length).toFixed(5),
+    spinMean:+(spinSum/SECONDS).toFixed(5),
     spinPeak:+spinPeak.toFixed(5),
     heat:+(p.__v17Heat||0).toFixed(5),
+    heatMean:+(heatSum/SECONDS).toFixed(5),
     heatPeak:+heatPeak.toFixed(5),
     stability:+(p.__v17Stability==null?1:p.__v17Stability).toFixed(5),
     fireCd:+p.fireCd.toFixed(5),updates:steps.length};
@@ -127,7 +129,7 @@ test('legal rotary builds: matched held and burst policies expose cadence sensit
     assert.deepEqual(a,b,'isolated no-target chronology should be seed invariant');
     assert.ok(a.volleys>0&&a.births.length===a.volleys);
     for(let i=1;i<a.births.length;i++)assert.ok(a.births[i]>=a.births[i-1]);
-    for(const key of ['spin','spinMean','spinPeak','heat','heatPeak','stability','fireCd'])
+    for(const key of ['spin','spinMean','spinPeak','heat','heatMean','heatPeak','stability','fireCd'])
      assert.ok(Number.isFinite(a[key]),key);
     rows.push({cls,reload,policy:policyName,cadence,...a,
      firstBirths:a.births.slice(0,8),births:undefined});
