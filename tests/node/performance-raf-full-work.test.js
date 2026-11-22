@@ -35,7 +35,7 @@ test('final RAF CPU work is measured after update, render and minimap, and reset
   const expected=work-before;
   assert.equal(g.__novaRafWorkMs,expected,'exact final synchronous callback cost');
   assert.ok(g.__novaRafWorkEmaMs>0&&g.__novaRafWorkPeakMs>=expected);
-  assert.ok(g.__novaRafWorkPeakMs>=g.__novaRafWorkEmaMs);
+  // A decaying peak can legitimately fall below the slower-smoothed EMA.
   lastEma=g.__novaRafWorkEmaMs;
  }
  assert.ok(updateCalls>=5);
@@ -77,4 +77,17 @@ test('copied Debug diagnostics expose RAF work without claiming GPU latency',()=
  assert.equal(debug({rafWorkEmaMs:12.5,rafWorkPeakMs:24.2})['RAF CPU WORK'],
   '12.5 ms smoothed / 24.2 ms peak');
  assert.equal(debug({})['RAF CPU WORK'],'n/a');
+});
+
+// Counterexample to a false peak>=EMA invariant. The active RAF owner's
+// EMA and peak use different decay factors, so the peak may cross the EMA
+// even though it always remains at least the latest measured callback.
+test('RAF peak may fall below EMA without violating the latest-work bound',()=>{
+ const oldEma=10,oldPeak=10,latest=9.6;
+ const ema=.9*oldEma+.1*latest;
+ const peak=Math.max(latest,.995*oldPeak);
+ assert.ok(peak<ema,'peak decay may cross the EMA');
+ assert.ok(peak>=latest,'peak still bounds the latest callback');
+ assert.match(body,/Math\\.max\\(priorWork, this\\.__novaRafWorkPeakMs \\* 0\\.995\\)/,
+  'test must remain tied to shipping peak owner');
 });
