@@ -56,3 +56,21 @@ test('production RAF patch is idempotent with one full-work instrumentation owne
  assert.equal(html.split('this.__novaRafWorkEmaMs =').length-1,2,
   'one initial EMA assignment and one EMA expression');
 });
+
+test('copied Debug diagnostics expose RAF work without claiming GPU latency',()=>{
+ const vm=require('node:vm');
+ const menu=fs.readFileSync(path.join(root,'nova-updates/menu-debug-motion-v1.7.8.js'),'utf8');
+ const a=menu.indexOf('function snapshot()'),b=menu.indexOf('function fillDebug()',a);
+ assert.ok(a>=0&&b>a,'canonical Debug snapshot owner');
+ function debug(perf){
+  const window={__NOVA_PERF_LAST__:perf,innerWidth:320,innerHeight:568,devicePixelRatio:2};
+  const navigator={onLine:true,maxTouchPoints:2,userAgent:'test'};
+  vm.runInNewContext(menu.slice(a,b)+'\nwindow.__snap=snapshot;',{
+   window,navigator,VERSION:'1.7.8',CODENAME:'Signal Flow',updaterState:()=> 'CURRENT'
+  });
+  return window.__snap();
+ }
+ assert.equal(debug({rafWorkEmaMs:12.5,rafWorkPeakMs:24.2})['RAF CPU WORK'],
+  '12.5 ms avg / 24.2 ms peak');
+ assert.equal(debug({})['RAF CPU WORK'],'n/a');
+});
