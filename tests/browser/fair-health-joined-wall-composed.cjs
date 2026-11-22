@@ -55,7 +55,29 @@ const {chromium}=require('playwright');
     if(delta<45)throw Error('real canvas not demonstrably occluded '+JSON.stringify({open,closed,delta}));
     walls[1].x=14;
     if(F.healthBarCovered(g,C,target))throw Error('visible wall seam was falsely concealed');
-    return {scoreDelta:wounded-healthy,pixels:{open,closed,delta},gapVisible:true};
+    // Independent viewport+wall arm: only the onscreen remainder of the
+    // bar is meaningful, and its real filled segment must be overpainted.
+    target.x=-495;target.hp=80;
+    const edgeWall={id:-999,kind:'terrain',shape:'rect',x:-480,y:barY,
+     w:60,h:20,type:'wall',destructible:false,solid:true,hp:0,maxHp:0};
+    g.__novaTerrain=[edgeWall];
+    if(F.healthBarCovered(g,C,target))throw Error('full world strip unexpectedly covered');
+    if(!window.__NOVA_FAIR_ENGAGEMENT__.healthPublicTo ||
+       window.__NOVA_FAIR_ENGAGEMENT__.healthPublicTo(g,C,observer,target))
+      throw Error('viewport-clipped HP is still public');
+    const edgeWounded=F.scoreTarget(g,C,observer,observer.ai,target,g.time);
+    target.hp=100;
+    const edgeHealthy=F.scoreTarget(g,C,observer,observer.ai,target,g.time);
+    if(!Number.isFinite(edgeWounded)||Math.abs(edgeWounded-edgeHealthy)>1e-7)
+      throw Error('viewport plus wall still leaks HP');
+    target.hp=80;
+    const edgeSample=()=>Array.from(g.ctx.getImageData(5,sy,1,1).data);
+    edgeWall.solid=false;renderer.render(g,1000,700);const edgeOpen=edgeSample();
+    edgeWall.solid=true;renderer.render(g,1000,700);const edgeClosed=edgeSample();
+    const edgeDelta=Math.max(...edgeOpen.slice(0,3).map((v,i)=>Math.abs(v-edgeClosed[i])));
+    if(edgeDelta<45)throw Error('clipped bar not overpainted in canvas '+JSON.stringify({edgeOpen,edgeClosed}));
+    return {scoreDelta:wounded-healthy,pixels:{open,closed,delta},gapVisible:true,
+     edge:{scoreDelta:edgeWounded-edgeHealthy,open:edgeOpen,closed:edgeClosed,delta:edgeDelta}};
    }finally{
     snapshots.forEach(({t,state,ai})=>{Object.assign(t,state);t.ai=ai;});
     Object.assign(g,{tanks:original.tanks,__novaTerrain:original.terrain,
