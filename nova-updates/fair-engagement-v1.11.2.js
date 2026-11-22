@@ -137,11 +137,23 @@ function healthBarInViewport(g,classes,observer,target){
  * alone is not a health-visibility test: many blocked hulls have readable bars.
  * Only a bar fully contained by one solid piece of terrain loses the public
  * vulnerability bonus. Conservative geometry avoids suppressing visible HP. */
-function healthBarCovered(g,classes,target){
+function healthBarCovered(g,classes,target,observer){
   var terrain=g&&g.__novaTerrain,defs=classes&&classes.CLASSES;
   var spec=defs&&target&&defs[target.cls],size=Number(spec&&spec.size);
   if(!Array.isArray(terrain)||!(size>0)||!target)return false;
   var x0=target.x-17,x1=target.x+17,y0=target.y-size-6,y1=target.y-size-2.5;
+  /* The player sees only the strip intersection with their viewport. A
+   * wall need not hide pixels that are already outside that rectangle.
+   * Optional observer keeps the original full-strip test hook stable. */
+  if(observer){
+    var ext=viewportHalfExtents(g);
+    x0=Math.max(x0,observer.x-ext.x);
+    x1=Math.min(x1,observer.x+ext.x);
+    y0=Math.max(y0,observer.y-ext.y);
+    y1=Math.min(y1,observer.y+ext.y);
+    if(!(x1>x0&&y1>y0))return false;
+  }
+  var intervals=[];
   for(var i=0;i<terrain.length;i++){
     var t=terrain[i];
     if(!t||t.solid===false||(t.destructible&&!(t.hp>0)))continue;
@@ -156,6 +168,16 @@ function healthBarCovered(g,classes,target){
         (x1<=t.x+hw-round||y0>=t.y-hh+round)&&
         (x0>=t.x-hw+round||y1<=t.y+hh-round)&&
         (x1<=t.x+hw-round||y1<=t.y+hh-round))return true;
+      /* Reuse the existing terrain pass to collect only guaranteed-opaque
+       * full-height intervals. Do not rescan every wall per AI candidate. */
+      var left=NaN,right=NaN;
+      if(y0>=t.y-hh+round&&y1<=t.y+hh-round){
+        left=t.x-hw;right=t.x+hw;
+      }else if(y0>=t.y-hh&&y1<=t.y+hh){
+        left=t.x-hw+round;right=t.x+hw-round;
+      }
+      if(right>left&&right>x0&&left<x1)
+        intervals.push([Math.max(x0,left),Math.min(x1,right)]);
     }else if(t.shape==='circle'){
       var rr=Number(t.r);
       if(!(rr>0))continue;
@@ -164,12 +186,22 @@ function healthBarCovered(g,classes,target){
          d2(t.x,t.y,x1,y0)<=rr2&&d2(t.x,t.y,x1,y1)<=rr2)return true;
     }
   }
+  /* Multiple opaque wall faces can hide a strip even if no one wall does.
+   * Only rounded-rectangle interior bands are certified; gaps stay visible. */
+  if(intervals.length<2)return false;
+  intervals.sort(function(a,b){return a[0]-b[0];});
+  var reach=x0;
+  for(var k=0;k<intervals.length;k++){
+    if(intervals[k][0]>reach+1e-8)return false;
+    reach=Math.max(reach,intervals[k][1]);
+    if(reach>=x1-1e-8)return true;
+  }
   return false;
 }
 /* Shared public-health evidence rule for scoring and tactical ability intent. */
 function healthPublicTo(g,classes,observer,target){
   if(!g||!observer||!target)return false;
-  return (healthBarInViewport(g,classes,observer,target)&&!healthBarCovered(g,classes,target))||
+  return (healthBarInViewport(g,classes,observer,target)&&!healthBarCovered(g,classes,target,observer))||
     hasSpotterRelay(g,classes,observer,target);
 }
 function scoreTarget(g,classes,observer,a,target,now,satCache){
