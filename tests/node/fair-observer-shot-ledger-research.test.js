@@ -44,7 +44,8 @@ function recordShot(g,fair,ledger,shooter,metrics){
    // The observer must have seen the candidate as well as the shooter.
    // This extra ray is deliberately measured: it may make this candidate
    // too expensive to promote into the shipping AI.
-   if(typeof g.hasLineOfSight==='function'){
+   if(typeof g.hasLineOfSight!=='function')continue;
+   {
     metrics.eventTargetRays=(metrics.eventTargetRays||0)+1;
     if(!g.hasLineOfSight(observer.x,observer.y,candidate.x,candidate.y,3))continue;
     metrics.eventTargetRays++;
