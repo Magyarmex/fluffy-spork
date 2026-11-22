@@ -69,6 +69,26 @@ const {chromium}=require('playwright');
       throw Error('physically covered but visible bar must retain public HP '+visibleDelta);
     covered.y=50;
     if(Math.abs(delta)>1e-7)throw Error('concealed HP still changes score '+delta);
+    // Actual composed chooser: concealment removes private HP preference,
+    // while uncovered wounds must still affect a matched target contest.
+    const priorClear={x:clear.x,y:clear.y,hp:clear.hp};
+    clear.x=covered.x;clear.y=covered.y;
+    covered.hp=20;clear.hp=100;
+    const coveredChoiceA=F.chooseTarget(g,C,observer,observer.ai,g.time)?.id;
+    covered.hp=100;clear.hp=20;
+    const coveredChoiceB=F.chooseTarget(g,C,observer,observer.ai,g.time)?.id;
+    if(coveredChoiceA!==coveredChoiceB)
+      throw Error('hidden health reversed composed target choice');
+    wall.solid=false;
+    covered.hp=20;clear.hp=100;
+    const visibleChoiceA=F.chooseTarget(g,C,observer,observer.ai,g.time)?.id;
+    covered.hp=100;clear.hp=20;
+    const visibleChoiceB=F.chooseTarget(g,C,observer,observer.ai,g.time)?.id;
+    if(visibleChoiceA===visibleChoiceB)
+      throw Error('uncovered wounded targets should remain distinguishable');
+    wall.solid=true;
+    Object.assign(clear,priorClear);
+    covered.hp=20;
     // Pixel A/B: same actual composed renderer, identical tank/HP/camera,
     // toggling only the wall's solidity. This is the player's canvas,
     // not a recreated bar painter or a geometric-only proxy.
@@ -99,7 +119,7 @@ const {chromium}=require('playwright');
      Object.assign(g.cam,drawSaved.cam);
      wall.solid=true;
     }
-    return {hullSize,bar,wall,barFullyOverpainted,scoreDelta:delta,visibleDelta,
+    return {hullSize,bar,wall,barFullyOverpainted,scoreDelta:delta,visibleDelta,coveredChoiceA,coveredChoiceB,visibleChoiceA,visibleChoiceB,
      pixelEvidence,physicalLOS:false,viewportContact:true,
      originalTankCount:originals.tanks.length};
    }finally{
