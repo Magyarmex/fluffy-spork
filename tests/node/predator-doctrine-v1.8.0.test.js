@@ -307,14 +307,15 @@ test('AI movement remains live while planning is reaction-limited',()=>{
 });
 
 test('Phase execution respects Fair Engagement public-health evidence without disabling self-preservation',()=>{
- function run({publicHp,targetHp=20,selfHp=100}){
+ function run({publicHp,targetHp=20,selfHp=100,fairMode='normal'}){
   const {Game,ai,context}=loadPredator(),g=new Game();
   const hunter=tank(1,'ghost',{hp:selfHp,maxHp:100,abilityCd:0,
     ai:brain({state:'hunt',__v180PlanT:0})});
   const enemy=tank(7,'twin',{x:260,y:0,hp:targetHp,maxHp:100,isPlayer:true});
   g.tanks=[hunter,enemy];g.player=enemy;
   let checks=0;
-  context.window.__NOVA_FAIR_ENGAGEMENT__={
+  if(fairMode==='missing')context.window.__NOVA_FAIR_ENGAGEMENT__={};
+  else if(fairMode!=='absent')context.window.__NOVA_FAIR_ENGAGEMENT__={
    healthPublicTo(_g,_classes,observer,target){
     checks++;
     assert.equal(observer,hunter);
@@ -333,4 +334,8 @@ test('Phase execution respects Fair Engagement public-health evidence without di
   'healthy target is not an execution candidate');
  assert.equal(run({publicHp:false,selfHp:20}).abilities,1,
   'defensive Phase uses the actor own HP and must remain available');
+ assert.equal(run({publicHp:false,fairMode:'missing'}).abilities,0,
+  'partially loaded Fair Engagement must fail closed on execution');
+ assert.equal(run({publicHp:false,fairMode:'absent'}).abilities,1,
+  'standalone Predator retains its historical Phase behavior');
 });
