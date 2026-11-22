@@ -15,7 +15,7 @@ const html=patchRafStepCap(zlib.gunzipSync(Buffer.from(b64,'base64')).toString('
 const s=html.indexOf('    start() {'),e=html.indexOf('    destroy() {',s);
 assert.ok(s>=0&&e>s,'canonical Game RAF owner');
 const body=html.slice(s,e);
-const start=new Function('performance','requestAnimationFrame','render_1',
+const factory=new Function('performance','requestAnimationFrame','render_1',
  'return ({start(){'+body.slice(body.indexOf('{')+1,body.indexOf('\n    }'))+'\n}}).start');
 function run(cls,seed,mode,pattern){return withSeed(seed,draws=>{
  const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
@@ -38,6 +38,8 @@ function run(cls,seed,mode,pattern){return withSeed(seed,draws=>{
  try{
   if(mode==='30')for(let i=0;i<60;i++)g.update(1/30);
   else{
+   const start=factory({now:()=>now},fn=>{raf=fn;return 1;},
+    {render:()=>drawsCount++});
    start.call(g);for(let i=0;i<40;i++){
     now+=i%2?52:48;
     const cb=raf;assert.equal(typeof cb,'function');cb(now);
