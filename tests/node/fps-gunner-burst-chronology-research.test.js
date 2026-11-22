@@ -53,6 +53,7 @@ function splitAtInputEdges(steps,policy){
 function run(seed,cls,reload,steps,policy){
  return withSeed(seed,()=>{
   const g=bootGame(),p=g.player;
+  const nominalFrames=steps.length;
   steps=splitAtInputEdges(steps,policy);
   try{
    g.sfx.muted=true;g.sfx.startMusic=()=>{};
@@ -67,7 +68,8 @@ function run(seed,cls,reload,steps,policy){
    g.status='playing';g.paused=false;p.stats.reload=reload;
    g.input.autofire=false;g.input.aim.active=true;
    g.input.aim.dx=40;g.input.aim.dy=0;
-   let volleys=0,spinSum=0,heatSum=0,heatPeak=0,spinPeak=0,t=0;
+   let volleys=0,cadenceRounds=0,needleGateRounds=0,restVolleys=0;
+   let spinSum=0,heatSum=0,heatPeak=0,spinPeak=0,t=0,active=true;
    const initialGameTime=g.time;
    const births=[],original=g.tryFire;
    g.tryFire=function(tank){
@@ -75,13 +77,22 @@ function run(seed,cls,reload,steps,policy){
     const result=original.apply(this,arguments);
     if(tank===p&&this.bullets.length>before){
      volleys++;
+     if(!active)restVolleys++;
+     for(let i=before;i<this.bullets.length;i++){
+      const b=this.bullets[i];
+      if(b&&b.ownerId===p.id){
+       if(b.__v17Cadence)cadenceRounds++;
+       if(b.__v171NeedleGate)needleGateRounds++;
+      }
+     }
      births.push(+this.time.toFixed(6));
     }
     return result;
    };
    for(const dt of steps){
     assert.ok(dt>0&&dt<=1/30+1e-10);
-    g.input.firing=policy(t);
+    active=policy(t);
+    g.input.firing=active;
     g.update(dt);
     t+=dt;
     spinSum+=(p.fireSpin||0)*dt;
@@ -93,7 +104,8 @@ function run(seed,cls,reload,steps,policy){
    assert.ok(Math.abs(t-SECONDS)<1e-8,'all arms simulate the same 8 seconds');
    assert.ok(Math.abs((g.time-initialGameTime)-SECONDS)<1e-6,
     'composed Game time must advance by exactly the matched duration');
-   return {volleys,births,spin:+(p.fireSpin||0).toFixed(5),
+   return {volleys,cadenceRounds,needleGateRounds,restVolleys,births,
+    nominalFrames,extraInputUpdates:steps.length-nominalFrames,spin:+(p.fireSpin||0).toFixed(5),
     spinMean:+(spinSum/SECONDS).toFixed(5),
     spinPeak:+spinPeak.toFixed(5),
     heat:+(p.__v17Heat||0).toFixed(5),
@@ -130,6 +142,7 @@ test('legal rotary builds: matched held and burst policies expose cadence sensit
     const b=run(1517802,cls,reload,steps,policy);
     assert.deepEqual(a,b,'isolated no-target chronology should be seed invariant');
     assert.ok(a.volleys>0&&a.births.length===a.volleys);
+    assert.equal(a.restVolleys,0,'releasing fire cannot create a delayed volley');
     for(let i=1;i<a.births.length;i++)assert.ok(a.births[i]>=a.births[i-1]);
     for(const key of ['spin','spinMean','spinPeak','heat','heatMean','heatPeak','stability','fireCd'])
      assert.ok(Number.isFinite(a[key]),key);
