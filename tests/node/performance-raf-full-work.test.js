@@ -55,8 +55,10 @@ test('production RAF patch is idempotent with one full-work instrumentation owne
  assert.equal(html.split('this.__novaRafWorkMs = priorWork;').length-1,1);
  assert.throws(()=>patchRafStepCap(html+'\n            priorWork = performance.now() - workStart;'),/owner drift/,
   'a second uninstrumented RAF timing owner must not pass idempotence');
- assert.equal(html.split('this.__novaRafWorkEmaMs =').length-1,2,
-  'one initial EMA assignment and one EMA expression');
+ assert.ok(body.includes('this.__novaRafWorkEmaMs = this.__novaRafWorkEmaMs == null ? priorWork'),
+  'active EMA must use the measured RAF work');
+ assert.ok(body.includes('this.__novaRafWorkEmaMs = null;'),
+  'inactive work estimate must reset');
 });
 
 test('copied Debug diagnostics expose RAF work without claiming GPU latency',()=>{
