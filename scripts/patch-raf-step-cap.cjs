@@ -141,7 +141,7 @@ const rafWorkInstrumented=rafWorkAnchor+'\n'+
  '                this.__novaRafWorkPeakMs = null;\n'+
  '            }';
 function instrumentRafWork(html){
- if(count(html,rafWorkInstrumented)===1)return html;
+ if(count(html,rafWorkInstrumented)===1&&count(html,rafWorkAnchor)===1)return html;
  if(count(html,rafWorkAnchor)!==1)throw Error('canonical RAF full-work timing owner drift');
  return html.replace(rafWorkAnchor,rafWorkInstrumented);
 }
