@@ -45,7 +45,7 @@ const {chromium}=require('playwright');
     target.hp=20;
     g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];g.parts=[];g.texts=[];
     Object.assign(g.cam,{x:0,y:0,zoom:1,shake:0});g.dpr=1;
-    const sx=500,sy=Math.round(350+barY);
+    const sx=485,sy=Math.round(350+barY);
     const sample=()=>Array.from(g.ctx.getImageData(sx,sy,1,1).data);
     walls.forEach(w=>w.solid=false);renderer.render(g,1000,700);const open=sample();
     walls.forEach(w=>w.solid=true);renderer.render(g,1000,700);const closed=sample();
