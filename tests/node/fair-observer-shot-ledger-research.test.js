@@ -49,7 +49,9 @@ function recordShot(g,fair,ledger,shooter,metrics){
   events.delete(shooter.id);
   events.set(shooter.id,Object.freeze({
    shooterId:shooter.id,x:shooter.x,y:shooter.y,
-   angle:shooter.angle,at:now,targets:Object.freeze(targets)
+   angle:shooter.angle,at:now,targets:Object.freeze(targets),
+   // Object identity prevents an unrelated respawn/replacement reusing an ID.
+   targetRefs:new WeakSet(witnesses.filter(t=>t&&targets.includes(t.id)))
   }));
   if(events.size>MAX_SHOOTERS)events.delete(events.keys().next().value);
   metrics.witnesses++;
@@ -73,7 +75,7 @@ function publicPressure(g,fair,ledger,observer,target,metrics){
      !alive(shooter)||!hostile(g,shooter,target))continue;
   // A public event-time target certificate survives target movement,
   // but never grows retroactively from a later target position.
-  if(ev.targets.includes(target.id))n++;
+  if(ev.targetRefs.has(target))n++;
  }
  return n;
 }
@@ -152,6 +154,21 @@ test('event-time certificate excludes allied and unobserved victims',()=>{
   'public commitment must exclude allies and victims outside observer sight');
  assert.equal(publicPressure(g,fair,ledger,observer,ally,metrics),0);
  assert.equal(publicPressure(g,fair,ledger,observer,offscreen,metrics),0);
+});
+test('recycled target ID cannot inherit a historical firing certificate',()=>{
+ const observer={id:1,x:0,y:0,hp:100,alive:true,ai:{}};
+ const shooter={id:2,x:-100,y:0,angle:0,hp:100,alive:true,ai:{}};
+ const original={id:3,x:100,y:0,hp:100,alive:true};
+ const tanks=[observer,shooter,original],ledger=new Map();
+ const g={time:10,tanks,getTank:id=>tanks.find(t=>t.id===id),
+  hasLineOfSight:()=>true};
+ const fair={inGameplayViewport:()=>true},metrics={witnesses:0,candidateChecks:0};
+ recordShot(g,fair,ledger,shooter,metrics);
+ assert.equal(publicPressure(g,fair,ledger,observer,original,metrics),1);
+ const replacement={id:3,x:100,y:0,hp:100,alive:true};
+ tanks[2]=replacement;
+ assert.equal(publicPressure(g,fair,ledger,observer,replacement,metrics),0,
+  'a new object with a reused ID cannot inherit old shot pressure');
 });
 test('ledger retains at most four distinct shooter events per observer',()=>{
  const fair={inGameplayViewport:()=>true};
