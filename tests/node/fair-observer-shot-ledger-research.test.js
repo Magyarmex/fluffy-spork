@@ -25,6 +25,7 @@ function recordShot(g,fair,ledger,shooter,metrics){
  // Its explicit full-world shot witness roster is the authorized source here.
  const witnesses=g.__novaFairShotWitnesses||g.tanks||[];
  for(const observer of witnesses){
+  metrics.witnessChecks=(metrics.witnessChecks||0)+1;
   if(!observer||!observer.ai||observer.id===shooter.id||!alive(observer))continue;
   if(!fair.inGameplayViewport(g,observer,shooter))continue;
   if(typeof g.hasLineOfSight==='function'&&
@@ -87,6 +88,21 @@ test('event-time public shot ledger ignores hidden private assignments and shoot
  assert.equal(publicPressure(g,fair,ledger,observer,target,m),0,
   'expired evidence cannot become permanent saturation');
 });
+test('offscreen or occluded shooter cannot seed an observer-owned event',()=>{
+ const observer={id:1,x:0,y:0,hp:100,alive:true,ai:{}};
+ const shooter={id:2,x:500,y:0,angle:0,hp:100,alive:true,ai:{}};
+ const g={time:10,tanks:[observer,shooter],hasLineOfSight:()=>true};
+ const fair={inGameplayViewport:(_g,o,t)=>Math.abs(t.x-o.x)<=400};
+ const ledger=new Map(),m={witnesses:0,candidateChecks:0};
+ recordShot(g,fair,ledger,shooter,m);
+ assert.equal(ledger.has(observer.id),false,'offscreen shooter is not observed');
+ shooter.x=100;g.hasLineOfSight=()=>false;
+ recordShot(g,fair,ledger,shooter,m);
+ assert.equal(ledger.has(observer.id),false,'opaque cover blocks shot observation');
+ g.hasLineOfSight=()=>true;
+ recordShot(g,fair,ledger,shooter,m);
+ assert.equal(ledger.get(observer.id).size,1,'visible firing event is recorded');
+});
 test('negative control: a target entering the old shot lane is not a certified event-time victim',()=>{
  const fair={inGameplayViewport:()=>true};
  const observer={id:1,x:0,y:0,hp:100,alive:true,ai:{}};
@@ -119,7 +135,7 @@ test('ledger retains at most four distinct shooter events per observer',()=>{
 function run(seed,instrument){
  return withSeed(seed,draws=>{
   const g=bootGame(),ledger=new Map(),fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
-  const metrics={seed,shots:0,witnesses:0,candidateChecks:0,
+  const metrics={seed,shots:0,witnesses:0,witnessChecks:0,candidateChecks:0,
    visiblePairs:0,privatePositive:0,publicPositive:0,bothPositive:0,
    maxLedgerSize:0,frames:0};
   try{
