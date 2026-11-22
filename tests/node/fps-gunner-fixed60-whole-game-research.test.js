@@ -78,7 +78,8 @@ function run(seed,cls,reload,mode,maxSteps=3,inputPolicy='held',nativePresentati
    }
    assert.ok(Math.abs(wall-SECONDS)<1e-7,'identical wall-clock duration');
    assert.ok(acc>=-EPS,'accumulator must not run into negative time');
-   assert.ok(Math.abs(g.time-initial-updates*STEP)<1e-6,'Game clock matches executed ticks');
+   assert.ok(Math.abs(g.time-initial-(nativePresentation?wall:updates*STEP))<1e-6,
+    'Game clock matches its actual variable or fixed update chronology');
    assert.ok(updates<=(nativePresentation?480:240),'bounded pilot never invents simulated time');
    return {seed,cls,reload,mode,maxSteps,inputPolicy,nativePresentation,updates,volleys,
     spin:+(p.fireSpin||0).toFixed(6),heat:+(p.__v17Heat||0).toFixed(6),
