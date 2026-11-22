@@ -367,8 +367,10 @@ function findPanel(){
 function paint(info){
  if(!info)return false;
  var target=findPanel();if(!target)return false;
- if(target.panel.querySelector('[data-nova-death-insight]'))return true;
+ var existing=target.panel.querySelector('[data-nova-death-insight]');
+ if(existing)return existing.__novaDeathInsightInfo===info;
  var box=document.createElement('div');
+ box.__novaDeathInsightInfo=info;
  box.setAttribute('data-nova-death-insight','');
  box.setAttribute('role','note');
  box.style.cssText='margin-top:10px;padding:8px 10px;border:1px solid rgba(125,243,255,.28);border-radius:8px;background:rgba(0,0,0,.42);text-align:left;overflow-wrap:anywhere;';
