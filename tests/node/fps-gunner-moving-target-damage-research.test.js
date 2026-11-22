@@ -155,6 +155,7 @@ function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhas
    assert.ok(hits<=volleys,'ordinary single-target rotary shots');
    assert.ok(Number.isFinite(damage)&&damage<=1000000);
    const windowDamage=damage,windowHits=hits,windowBullets=g.bullets.length;
+   const windowSpin=p.fireSpin||0,windowHeat=p.__v17Heat||0;
    // Resolve already-born rounds without allowing another shot. Continue
    // the same prescribed moving-body path through the real Battlefield owner
    // rather than freezing the Scout at an artificially favorable hit position.
@@ -182,7 +183,8 @@ function trial(seed,cls,reload,mode,offset,amplitude,motionPeriod=1.6,motionPhas
     travel:+travel.toFixed(4),peakOffset:+peakOffset.toFixed(4),
     damage:+damage.toFixed(4),
     ...(drainSeconds?{windowDamage:+windowDamage.toFixed(4),
-     windowHits,windowBullets,drainDamage:+(damage-windowDamage).toFixed(4),
+     windowHits,windowBullets,windowSpin:+windowSpin.toFixed(5),
+     windowHeat:+windowHeat.toFixed(5),drainDamage:+(damage-windowDamage).toFixed(4),
      drainHits:hits-windowHits,remainingBullets:g.bullets.length}:{}),
     onTime:+onTime.toFixed(5),firstBirths,firstHits,
     heat:+(p.__v17Heat||0).toFixed(5),spin:+(p.fireSpin||0).toFixed(5)};
@@ -479,7 +481,8 @@ test('held-fire equal-mean jitter measures real moving and stationary HP after p
      arms[mode]={movingDamage:moving.damage,stationaryDamage:stationary.damage,
       movingHits:moving.hits,stationaryHits:stationary.hits,
       volleys:moving.volleys,windowDamage:moving.windowDamage,
-      drainDamage:moving.drainDamage,spin:moving.spin,heat:moving.heat,
+      drainDamage:moving.drainDamage,windowSpin:moving.windowSpin,
+      windowHeat:moving.windowHeat,spinAfterDrain:moving.spin,heatAfterDrain:moving.heat,
       firstBirths:moving.firstBirths,firstHits:moving.firstHits};
     }
     rows.push({cls,reload,seed,phase,arms,
