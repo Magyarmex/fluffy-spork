@@ -137,11 +137,22 @@ function healthBarInViewport(g,classes,observer,target){
  * alone is not a health-visibility test: many blocked hulls have readable bars.
  * Only a bar fully contained by one solid piece of terrain loses the public
  * vulnerability bonus. Conservative geometry avoids suppressing visible HP. */
-function healthBarCovered(g,classes,target){
+function healthBarCovered(g,classes,target,observer){
   var terrain=g&&g.__novaTerrain,defs=classes&&classes.CLASSES;
   var spec=defs&&target&&defs[target.cls],size=Number(spec&&spec.size);
   if(!Array.isArray(terrain)||!(size>0)||!target)return false;
   var x0=target.x-17,x1=target.x+17,y0=target.y-size-6,y1=target.y-size-2.5;
+  /* The player sees only the strip intersection with their viewport. A
+   * wall need not hide pixels that are already outside that rectangle.
+   * Optional observer keeps the original full-strip test hook stable. */
+  if(observer){
+    var ext=viewportHalfExtents(g);
+    x0=Math.max(x0,observer.x-ext.x);
+    x1=Math.min(x1,observer.x+ext.x);
+    y0=Math.max(y0,observer.y-ext.y);
+    y1=Math.min(y1,observer.y+ext.y);
+    if(!(x1>x0&&y1>y0))return false;
+  }
   var intervals=[];
   for(var i=0;i<terrain.length;i++){
     var t=terrain[i];
@@ -190,7 +201,7 @@ function healthBarCovered(g,classes,target){
 /* Shared public-health evidence rule for scoring and tactical ability intent. */
 function healthPublicTo(g,classes,observer,target){
   if(!g||!observer||!target)return false;
-  return (healthBarInViewport(g,classes,observer,target)&&!healthBarCovered(g,classes,target))||
+  return (healthBarInViewport(g,classes,observer,target)&&!healthBarCovered(g,classes,target,observer))||
     hasSpotterRelay(g,classes,observer,target);
 }
 function scoreTarget(g,classes,observer,a,target,now,satCache){
