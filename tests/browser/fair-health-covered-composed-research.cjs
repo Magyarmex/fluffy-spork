@@ -62,8 +62,38 @@ const {chromium}=require('playwright');
     const low=F.scoreTarget(g,C,observer,observer.ai,covered,g.time);
     const delta=low-high;
     if(Math.abs(delta-.384)>1e-7)throw Error('expected current HP leak '+delta);
+    // Pixel A/B: same actual composed renderer, identical tank/HP/camera,
+    // toggling only the wall's solidity. This is the player's canvas,
+    // not a recreated bar painter or a geometric-only proxy.
+    const renderer=window.__novaMakeRequire('')('game/render');
+    const drawSaved={shapes:g.shapes,drones:g.drones,bullets:g.bullets,
+     powerups:g.powerups,parts:g.parts,texts:g.texts,
+     cam:{...g.cam},dpr:g.dpr};
+    let pixelEvidence;
+    try{
+     g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];
+     g.parts=[];g.texts=[];
+     Object.assign(g.cam,{x:0,y:0,zoom:1,shake:0});
+     g.dpr=1;
+     const sample=()=>Array.from(g.ctx.getImageData(485,381,1,1).data);
+     wall.solid=false;
+     renderer.render(g,1000,700);
+     const open=sample();
+     wall.solid=true;
+     renderer.render(g,1000,700);
+     const coveredPixel=sample();
+     pixelEvidence={open,covered:coveredPixel,redDelta:open[0]-coveredPixel[0]};
+     if(pixelEvidence.redDelta<70)
+      throw Error('actual canvas bar not demonstrably overpainted: '+JSON.stringify(pixelEvidence));
+    }finally{
+     Object.assign(g, {shapes:drawSaved.shapes,drones:drawSaved.drones,
+      bullets:drawSaved.bullets,powerups:drawSaved.powerups,
+      parts:drawSaved.parts,texts:drawSaved.texts,dpr:drawSaved.dpr});
+     Object.assign(g.cam,drawSaved.cam);
+     wall.solid=true;
+    }
     return {hullSize,bar,wall,barFullyOverpainted,scoreDelta:delta,
-     physicalLOS:false,viewportContact:true,
+     pixelEvidence,physicalLOS:false,viewportContact:true,
      originalTankCount:originals.tanks.length};
    }finally{
     for(const {t,state,ai} of saved){Object.assign(t,state);t.ai=ai;}
