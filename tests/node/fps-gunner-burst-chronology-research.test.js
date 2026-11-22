@@ -14,7 +14,9 @@ function schedule(hz){
 }
 function irregular(){
  // Deliberately nonuniform presentation cadence; identical 8s simulated time.
- const pattern=[1/30,1/120,1/40,1/80];
+ // Four intervals sum to 1/15s: same mean 60Hz as native60,
+ // but includes a 30Hz stall and two 120Hz catch-up slices.
+ const pattern=[1/30,1/120,1/60,1/120];
  const steps=[];let elapsed=0,i=0;
  while(elapsed<SECONDS-1e-10){
   const dt=Math.min(pattern[i++%pattern.length],SECONDS-elapsed);
