@@ -88,6 +88,6 @@ test('RAF peak may fall below EMA without violating the latest-work bound',()=>{
  const peak=Math.max(latest,.995*oldPeak);
  assert.ok(peak<ema,'peak decay may cross the EMA');
  assert.ok(peak>=latest,'peak still bounds the latest callback');
- assert.match(body,/Math\\.max\\(priorWork, this\\.__novaRafWorkPeakMs \\* 0\\.995\\)/,
+ assert.ok(body.includes('Math.max(priorWork, (this.__novaRafWorkPeakMs || 0) * .995)'),
   'test must remain tied to shipping peak owner');
 });
