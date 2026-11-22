@@ -382,14 +382,15 @@ function paint(info){
  target.panel.insertBefore(box,target.before);
  return true;
 }
-function cleanup(g){
+function cleanup(g,ownerOnly){
  if(g.__novaDeathInsightObserver){g.__novaDeathInsightObserver.disconnect();g.__novaDeathInsightObserver=null;}
  if(g.__novaDeathInsightTimeout!=null&&typeof clearTimeout==='function'){
   clearTimeout(g.__novaDeathInsightTimeout);g.__novaDeathInsightTimeout=null;
  }
  if(typeof document!=='undefined'&&document.querySelector){
   var node=document.querySelector('[data-nova-death-insight]');
-  if(node&&node.parentNode)node.parentNode.removeChild(node);
+  if(node&&node.parentNode&&(!ownerOnly||node===g.__novaDeathInsightNode))
+   node.parentNode.removeChild(node);
  }
  g.__novaDeathInsight=null;g.__novaDeathInsightAttempted=false;
  g.__novaDeathInsightNode=null;
@@ -494,7 +495,7 @@ mods['game/engine']=function(module,exports,require){
  if(typeof oldDestroy==='function')Game.prototype.destroy=function(){
   // A pending death-panel observer must not paint a previous match's note
   // into a replacement Game's UI after the original owner is destroyed.
-  try{cleanup(this);}catch(ignore){this.__novaDeathInsight=null;}
+  try{cleanup(this,true);}catch(ignore){this.__novaDeathInsight=null;}
   return oldDestroy.apply(this,arguments);
  };
 };
