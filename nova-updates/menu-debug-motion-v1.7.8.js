@@ -65,6 +65,7 @@ function snapshot(){var st=window.__NOVA_UPDATE_STATUS||{},ready=window.__NOVA_U
  'FRAMES >25MS':perf.frameOver25Pct==null?'n/a':perf.frameOver25Pct+'%',
  'FRAMES >33.3MS':perf.frameOver33Pct==null?'n/a':perf.frameOver33Pct+'%',
  'FRAMES >50MS':perf.frameOver50Pct==null?'n/a':perf.frameOver50Pct+'%',
+ 'RAF CPU WORK':perf.rafWorkEmaMs==null?'n/a':perf.rafWorkEmaMs+' ms smoothed / '+perf.rafWorkPeakMs+' ms peak',
  'SIMULATION P95':perf.updateP95Ms==null?'n/a':perf.updateP95Ms+' ms',
  'RENDER P95':perf.renderP95Ms==null?'n/a':perf.renderP95Ms+' ms',
  'TIMING SAMPLES':String(perf.frameSamples||0)+' · last game window',

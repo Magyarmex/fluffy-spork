@@ -223,6 +223,15 @@ function timingWindow(p){
     renderP95Ms:p.renderTimes&&p.renderTimes.count>=5?
       +timingPercentile(p.renderTimes,.95).toFixed(2):null};
 }
+/* Final Game.start RAF cost includes every synchronous update, render
+ * overlay and minimap draw in that callback. It excludes GPU compositing,
+ * async browser work and input-to-photon latency. Null before live samples. */
+function rafWorkSnapshot(g){
+ function safe(v){return Number.isFinite(v)?+v.toFixed(2):null;}
+ return {rafWorkMs:safe(g&&g.__novaRafWorkMs),
+  rafWorkEmaMs:safe(g&&g.__novaRafWorkEmaMs),
+  rafWorkPeakMs:safe(g&&g.__novaRafWorkPeakMs)};
+}
 function record(g,key,ms){
   if(!g)return;var p=perfState(g),peak=key==='updateMs'?'updatePeakMs':'renderPeakMs';
   p[key]=ema(p[key],ms,.08);p[peak]=Math.max(p[peak]*.997,ms);p.samples++;
@@ -230,7 +239,7 @@ function record(g,key,ms){
      !(key==='renderMs'&&p.__novaSkipRenderTiming))
     timingSample(p,key==='updateMs'?'updateTimes':'renderTimes',ms);
   var now=typeof performance!=='undefined'&&performance.now?performance.now():Date.now();
-  if(now-p.lastSnapshotAt>2000){p.lastSnapshotAt=now;if(!g.__novaDecorativeWorld&&g.status==='playing'&&!g.paused&&timingWindow(p).frameSamples>=5)window.__NOVA_PERF_LAST__=Object.assign({version:VERSION,updateMs:+p.updateMs.toFixed(2),renderMs:+p.renderMs.toFixed(2),updatePeakMs:+p.updatePeakMs.toFixed(2),renderPeakMs:+p.renderPeakMs.toFixed(2),terrainQueries:p.terrainQueries,avgTerrainCandidates:p.terrainQueries?+(p.terrainCandidates/p.terrainQueries).toFixed(2):0,aiRouteFramesSkipped:p.aiRouteFramesSkipped,droneRouteFramesSkipped:p.droneRouteFramesSkipped,tanks:g.tanks?g.tanks.length:0,drones:g.drones?g.drones.length:0,bullets:g.bullets?g.bullets.length:0,shapes:g.shapes?g.shapes.length:0},timingWindow(p));}
+  if(now-p.lastSnapshotAt>2000){p.lastSnapshotAt=now;if(!g.__novaDecorativeWorld&&g.status==='playing'&&!g.paused&&timingWindow(p).frameSamples>=5)window.__NOVA_PERF_LAST__=Object.assign({version:VERSION,updateMs:+p.updateMs.toFixed(2),renderMs:+p.renderMs.toFixed(2),updatePeakMs:+p.updatePeakMs.toFixed(2),renderPeakMs:+p.renderPeakMs.toFixed(2),terrainQueries:p.terrainQueries,avgTerrainCandidates:p.terrainQueries?+(p.terrainCandidates/p.terrainQueries).toFixed(2):0,aiRouteFramesSkipped:p.aiRouteFramesSkipped,droneRouteFramesSkipped:p.droneRouteFramesSkipped,tanks:g.tanks?g.tanks.length:0,drones:g.drones?g.drones.length:0,bullets:g.bullets?g.bullets.length:0,shapes:g.shapes?g.shapes.length:0},rafWorkSnapshot(g),timingWindow(p));}
 }
 function callWithoutFirstHit(g,fn,a,b,c,d){
   var own=Object.prototype.hasOwnProperty.call(g,'firstTerrainHit'),prev=g.firstTerrainHit;
@@ -341,7 +350,7 @@ wrap('game/engine',function(engine,require){
   if(oldUpdate)Game.prototype.update=function(dt){var st=performance.now(),out=oldUpdate.call(this,dt);recordSimulation(this,dt);record(this,'updateMs',performance.now()-st);return out;};
 
   Game.prototype.novaPerfSnapshot=function(){
-    var p=perfState(this);return Object.assign({version:VERSION,updateMs:p.updateMs,renderMs:p.renderMs,updatePeakMs:p.updatePeakMs,renderPeakMs:p.renderPeakMs,terrainQueries:p.terrainQueries,terrainCandidates:p.terrainCandidates,terrainNarrowTests:p.terrainNarrowTests,aiRouteFramesSkipped:p.aiRouteFramesSkipped,aiRouteFramesPlanned:p.aiRouteFramesPlanned,droneRouteFramesSkipped:p.droneRouteFramesSkipped,droneRouteFramesPlanned:p.droneRouteFramesPlanned},timingWindow(p));
+    var p=perfState(this);return Object.assign({version:VERSION,updateMs:p.updateMs,renderMs:p.renderMs,updatePeakMs:p.updatePeakMs,renderPeakMs:p.renderPeakMs,terrainQueries:p.terrainQueries,terrainCandidates:p.terrainCandidates,terrainNarrowTests:p.terrainNarrowTests,aiRouteFramesSkipped:p.aiRouteFramesSkipped,aiRouteFramesPlanned:p.aiRouteFramesPlanned,droneRouteFramesSkipped:p.droneRouteFramesSkipped,droneRouteFramesPlanned:p.droneRouteFramesPlanned},rafWorkSnapshot(this),timingWindow(p));
   };
 });
 

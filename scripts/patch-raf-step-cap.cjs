@@ -126,14 +126,33 @@ const oldCarryLine='carry = excess > 1e-9 ? Math.min(1 / 30, excess) : 0;';
 const newCarryLine='carry = excess > 1e-9 ? excess : 0;';
 const oldPauseLine='            if (this.paused)\n                carry = 0;';
 const postClampLine='            carry = Math.min(1 / 30, carry);\n';
+/* The RAF already measures workStart -> after final render/minimap. Expose
+ * that full synchronous callback cost without adding another clock read.
+ * This is CPU work only, not compositor/GPU time or input-to-photon latency. */
+const rafWorkAnchor='            priorWork = performance.now() - workStart;';
+const rafWorkInstrumented=rafWorkAnchor+'\n'+
+ '            if (!this.paused && this.status === \'playing\') {\n'+
+ '                this.__novaRafWorkMs = priorWork;\n'+
+ '                this.__novaRafWorkEmaMs = this.__novaRafWorkEmaMs == null ? priorWork : this.__novaRafWorkEmaMs * .9 + priorWork * .1;\n'+
+ '                this.__novaRafWorkPeakMs = Math.max(priorWork, (this.__novaRafWorkPeakMs || 0) * .995);\n'+
+ '            } else {\n'+
+ '                this.__novaRafWorkMs = null;\n'+
+ '                this.__novaRafWorkEmaMs = null;\n'+
+ '                this.__novaRafWorkPeakMs = null;\n'+
+ '            }';
+function instrumentRafWork(html){
+ if(count(html,rafWorkInstrumented)===1&&count(html,rafWorkAnchor)===1)return html;
+ if(count(html,rafWorkAnchor)!==1)throw Error('canonical RAF full-work timing owner drift');
+ return html.replace(rafWorkAnchor,rafWorkInstrumented);
+}
 function patchRafStepCap(html){
  const out=patchRafStepCapLegacy(html);
- if(count(out,newCarryLine)===1&&count(out,postClampLine)===1)return out;
+ if(count(out,newCarryLine)===1&&count(out,postClampLine)===1)return instrumentRafWork(out);
  if(count(out,oldCarryLine)!==1||count(out,oldPauseLine)!==1||
     count(out,newCarryLine)!==0||count(out,postClampLine)!==0)
   throw Error('canonical RAF post-second carry owner drift; refuse materialization');
- return out.replace(oldCarryLine,newCarryLine)
-  .replace(oldPauseLine,postClampLine+oldPauseLine);
+ return instrumentRafWork(out.replace(oldCarryLine,newCarryLine)
+  .replace(oldPauseLine,postClampLine+oldPauseLine));
 }
 module.exports={patchRafStepCap,protectBootCleanup,protectInputBlurCleanup,before,intermediate,after};
 if(require.main===module){
