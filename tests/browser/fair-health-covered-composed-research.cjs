@@ -85,6 +85,23 @@ const {chromium}=require('playwright');
      pixelEvidence={open,covered:coveredPixel,redDelta:open[0]-coveredPixel[0]};
      if(pixelEvidence.redDelta<70)
       throw Error('actual canvas bar not demonstrably overpainted: '+JSON.stringify(pixelEvidence));
+     // Adversarial reachable-boundary probe: normal Battlefield movement
+     // resolves a size14 Twin against a wall with radius size+3. The prior
+     // y=50 pixel witness may be inside that collision exclusion.
+     covered.y=50;
+     g.moveTank(covered,0,0,1/60);
+     const resolvedY=covered.y;
+     const rows=()=>Array.from({length:9},(_,i)=>({
+       y:380+i,rgba:Array.from(g.ctx.getImageData(485,380+i,1,1).data)
+     }));
+     wall.solid=false;renderer.render(g,1000,700);
+     const reachableOpen=rows();
+     wall.solid=true;renderer.render(g,1000,700);
+     const reachableCovered=rows();
+     pixelEvidence.reachableBoundary={resolvedY,barBottom:resolvedY-hullSize-2.5,
+       open:reachableOpen,covered:reachableCovered,
+       coveredByFullStrip:reachableCovered.length>0&&
+        (resolvedY-hullSize-2.5)<=wall.y+wall.h/2};
     }finally{
      Object.assign(g, {shapes:drawSaved.shapes,drones:drawSaved.drones,
       bullets:drawSaved.bullets,powerups:drawSaved.powerups,
