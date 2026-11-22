@@ -35,7 +35,7 @@ function recordShot(g,fair,ledger,shooter,metrics){
   // Certify potential victims AT the firing event. A target walking into
   // the old lane later must never become a retroactive witnessed attack.
   // This is a directional commitment, not a certified projectile hit.
-  const targets=[];
+  const targets=[],targetRefs=new WeakSet();
   for(const candidate of witnesses){
    metrics.eventTargetChecks=(metrics.eventTargetChecks||0)+1;
    if(!candidate||candidate.id===observer.id||candidate.id===shooter.id||
@@ -51,14 +51,16 @@ function recordShot(g,fair,ledger,shooter,metrics){
     if(!g.hasLineOfSight(shooter.x,shooter.y,candidate.x,candidate.y,3))continue;
    }
    const bearing=Math.atan2(candidate.y-shooter.y,candidate.x-shooter.x);
-   if(Math.cos(shooter.angle-bearing)>=CONE)targets.push(candidate.id);
+   if(Math.cos(shooter.angle-bearing)>=CONE){
+    targets.push(candidate.id);targetRefs.add(candidate);
+   }
   }
   events.delete(shooter.id);
   events.set(shooter.id,Object.freeze({
    shooterId:shooter.id,x:shooter.x,y:shooter.y,
    angle:shooter.angle,at:now,targets:Object.freeze(targets),
    // Object identity prevents an unrelated respawn/replacement reusing an ID.
-   targetRefs:new WeakSet(witnesses.filter(t=>t&&targets.includes(t.id)))
+   targetRefs
   }));
   if(events.size>MAX_SHOOTERS)events.delete(events.keys().next().value);
   metrics.witnesses++;
