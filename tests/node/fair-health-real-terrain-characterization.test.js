@@ -118,8 +118,9 @@ test('RESEARCH CENSUS: real 49-overlay AI motion samples reachable partially hid
    if(!g.player)g.redeploy();
    assert.equal(g.status,'playing');
    const classes=g.__testWindow.__novaMakeRequire('')('game/classes');
+   const gateAvailable=typeof g.__testFair.healthBarCovered==='function';
    const counts={ticks:0,botSamples:0,partialOverHalf:0,partialOverThreeQuarters:0,
-    fullStripGate:0,viewportPartial:0,maxFraction:0};
+    fullStripGate:gateAvailable?0:null,viewportPartial:0,maxFraction:0};
    for(let step=0;step<360;step++){
     if(g.status!=='playing')break;
     g.update(1/60);counts.ticks++;
@@ -141,7 +142,7 @@ test('RESEARCH CENSUS: real 49-overlay AI motion samples reachable partially hid
      counts.maxFraction=Math.max(counts.maxFraction,maxFraction);
      if(maxFraction>=.5)counts.partialOverHalf++;
      if(maxFraction>=.75)counts.partialOverThreeQuarters++;
-     if(typeof g.__testFair.healthBarCovered==='function'&&g.__testFair.healthBarCovered(g,classes,t))counts.fullStripGate++;
+     if(gateAvailable&&g.__testFair.healthBarCovered(g,classes,t))counts.fullStripGate++;
      if(maxFraction>=.5&&g.player&&g.__testFair.inGameplayViewport(g,g.player,t))
       counts.viewportPartial++;
     }
