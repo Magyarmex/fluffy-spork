@@ -36,6 +36,8 @@ function samePhysical(a,b,at){
 function run(cls,seed,mode,pattern){return withSeed(seed,draws=>{
  const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
  g.setClass(g.player,cls);g.input.autofire=false;
+ // Legal upgrade cliffs under investigation in #799; Tempest remains baseline.
+ g.player.stats.reload=cls==='minigun'?1:cls==='needlestorm'?3:0;
  let ticks=0,volleys=0,now=0,raf=null,drawsCount=0;
  const fire=g.tryFire,update=g.update;
  g.tryFire=function(t){const before=this.bullets.length;
