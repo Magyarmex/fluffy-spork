@@ -157,6 +157,7 @@ jobs:
           node tests/browser/observer-projectile-pickup-composed.cjs
           node tests/browser/no-target-public-heal-composed.cjs
           node tests/browser/fair-saturation-hidden-intent-composed.cjs
+          node tests/browser/fair-health-covered-composed-research.cjs
           node tests/browser/public-class-contest-composed.cjs
           node tests/browser/mixed-resource-strategic-owner-composed.cjs
           node tests/browser/tactical-frontlines-memory.cjs
