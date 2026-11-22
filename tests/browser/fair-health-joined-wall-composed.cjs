@@ -22,7 +22,8 @@ const {chromium}=require('playwright');
    const renderer=window.__novaMakeRequire('')('game/render');
    const bots=g.tanks.filter(t=>t?.ai&&!t.isPlayer);
    if(bots.length<2)throw Error('missing real AI tanks');
-   const [observer,target]=bots;
+   const observer=bots[0],target=bots.find(t=>t!==observer&&!g.areAllies?.(observer,t));
+   if(!target)throw Error('no hostile composed target');
    const original={tanks:g.tanks,terrain:g.__novaTerrain,index:g.__novaBattlefieldIndex,
     w:g.w,h:g.h,time:g.time,shapes:g.shapes,drones:g.drones,bullets:g.bullets,
     powerups:g.powerups,parts:g.parts,texts:g.texts,cam:{...g.cam},dpr:g.dpr};
@@ -41,6 +42,7 @@ const {chromium}=require('playwright');
     const wounded=F.scoreTarget(g,C,observer,observer.ai,target,g.time);
     target.hp=100;
     const healthy=F.scoreTarget(g,C,observer,observer.ai,target,g.time);
+    if(!Number.isFinite(wounded)||!Number.isFinite(healthy))throw Error('hostile target not selectable');
     if(Math.abs(wounded-healthy)>1e-7)throw Error('concealed HP leaked into scoring');
     target.hp=20;
     g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];g.parts=[];g.texts=[];
