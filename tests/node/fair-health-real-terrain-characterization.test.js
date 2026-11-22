@@ -108,3 +108,46 @@ test('REACHABILITY: legal straight-wall collision leaves 6/7 of health bar overp
   CLASSES.basic.size=originalSize;
  }
 });
+
+test('RESEARCH CENSUS: real 49-overlay AI motion samples reachable partially hidden HP strips',()=>{
+ process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ withSeed(1517825,()=>{
+  const g=bootGame();
+  try {
+   if(!g.player)g.redeploy();
+   assert.equal(g.status,'playing');
+   const classes=g.__testWindow.__novaMakeRequire('')('game/classes');
+   const counts={ticks:0,botSamples:0,partialOverHalf:0,partialOverThreeQuarters:0,
+    fullStripGate:0,viewportPartial:0,maxFraction:0};
+   for(let step=0;step<360;step++){
+    if(g.status!=='playing')break;
+    g.update(1/60);counts.ticks++;
+    if(step%6!==0)continue;
+    for(const t of g.tanks){
+     if(!t||!t.ai||!t.alive)continue;
+     const size=classes.CLASSES[t.cls]?.size;
+     if(!(size>0))continue;
+     counts.botSamples++;
+     const bx0=t.x-17,bx1=t.x+17,by0=t.y-size-6,by1=t.y-size-2.5;
+     let maxFraction=0;
+     for(const solid of g.__novaTerrain||[]){
+      if(!solid||solid.solid===false||(solid.destructible&&!(solid.hp>0))||
+         solid.shape!=='rect')continue;
+      const ix=Math.max(0,Math.min(bx1,solid.x+solid.w/2)-Math.max(bx0,solid.x-solid.w/2));
+      const iy=Math.max(0,Math.min(by1,solid.y+solid.h/2)-Math.max(by0,solid.y-solid.h/2));
+      maxFraction=Math.max(maxFraction,ix*iy/(34*3.5));
+     }
+     counts.maxFraction=Math.max(counts.maxFraction,maxFraction);
+     if(maxFraction>=.5)counts.partialOverHalf++;
+     if(maxFraction>=.75)counts.partialOverThreeQuarters++;
+     if(g.__testFair.healthBarCovered(g,classes,t))counts.fullStripGate++;
+     if(maxFraction>=.5&&g.player&&g.__testFair.inGameplayViewport(g,g.player,t))
+      counts.viewportPartial++;
+    }
+   }
+   assert.ok(counts.ticks>0&&counts.botSamples>0,'real composed match must advance');
+   console.log('NOVA_REACHABLE_HP_STRIP_CENSUS '+JSON.stringify(counts));
+  }finally{g.destroy();}
+ });
+});
