@@ -102,3 +102,19 @@ test('viewport-clipped strip concealed by one wall does not reveal private HP',(
  const exposedHealthy=F.scoreTarget(g,C,observer,observer.ai,t,g.time);
  assert.ok(Math.abs(exposed-exposedHealthy-.384)<1e-8,'visible clipped HP remains actionable');
 });
+
+test('portrait zoom uses CSS viewport world extents for clipped HP evidence',()=>{
+ const F=boot(),t=target();
+ t.x=-315;
+ const g=world([{shape:'rect',x:-300,y:30,w:60,h:70,solid:true}],t);
+ g.w=320;g.h=640;g.cam.zoom=.5;
+ assert.equal(F.inGameplayViewport(g,observer,t),true);
+ assert.equal(F.healthBarCovered(g,C,t),false);
+ assert.equal(F.healthBarCovered(g,C,t,observer),true);
+ const healthy=F.scoreTarget(g,C,observer,observer.ai,t,g.time);
+ t.hp=20;
+ assert.equal(F.scoreTarget(g,C,observer,observer.ai,t,g.time),healthy);
+ g.cam.zoom=1;
+ assert.equal(F.inGameplayViewport(g,observer,t),false,
+  'the same target is offscreen at portrait zoom 1');
+});
