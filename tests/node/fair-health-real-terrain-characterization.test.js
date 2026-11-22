@@ -151,3 +151,46 @@ test('RESEARCH CENSUS: real 49-overlay AI motion samples reachable partially hid
   }finally{g.destroy();}
  });
 });
+
+test('RESEARCH: reachable wall-adjacent target HP may change composed Phase ability intent',()=>{
+ process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
+ const {bootGame,withSeed}=require('../research/audio-rng-causal-pilot.cjs');
+ const arm=hp=>withSeed(1517825,()=>{
+  const g=bootGame();
+  try{
+   if(!g.player)g.redeploy();
+   const observer=g.tanks.find(t=>t&&t.ai&&!t.isPlayer),target=g.player;
+   assert.ok(observer&&target);
+   Object.assign(observer,{x:0,y:150,cls:'ghost',tier:3,hp:100,maxHp:100,
+    alive:true,spawnShieldT:0,abilityCd:0,angle:-Math.PI/2});
+   Object.assign(target,{x:0,y:52,cls:'twin',tier:1,hp,maxHp:100,
+    alive:true,spawnShieldT:0});
+   observer.ai={...observer.ai,state:'hunt',targetId:-1,
+    __v1112TargetId:-1,__v1105TargetId:-1,__v180TargetId:-1,
+    __v1112NextThink:0,__v1105PlanT:0,__v180PlanT:0,
+    __v180LastAttacker:-1,__v180HitAt:-99,__v180LastAbilityAt:-99};
+   g.tanks=[observer,target];g.powerups=[];g.bullets=[];g.shapes=[];
+   g.w=1000;g.h=700;g.cam.zoom=1;g.time=10;
+   g.__novaTerrain=[{id:-1000,kind:'terrain',shape:'rect',x:0,y:0,
+    w:240,h:70,type:'wall',destructible:false,hp:0,maxHp:0,solid:true}];
+   g.__novaBattlefieldIndex=null;
+   g.moveTank(target,0,0,1/60);
+   assert.equal(target.y,52,'legal Twin center must be collision-resolved');
+   assert.equal(g.hasLineOfSight(observer.x,observer.y,target.x,target.y,4),true);
+   const classes=g.__testWindow.__novaMakeRequire('')('game/classes');
+   assert.equal(g.__testFair.canPerceive(g,classes,observer,target),true);
+   let abilities=0;g.useAbility=function(t){if(t===observer)abilities++;return true;};
+   const ai=g.__testWindow.__novaMakeRequire('')('game/ai');
+   ai.updateAI(observer,g,1/60);
+   return {hp,abilities,targetId:observer.ai.__v1112TargetId,
+    legalY:target.y,barBottom:target.y-14-2.5};
+  }finally{g.destroy();}
+ });
+ const healthy=arm(100),wounded=arm(20);
+ console.log('NOVA_PHASE_PARTIAL_BAR_HP_RESEARCH '+JSON.stringify({healthy,wounded}));
+ assert.equal(healthy.legalY,wounded.legalY);
+ assert.equal(healthy.barBottom,35.5);
+ assert.equal(wounded.barBottom,35.5);
+ // Characterization only: do not freeze a private-HP-triggered Phase ability
+ // as desired behavior. The browser must establish actual bar readability.
+});
