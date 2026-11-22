@@ -168,6 +168,20 @@ test('destroying an old Game cannot remove a replacement Game death note',()=>{
  assert.ok(panel.note,'replacement note must survive old Game teardown');
  assert.match(panel.note.children[0].textContent,/GUARD/);
 });
+test('a stale observer cannot adopt a replacement Game note before teardown',()=>{
+ const {Game,addPanel,observers}=boot(),old=new Game(),replacement=new Game();
+ old.killTank(victim(),killer('marksman'));old.update();
+ const oldObserver=observers[0],panel=addPanel();
+ replacement.killTank(victim(),killer('guard'));replacement.update();
+ const newNote=panel.note;
+ assert.ok(newNote);
+ oldObserver.notify();
+ assert.equal(panel.note,newNote,'old observer cannot replace the new note');
+ assert.equal(old.__novaDeathInsightNode,null,'old Game cannot claim a foreign note');
+ old.destroy();
+ assert.equal(panel.note,newNote,'old Game teardown cannot remove foreign note');
+ assert.match(panel.note.children[0].textContent,/GUARD/);
+});
 test('missing React panel times out rather than observing forever',()=>{
  const {Game,observers,timeouts}=boot(),g=new Game();
  g.killTank(victim(),killer());g.update();
