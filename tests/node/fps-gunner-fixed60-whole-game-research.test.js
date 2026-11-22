@@ -20,7 +20,8 @@ function frames(mode){
  if(mode==='single100msStall')return [0.1,...Array.from({length:234},()=>STEP)];
  throw Error('unknown presentation schedule');
 }
-function run(seed,cls,reload,mode,maxSteps=3){
+function run(seed,cls,reload,mode,maxSteps=3,inputPolicy='held',nativePresentation=false){
+ assert.ok(['held','firstFrameTap'].includes(inputPolicy));
  return withSeed(seed,()=>{
   const g=bootGame();
   if(!g.player)g.redeploy();
@@ -28,7 +29,7 @@ function run(seed,cls,reload,mode,maxSteps=3){
   g.sfx.muted=true;
   g.setClass(p,cls);
   Object.assign(p,{x:0,y:0,vx:0,vy:0,angle:0,spawnShieldT:0,droneRespawnT:Infinity});
-  p.stats.reload=reload;
+  p.stats.reload=reload;p.fireCd=0;
   g.tanks=[p];
   g.tankById=new Map([[p.id,p]]);
   g.shapes=[];g.drones=[];g.bullets=[];g.powerups=[];g.orbs=[];
@@ -54,12 +55,16 @@ function run(seed,cls,reload,mode,maxSteps=3){
   };
   const initial=g.time;
   let wall=0,acc=0,updates=0,maxUsed=0,backloggedFrames=0,peakDebt=0;
-  let peakStepBudget=0,zeroUpdateFrames=0;
+  let peakStepBudget=0,zeroUpdateFrames=0,frameIndex=0;
   try{
    for(const frame of frames(mode)){
+    g.input.firing=inputPolicy==='held'||frameIndex===0;
+    frameIndex++;
     wall+=frame;acc+=frame;
     let used=0;
-    while(acc+EPS>=STEP&&used<maxSteps){
+    if(nativePresentation){
+     g.update(frame);updates++;used=1;acc=0;
+    }else while(acc+EPS>=STEP&&used<maxSteps){
      g.update(STEP);
      acc-=STEP;
      if(Math.abs(acc)<EPS)acc=0;
@@ -74,8 +79,8 @@ function run(seed,cls,reload,mode,maxSteps=3){
    assert.ok(Math.abs(wall-SECONDS)<1e-7,'identical wall-clock duration');
    assert.ok(acc>=-EPS,'accumulator must not run into negative time');
    assert.ok(Math.abs(g.time-initial-updates*STEP)<1e-6,'Game clock matches executed ticks');
-   assert.ok(updates<=240,'bounded pilot never invents simulated time');
-   return {seed,cls,reload,mode,maxSteps,updates,volleys,
+   assert.ok(updates<=(nativePresentation?480:240),'bounded pilot never invents simulated time');
+   return {seed,cls,reload,mode,maxSteps,inputPolicy,nativePresentation,updates,volleys,
     spin:+(p.fireSpin||0).toFixed(6),heat:+(p.__v17Heat||0).toFixed(6),
     simulated:+(g.time-initial).toFixed(6),
     remainingDebt:+acc.toFixed(6),maxUsed,backloggedFrames,
@@ -107,6 +112,16 @@ test('bounded whole-Game fixed60 preserves held rotary fire across ordinary pres
  }
  assert.equal(rows.length,30);
  console.log('GUNNER_FIXED60_WHOLE_GAME_PRESENTATION_PILOT '+JSON.stringify(rows));
+});
+test('fixed60 without input-edge buffering can lose a one-frame 120Hz tap',()=>{
+ const native=run(1517800,'minigun',1,'uniform120',3,'firstFrameTap',true);
+ const fixed=run(1517800,'minigun',1,'uniform120',3,'firstFrameTap');
+ assert.equal(native.updates,480,'current variable-step 120Hz can sample every presentation');
+ assert.equal(native.volleys,1,'a legal first-frame press fires in current 120Hz Game');
+ assert.equal(fixed.updates,240);
+ assert.equal(fixed.volleys,0,'unbuffered fixed60 misses a press released before its first tick');
+ assert.equal(fixed.zeroUpdateFrames,240);
+ console.log('GUNNER_FIXED60_SHORT_TAP_FALSIFIER '+JSON.stringify({native,fixed}));
 });
 test('bounded whole-Game scheduler recovers one 100ms stall without changing the 60Hz weapon timeline',()=>{
  const rows=[];
