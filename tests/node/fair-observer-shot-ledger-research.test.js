@@ -43,20 +43,17 @@ function recordShot(g,fair,ledger,shooter,metrics){
    if(!candidate||candidate.id===observer.id||candidate.id===shooter.id||
       !alive(candidate)||!hostile(g,shooter,candidate)||
       !fair.inGameplayViewport(g,observer,candidate))continue;
-   // The observer must have seen the candidate as well as the shooter.
-   // This extra ray is deliberately measured: it may make this candidate
-   // too expensive to promote into the shipping AI.
-   if(typeof g.hasLineOfSight!=='function')continue;
-   {
-    metrics.eventTargetRays=(metrics.eventTargetRays||0)+1;
-    if(!g.hasLineOfSight(observer.x,observer.y,candidate.x,candidate.y,3))continue;
-    metrics.eventTargetRays++;
-    if(!g.hasLineOfSight(shooter.x,shooter.y,candidate.x,candidate.y,3))continue;
-   }
+   // Reject out-of-cone candidates before expensive terrain LOS.
    const bearing=Math.atan2(candidate.y-shooter.y,candidate.x-shooter.x);
-   if(Math.cos(shooter.angle-bearing)>=CONE){
-    targets.push(candidate.id);targetRefs.add(candidate);
-   }
+   if(Math.cos(shooter.angle-bearing)<CONE)continue;
+   // The observer must have seen the candidate as well as the shooter.
+   // Fail closed when terrain visibility cannot be established.
+   if(typeof g.hasLineOfSight!=='function')continue;
+   metrics.eventTargetRays=(metrics.eventTargetRays||0)+1;
+   if(!g.hasLineOfSight(observer.x,observer.y,candidate.x,candidate.y,3))continue;
+   metrics.eventTargetRays++;
+   if(!g.hasLineOfSight(shooter.x,shooter.y,candidate.x,candidate.y,3))continue;
+   targets.push(candidate.id);targetRefs.add(candidate);
   }
   events.delete(shooter.id);
   events.set(shooter.id,Object.freeze({
