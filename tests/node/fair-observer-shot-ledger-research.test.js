@@ -146,8 +146,10 @@ function run(seed,instrument){
     g.tryFire=function(shooter){
      const before=this.bullets.length;
      // Preserve the firing-time origin, not a potentially moved hull.
+     // Successful projectile birth certifies an active shooter; do not read
+     // hidden live HP before each observer's public-geometry sight gate.
      const fired=shooter?{id:shooter.id,x:shooter.x,y:shooter.y,
-      angle:shooter.angle,hp:shooter.hp,alive:shooter.alive}:null;
+      angle:shooter.angle,hp:1,alive:true}:null;
      const out=oldFire.apply(this,arguments);
      if(this.bullets.length>before){
       metrics.shots++;
