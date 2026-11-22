@@ -21,7 +21,8 @@ function frames(mode){
  if(mode==='single100msStall')return [0.1,...Array.from({length:234},()=>STEP)];
  throw Error('unknown presentation schedule');
 }
-function run(seed,cls,reload,mode,maxSteps=3,inputPolicy='held',nativePresentation=false){
+function run(seed,cls,reload,mode,maxSteps=3,inputPolicy='held',nativePresentation=false,aimDirection='east'){
+ assert.ok(['east','north'].includes(aimDirection));
  assert.ok(['held','firstFrameTap','firstFrameTapBuffered','firstFrameTapBufferedNoAim'].includes(inputPolicy));
  return withSeed(seed,()=>{
   const g=bootGame();
@@ -43,15 +44,20 @@ function run(seed,cls,reload,mode,maxSteps=3,inputPolicy='held',nativePresentati
   g.spawnAITank=()=>null;g.spawnDrone=()=>null;
   g.status='playing';g.paused=false;
   g.input.autofire=false;g.input.mouseActive=false;
-  g.input.aim.active=true;g.input.aim.dx=40;g.input.aim.dy=0;
+  g.input.aim.active=true;
+  g.input.aim.dx=aimDirection==='east'?40:0;
+  g.input.aim.dy=aimDirection==='north'?40:0;
   g.input.moveVec=()=>({x:0,y:0});
   g.input.firing=true;
-  let volleys=0;
+  let volleys=0,firstShotAngle=null;
   const fire=g.tryFire;
   g.tryFire=function(t){
    const before=this.bullets.length;
    const result=fire.apply(this,arguments);
-   if(t===p&&this.bullets.length>before)volleys++;
+   if(t===p&&this.bullets.length>before){
+    volleys++;
+    if(firstShotAngle===null)firstShotAngle=+t.angle.toFixed(6);
+   }
    return result;
   };
   const initial=g.time;
@@ -88,7 +94,8 @@ function run(seed,cls,reload,mode,maxSteps=3,inputPolicy='held',nativePresentati
    assert.ok(Math.abs(g.time-initial-(nativePresentation?wall:updates*STEP))<1e-6,
     'Game clock matches its actual variable or fixed update chronology');
    assert.ok(updates<=(nativePresentation?480:240),'bounded pilot never invents simulated time');
-   return {seed,cls,reload,mode,maxSteps,inputPolicy,nativePresentation,updates,volleys,
+   return {seed,cls,reload,mode,maxSteps,inputPolicy,nativePresentation,aimDirection,
+    updates,volleys,firstShotAngle,
     spin:+(p.fireSpin||0).toFixed(6),heat:+(p.__v17Heat||0).toFixed(6),
     simulated:+(g.time-initial).toFixed(6),
     remainingDebt:+acc.toFixed(6),maxUsed,backloggedFrames,
@@ -141,6 +148,16 @@ test('fixed60 without input-edge buffering can lose a one-frame 120Hz tap',()=>{
  assert.equal(noAim.volleys,0,
   'press-only buffering cannot fire after the touch aim vector is released');
  console.log('GUNNER_FIXED60_SHORT_TAP_FALSIFIER '+JSON.stringify({native,fixed,buffered,noAim}));
+});
+test('buffering a short press does not by itself preserve native120 first-shot bearing',()=>{
+ const native=run(1517800,'minigun',1,'uniform120',3,'firstFrameTap',true,'north');
+ const buffered=run(1517800,'minigun',1,'uniform120',3,'firstFrameTapBuffered',false,'north');
+ assert.equal(native.volleys,1);
+ assert.equal(buffered.volleys,1);
+ assert.ok(native.firstShotAngle!==null&&buffered.firstShotAngle!==null);
+ assert.ok(Math.abs(native.firstShotAngle-buffered.firstShotAngle)>0.05,
+  'different time steps change aim smoothing before the first real projectile');
+ console.log('GUNNER_FIXED60_FIRST_SHOT_BEARING '+JSON.stringify({native,buffered:buffered}));
 });
 test('shipping Input clears right-stick aim on pointerup, so a press-only latch is insufficient',()=>{
  const g=bootGame();
