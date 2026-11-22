@@ -39,3 +39,12 @@ test('missing owner fails closed instead of manipulating global UI',()=>{
  assert.equal(h.queries,0);
  assert.equal(h.clicks,0);
 });
+test('stale and live evolution timers cannot cross-control the replacement UI',()=>{
+ const h=harness(),oldGame={__novaDestroyed:false},newGame={__novaDestroyed:false};
+ h.collapse(oldGame);
+ oldGame.__novaDestroyed=true;
+ h.collapse(newGame);
+ h.flush();
+ assert.equal(h.queries,1,'only the replacement owner may inspect the UI');
+ assert.equal(h.clicks,1,'only the replacement owner may minimize its own tray');
+});
