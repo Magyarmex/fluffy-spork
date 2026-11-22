@@ -87,6 +87,23 @@ test('event-time public shot ledger ignores hidden private assignments and shoot
  assert.equal(publicPressure(g,fair,ledger,observer,target,m),0,
   'expired evidence cannot become permanent saturation');
 });
+test('negative control: a target entering the old shot lane is not a certified event-time victim',()=>{
+ const fair={inGameplayViewport:()=>true};
+ const observer={id:1,x:0,y:0,hp:100,alive:true,ai:{}};
+ const shooter={id:2,x:0,y:0,angle:0,hp:100,alive:true,ai:{}};
+ const target={id:3,x:100,y:100,hp:100,alive:true,ai:{}};
+ const tanks=[observer,shooter,target],ledger=new Map();
+ const g={time:10,tanks,getTank:id=>tanks.find(t=>t.id===id),
+  hasLineOfSight:()=>true};
+ const m={witnesses:0,candidateChecks:0};
+ recordShot(g,fair,ledger,shooter,m);
+ assert.equal(publicPressure(g,fair,ledger,observer,target,m),0);
+ target.y=0;
+ assert.equal(publicPressure(g,fair,ledger,observer,target,m),1,
+  'falsifier: current target position can retroactively create a false witness');
+ // Do not promote this proxy without event-time victim or actual projectile
+ // lane evidence; preserving the firing origin alone is insufficient.
+});
 test('ledger retains at most four distinct shooter events per observer',()=>{
  const fair={inGameplayViewport:()=>true};
  const observer={id:1,x:0,y:0,hp:100,alive:true,ai:{}};
@@ -112,10 +129,13 @@ function run(seed,instrument){
     const oldFire=g.tryFire;
     g.tryFire=function(shooter){
      const before=this.bullets.length;
+     // Preserve the firing-time origin, not a potentially moved hull.
+     const fired=shooter?{id:shooter.id,x:shooter.x,y:shooter.y,
+      angle:shooter.angle,hp:shooter.hp,alive:shooter.alive}:null;
      const out=oldFire.apply(this,arguments);
      if(this.bullets.length>before){
       metrics.shots++;
-      recordShot(this,fair,ledger,shooter,metrics);
+      recordShot(this,fair,ledger,fired,metrics);
      }
      return out;
     };
