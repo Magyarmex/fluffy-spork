@@ -355,7 +355,7 @@ test('destroyed cover and circle geometry cannot hide public HP',()=>{
   assert.equal(T.healthBarCovered(g,C,target),true);
   cover.hp=0;assert.equal(T.healthBarCovered(g,C,target),false);
   cover.hp=100;cover.solid=false;assert.equal(T.healthBarCovered(g,C,target),false);
-  g.__novaTerrain=[{shape:'circle',x:0,y:0,r:50,solid:true}];
+  g.__novaTerrain=[{shape:'circle',x:0,y:0,r:30,solid:true}];
   assert.equal(T.healthBarCovered(g,C,target),false,'bar corners are outside circle');
   g.__novaTerrain[0].r=90;
   assert.equal(T.healthBarCovered(g,C,target),true,'all bar corners fit inside the pillar');
