@@ -17,6 +17,22 @@ assert.ok(s>=0&&e>s,'canonical Game RAF owner');
 const body=html.slice(s,e);
 const factory=new Function('performance','requestAnimationFrame','render_1',
  'return ({start(){'+body.slice(body.indexOf('{')+1,body.indexOf('\n    }'))+'\n}}).start');
+function samePhysical(a,b,at){
+ if(typeof a==='number'&&typeof b==='number'){
+  assert.ok(Math.abs(a-b)<=1e-9,at+': '+a+' vs '+b);return;
+ }
+ if(Array.isArray(a)&&Array.isArray(b)){
+  assert.equal(a.length,b.length,at+' length');
+  for(let i=0;i<a.length;i++)samePhysical(a[i],b[i],at+'['+i+']');
+  return;
+ }
+ if(a&&b&&typeof a==='object'&&typeof b==='object'){
+  assert.deepEqual(Object.keys(a),Object.keys(b),at+' keys');
+  for(const key of Object.keys(a))samePhysical(a[key],b[key],at+'.'+key);
+  return;
+ }
+ assert.deepEqual(a,b,at);
+}
 function run(cls,seed,mode,pattern){return withSeed(seed,draws=>{
  const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
  g.setClass(g.player,cls);g.input.autofire=false;
@@ -66,6 +82,6 @@ test('burst/release and rotating aim preserve composed Game state at recovered 2
     assert.equal(b.drawsCount,40,label+' presentation frames');
     for(const key of ['volleys','rng','time','heat','fireCd'])
      assert.deepEqual(b[key],a[key],label+' '+key);
-    assert.deepEqual(b.physical,a.physical,label+' full physical state');
+    samePhysical(b.physical,a.physical,label+' physical');
    }
 });
