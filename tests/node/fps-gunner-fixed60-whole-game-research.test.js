@@ -12,6 +12,7 @@ const STEP=1/60, EPS=1e-9, SECONDS=4;
 function frames(mode){
  if(mode==='uniform60')return Array.from({length:240},()=>STEP);
  if(mode==='uniform30')return Array.from({length:120},()=>1/30);
+ if(mode==='uniform120')return Array.from({length:480},()=>1/120);
  if(mode==='alternating60p15')return Array.from({length:240},(_,i)=>(i%2?0.85:1.15)*STEP);
  if(mode==='alternating40_120')return Array.from({length:120},()=>[1/40,1/120]).flat();
  if(mode==='uniform20')return Array.from({length:80},()=>1/20);
@@ -52,7 +53,7 @@ function run(seed,cls,reload,mode,maxSteps=3){
   };
   const initial=g.time;
   let wall=0,acc=0,updates=0,maxUsed=0,backloggedFrames=0,peakDebt=0;
-  let peakStepBudget=0;
+  let peakStepBudget=0,zeroUpdateFrames=0;
   try{
    for(const frame of frames(mode)){
     wall+=frame;acc+=frame;
@@ -64,6 +65,7 @@ function run(seed,cls,reload,mode,maxSteps=3){
      used++;updates++;
     }
     maxUsed=Math.max(maxUsed,used);
+    if(used===0)zeroUpdateFrames++;
     peakStepBudget=Math.max(peakStepBudget,used/maxSteps);
     if(acc+EPS>=STEP)backloggedFrames++;
     peakDebt=Math.max(peakDebt,acc);
@@ -76,7 +78,7 @@ function run(seed,cls,reload,mode,maxSteps=3){
     spin:+(p.fireSpin||0).toFixed(6),heat:+(p.__v17Heat||0).toFixed(6),
     simulated:+(g.time-initial).toFixed(6),
     remainingDebt:+acc.toFixed(6),maxUsed,backloggedFrames,
-    peakDebt:+peakDebt.toFixed(6),peakStepBudget};
+    peakDebt:+peakDebt.toFixed(6),peakStepBudget,zeroUpdateFrames};
   }finally{g.destroy();}
  });
 }
@@ -86,7 +88,7 @@ test('bounded whole-Game fixed60 preserves held rotary fire across ordinary pres
   for(const seed of [1517800,1517802]){
    const baseline=run(seed,cls,reload,'uniform60');
    assert.equal(baseline.updates,240);
-   for(const mode of ['uniform30','alternating60p15','alternating40_120','uniform20']){
+   for(const mode of ['uniform30','uniform120','alternating60p15','alternating40_120','uniform20']){
     const row=run(seed,cls,reload,mode);
     assert.deepEqual(run(seed,cls,reload,mode),row,'same schedule and seed reproduce');
     assert.equal(row.updates,240,'ordinary presentation schedule must repay all 60Hz ticks');
@@ -96,11 +98,13 @@ test('bounded whole-Game fixed60 preserves held rotary fire across ordinary pres
     assert.equal(row.heat,baseline.heat,'same Game tick history must preserve heat');
     assert.ok(row.maxUsed<=3,'strict per-frame update budget');
     assert.equal(row.backloggedFrames,0,'no ordinary frame should leave whole ticks behind');
+    if(mode==='uniform120')assert.equal(row.zeroUpdateFrames,240,
+     '120Hz rendering would repeat the same simulation pose on half its frames without interpolation');
     rows.push({cls,reload,seed,mode,volleys:row.volleys,updates:row.updates,maxUsed:row.maxUsed});
    }
   }
  }
- assert.equal(rows.length,24);
+ assert.equal(rows.length,30);
  console.log('GUNNER_FIXED60_WHOLE_GAME_PRESENTATION_PILOT '+JSON.stringify(rows));
 });
 test('bounded fixed60 refuses to claim parity when 10Hz frames exceed the update budget',()=>{
