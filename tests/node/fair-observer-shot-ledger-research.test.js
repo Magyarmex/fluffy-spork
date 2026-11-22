@@ -42,8 +42,9 @@ function recordShot(g,fair,ledger,shooter,metrics){
  }
 }
 function publicPressure(g,fair,ledger,observer,target,metrics){
- if(!observer||!target||!alive(target)||
-    !fair.inGameplayViewport(g,observer,target))return 0;
+ // Public geometry must precede target health or status reads.
+ if(!observer||!target||!fair.inGameplayViewport(g,observer,target)||
+    !alive(target))return 0;
  const events=ledger.get(observer.id);
  if(!events)return 0;
  const now=Number(g.time);
@@ -52,7 +53,10 @@ function publicPressure(g,fair,ledger,observer,target,metrics){
   metrics.candidateChecks++;
   if(!Number.isFinite(now)||now-ev.at<0||now-ev.at>MAX_AGE)continue;
   const shooter=g.getTank&&g.getTank(ev.shooterId);
-  if(!alive(shooter)||!hostile(g,shooter,target))continue;
+  // Current offscreen shooter state is not public, even after a witnessed shot.
+  // This conservative prototype drops such memories instead of inspecting HP.
+  if(!shooter||!fair.inGameplayViewport(g,observer,shooter)||
+     !alive(shooter)||!hostile(g,shooter,target))continue;
   // This is a current-position geometric proxy, NOT an event-time
   // certification that the target was in the actual projectile lane.
   if(typeof g.hasLineOfSight==='function'&&
