@@ -11,9 +11,10 @@ function loadShared(){
     cannon:{id:'cannon',size:15,ability:'ragnarok',bullet:{speed:380}},
     carrier:{id:'carrier',size:14,ability:'swarm',bullet:{speed:430}},
     guard:{id:'guard',size:16,ability:'bulwark',bullet:{speed:420}},
+    ghost:{id:'ghost',size:14,ability:'phase',bullet:{speed:980}},
   };
   function lineageForClass(id){
-    if(id==='marksman')return 'sniper';
+    if(id==='marksman'||id==='ghost')return 'sniper';
     if(id==='cannon')return 'cannon';
     if(id==='carrier')return 'controller';
     if(id==='guard')return 'guardian';
@@ -162,4 +163,24 @@ test('active diagnostics supersede the old wall-vision wording',()=>{
   assert.equal(fair.hiddenTracking,'not-hidden-to-player');
   assert.equal(fair.occlusionBlocksFire,true);
   assert.equal(fair.occlusionBreaksAwareness,false);
+});
+test('shared-view authoritative Phase planner respects public HP and preserves escape',()=>{
+ function run({publicHp,ownHp=100}){
+  const {Game,ai,context}=loadShared(),g=new Game();
+  const hunter=tank(1,'ghost',{hp:ownHp,maxHp:100,abilityCd:0,ai:brain({__v1105PlanT:0})});
+  const enemy=tank(7,'twin',{x:250,y:0,hp:20,maxHp:100,isPlayer:true});
+  g.tanks=[hunter,enemy];g.player=enemy;
+  let checked=0;
+  context.window.__NOVA_FAIR_ENGAGEMENT__={healthPublicTo(_g,_classes,observer,target){
+   checked++;assert.equal(observer,hunter);assert.equal(target,enemy);return publicHp;
+  }};
+  ai.updateAI(hunter,g,1/60);
+  return {abilities:g.abilities,checked};
+ }
+ assert.equal(run({publicHp:false}).abilities,0,
+  'shared-view Phase must not execute on private low HP');
+ assert.equal(run({publicHp:true}).abilities,1,
+  'shared-view Phase still executes on public low HP');
+ assert.equal(run({publicHp:false,ownHp:20}).abilities,1,
+  'shared-view defensive Phase must not depend on target HP visibility');
 });

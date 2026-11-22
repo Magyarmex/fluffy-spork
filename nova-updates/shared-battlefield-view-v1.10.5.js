@@ -211,7 +211,16 @@ function planAbility(g,classes,C,t,a,target,sight,risk,now){
   else if(ab==='swarm')due=!!(target&&dist<900);
   else if(ab==='phase'){
     if(target&&hp<.36&&dist<520){ang=Math.atan2(t.y-target.y,t.x-target.x);due=true;}
-    else if(sight&&target&&target.hp<target.maxHp*.32&&dist<440){ang+=(a.__v1105FlankSide||1)*.34;due=true;}
+    else if(sight&&target&&dist<440){
+      /* The later shared-view planner owns the shipping ability intent.
+       * Apply the same public-health gate as Fair scoring and Predator. */
+      var fair=window.__NOVA_FAIR_ENGAGEMENT__;
+      var publicHp=!fair||(typeof fair.healthPublicTo==='function'&&
+        fair.healthPublicTo(g,classes,t,target));
+      if(publicHp&&target.hp<target.maxHp*.32){
+        ang+=(a.__v1105FlankSide||1)*.34;due=true;
+      }
+    }
   }
   if(due&&now-(a.__v180LastAbilityAt||-99)>.55){a.__v180AbilityPermit=true;a.__v180AbilityAngle=ang;}
 }

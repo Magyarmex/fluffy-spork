@@ -475,3 +475,25 @@ test('wholly clipped low HP cannot lure AI away from a closer healthy visible ri
   assert.equal(T.chooseTarget(g,C,observer,observer.ai,g.time).id,edge.id,
     'when the bar enters view, a visible low-health rival may legitimately win');
 });
+
+test('public health evidence is shared with tactical abilities: viewport, cover and Observer relay',()=>{
+ const {window}=boot(),fair=window.__NOVA_FAIR_ENGAGEMENT__;
+ assert.equal(typeof fair.healthPublicTo,'function');
+ const C={CLASSES:{basic:{size:14},marksman:{size:14}},lineageForClass:id=>id==='marksman'?'sniper':'gunner'};
+ const g=game(400,300,1),observer=tank(1,0,0),target=tank(2,0,0);
+ assert.equal(fair.healthPublicTo(g,C,observer,target),true);
+ g.__novaTerrain=[{shape:'rect',x:0,y:-20,w:100,h:20,solid:true}];
+ assert.equal(fair.healthPublicTo(g,C,observer,target),false,
+  'fully occluded bar is not public health evidence');
+ g.__novaTerrain=[];
+ target.x=400;
+ assert.equal(fair.healthPublicTo(g,C,observer,target),false,
+  'off-viewport health remains private');
+ const sniper=tank(3,0,0,{cls:'marksman',__novaSpotterContactId:2,__novaSpotterContactUntil:5});
+ window.__NOVA_SPOTTER_LIVE_RELAY__=(_g,owner,t)=>owner.__novaSpotterContactId===t.id;
+ assert.equal(fair.healthPublicTo(g,C,sniper,target),true,
+  'live Observer relay remains the intentional remote-health exception');
+ sniper.__novaSpotterContactUntil=0;
+ assert.equal(fair.healthPublicTo(g,C,sniper,target),false,
+  'expired relay cannot reveal health');
+});

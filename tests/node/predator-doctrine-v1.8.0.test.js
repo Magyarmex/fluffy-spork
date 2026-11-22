@@ -305,3 +305,37 @@ test('AI movement remains live while planning is reaction-limited',()=>{
   ai.updateAI(hunter,g,.016);
   assert.equal(g.moves.length,moves+1,'cached tactical steering should still execute every simulation update');
 });
+
+test('Phase execution respects Fair Engagement public-health evidence without disabling self-preservation',()=>{
+ function run({publicHp,targetHp=20,selfHp=100,fairMode='normal'}){
+  const {Game,ai,context}=loadPredator(),g=new Game();
+  const hunter=tank(1,'ghost',{hp:selfHp,maxHp:100,abilityCd:0,
+    ai:brain({state:'hunt',__v180PlanT:0})});
+  const enemy=tank(7,'twin',{x:260,y:0,hp:targetHp,maxHp:100,isPlayer:true});
+  g.tanks=[hunter,enemy];g.player=enemy;
+  let checks=0;
+  if(fairMode==='missing')context.window.__NOVA_FAIR_ENGAGEMENT__={};
+  else if(fairMode!=='absent')context.window.__NOVA_FAIR_ENGAGEMENT__={
+   healthPublicTo(_g,_classes,observer,target){
+    checks++;
+    assert.equal(observer,hunter);
+    assert.equal(target,enemy);
+    return publicHp;
+   }
+  };
+  ai.updateAI(hunter,g,1/60);
+  return {abilities:g.abilities,checks};
+ }
+ assert.equal(run({publicHp:false}).abilities,0,
+  'unreadable enemy HP must not trigger execution Phase');
+ assert.equal(run({publicHp:true}).abilities,1,
+  'legible low HP must still permit execution Phase');
+ assert.equal(run({publicHp:true,targetHp:90}).abilities,0,
+  'healthy target is not an execution candidate');
+ assert.equal(run({publicHp:false,selfHp:20}).abilities,1,
+  'defensive Phase uses the actor own HP and must remain available');
+ assert.equal(run({publicHp:false,fairMode:'missing'}).abilities,0,
+  'partially loaded Fair Engagement must fail closed on execution');
+ assert.equal(run({publicHp:false,fairMode:'absent'}).abilities,1,
+  'standalone Predator retains its historical Phase behavior');
+});
