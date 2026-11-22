@@ -29,3 +29,25 @@ test('composed Fair Engagement scoring cannot read an offscreen tank HP',()=>wit
     g.destroy();
   }
 }));
+
+test('composed 49-overlay Game exposes the same public HP evidence used by Phase',()=>withSeed(1095,()=>{
+ const g=bootGame();
+ try{
+  const fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT__;
+  const C=g.__testWindow.__novaMakeRequire('')('game/classes');
+  assert.equal(typeof fair.healthPublicTo,'function',
+   'shipping Fair Engagement must export its public-health contract');
+  const bots=g.tanks.filter(t=>t&&t.ai&&!t.isPlayer);
+  assert.ok(bots.length>=2);
+  const observer=bots[0],target=bots[1];
+  observer.x=0;observer.y=0;
+  target.cls='twin';target.x=0;target.y=0;
+  g.w=800;g.h=600;g.cam.zoom=1;
+  const oldTerrain=g.__novaTerrain;
+  g.__novaTerrain=[];
+  assert.equal(fair.healthPublicTo(g,C,observer,target),true);
+  target.x=2000;
+  assert.equal(fair.healthPublicTo(g,C,observer,target),false);
+  g.__novaTerrain=oldTerrain;
+ }finally{g.destroy();}
+}));
