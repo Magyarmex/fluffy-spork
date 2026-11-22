@@ -41,8 +41,15 @@ function recordShot(g,fair,ledger,shooter,metrics){
    if(!candidate||candidate.id===observer.id||candidate.id===shooter.id||
       !alive(candidate)||!hostile(g,shooter,candidate)||
       !fair.inGameplayViewport(g,observer,candidate))continue;
-   if(typeof g.hasLineOfSight==='function'&&
-      !g.hasLineOfSight(shooter.x,shooter.y,candidate.x,candidate.y,3))continue;
+   // The observer must have seen the candidate as well as the shooter.
+   // This extra ray is deliberately measured: it may make this candidate
+   // too expensive to promote into the shipping AI.
+   if(typeof g.hasLineOfSight==='function'){
+    metrics.eventTargetRays=(metrics.eventTargetRays||0)+1;
+    if(!g.hasLineOfSight(observer.x,observer.y,candidate.x,candidate.y,3))continue;
+    metrics.eventTargetRays++;
+    if(!g.hasLineOfSight(shooter.x,shooter.y,candidate.x,candidate.y,3))continue;
+   }
    const bearing=Math.atan2(candidate.y-shooter.y,candidate.x-shooter.x);
    if(Math.cos(shooter.angle-bearing)>=CONE)targets.push(candidate.id);
   }
@@ -155,6 +162,21 @@ test('event-time certificate excludes allied and unobserved victims',()=>{
  assert.equal(publicPressure(g,fair,ledger,observer,ally,metrics),0);
  assert.equal(publicPressure(g,fair,ledger,observer,offscreen,metrics),0);
 });
+test('an occluded victim cannot be inferred merely from visible shooter aim',()=>{
+ const observer={id:1,x:0,y:0,hp:100,alive:true,ai:{}};
+ const shooter={id:2,x:-100,y:0,angle:0,hp:100,alive:true,ai:{}};
+ const target={id:3,x:100,y:0,hp:100,alive:true};
+ const tanks=[observer,shooter,target],ledger=new Map();
+ const g={time:10,tanks,getTank:id=>tanks.find(t=>t.id===id),
+  hasLineOfSight:(ax,ay,bx,by)=>!(ax===observer.x&&ay===observer.y&&
+   bx===target.x&&by===target.y)};
+ const fair={inGameplayViewport:()=>true},metrics={witnesses:0,candidateChecks:0};
+ recordShot(g,fair,ledger,shooter,metrics);
+ assert.deepEqual(ledger.get(observer.id).get(shooter.id).targets,[]);
+ g.hasLineOfSight=()=>true;
+ assert.equal(publicPressure(g,fair,ledger,observer,target,metrics),0,
+  'later cover removal cannot retroactively reveal the shot-time victim');
+});
 test('recycled target ID cannot inherit a historical firing certificate',()=>{
  const observer={id:1,x:0,y:0,hp:100,alive:true,ai:{}};
  const shooter={id:2,x:-100,y:0,angle:0,hp:100,alive:true,ai:{}};
@@ -186,7 +208,7 @@ function run(seed,instrument){
  return withSeed(seed,draws=>{
   const g=bootGame(),ledger=new Map(),fair=g.__testWindow.__NOVA_FAIR_ENGAGEMENT_TEST__;
   const metrics={seed,shots:0,witnesses:0,witnessChecks:0,candidateChecks:0,
-   visiblePairs:0,privatePositive:0,publicPositive:0,bothPositive:0,eventTargetChecks:0,
+   visiblePairs:0,privatePositive:0,publicPositive:0,bothPositive:0,eventTargetChecks:0,eventTargetRays:0,
    maxLedgerSize:0,frames:0};
   try{
    g.sfx.muted=true;g.sfx.startMusic=()=>{};
