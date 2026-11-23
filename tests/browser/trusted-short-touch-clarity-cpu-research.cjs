@@ -213,6 +213,11 @@ const round=x=>x==null?null:+x.toFixed(2);
      if(sequentialControl){
       await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[origin]});
       await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[moved]});
+      // A CDP acknowledgement alone is not a DOM handler witness. Confirm
+      // the actual Input owner armed the right stick before the timed hold.
+      const delivered=await page.evaluate(i=>window.__novaTouchClarity.edges.some(e=>
+       e.trial===i&&e.type==='move'&&e.armed),trial);
+      assert.equal(delivered,true,'sequential mode must observe an armed DOM move before hold');
       await new Promise(resolve=>setTimeout(resolve,trial>=8?300:40));
       releaseAt=clock.now();
       await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
