@@ -35,10 +35,10 @@ async function assertPortraitHud(page, label, expectedClass) {
     assert.notEqual(metrics.clockDisplay,'none',label+': elapsed match time remains visible');
     assert.ok(metrics.kills.right+1<=metrics.clock.left,label+': kills and clock do not collide: '+JSON.stringify(metrics));
   }
-  if(metrics.gene)assert.ok(metrics.class.right+1<=metrics.gene.left&&metrics.gene.right+1<=metrics.kills.left,
+  if(metrics.gene)assert.ok((metrics.class.top>=metrics.gene.bottom-1 || metrics.class.right+1<=metrics.gene.left)&&metrics.gene.right+1<=metrics.kills.left,
     label+': hybrid gene badge does not cover class or kills: '+JSON.stringify(metrics));
-  assert.ok(metrics.class.right+1<=metrics.kills.left,
-    label+': class identity must not collide with kill indicator: '+JSON.stringify(metrics));
+  assert.ok(metrics.class.top>=metrics.kills.bottom-1 || metrics.class.right+1<=metrics.kills.left,
+    label+': class identity must not collide with kill indicator in either HUD row: '+JSON.stringify(metrics));
   assert.ok(metrics.buttons.every(b=>b.box.bottom-b.box.top>=29.5),
     label+': compact combat controls retain at least a 30px vertical tap target: '+JSON.stringify(metrics));
   assert.ok(metrics.buttons.every(b=>b.box.left>=metrics.panel.left&&b.box.right<=metrics.panel.right+1),
@@ -743,6 +743,7 @@ async function scenario(browser, label, options) {
   const browser=await chromium.launch({headless:true,args:['--disable-dev-shm-usage','--no-sandbox']});
   try {
     await scenario(browser,'desktop',{viewport:{width:1280,height:800},deviceScaleFactor:1});
+    await scenario(browser,'mobile-280',{viewport:{width:280,height:700},deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await scenario(browser,'mobile-320',{viewport:{width:320,height:700},deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await scenario(browser,'mobile-320-short',{viewport:{width:320,height:568},deviceScaleFactor:2,isMobile:true,hasTouch:true});
     await scenario(browser,'mobile-360',{viewport:{width:360,height:780},deviceScaleFactor:2,isMobile:true,hasTouch:true});
