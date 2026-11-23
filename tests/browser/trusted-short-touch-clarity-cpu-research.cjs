@@ -111,9 +111,10 @@ const round=x=>x==null?null:+x.toFixed(2);
     const moved={...origin,x:origin.x+Math.min(35,rect.width*.12),y:origin.y-30};
     await cdp.send('Emulation.setCPUThrottlingRate',{rate:4});
     const trials=[];
-    // Long positive control last: avoid a misleading short-pulse failure
-    // when the fixture itself is unable to arm a real Scout shot.
-    for(let trial=0;trial<9;trial++){
+    // Eight short CPU x4 pulses, one long CPU x4 control, then a long
+    // CPU x1 positive control to certify the fixture itself can fire.
+    for(let trial=0;trial<10;trial++){
+     if(trial===9)await cdp.send('Emulation.setCPUThrottlingRate',{rate:1});
      await page.evaluate(i=>{
       const w=window.__novaTouchClarity,g=w.game;
       if(g.status!=='playing')throw Error('playable game ended during trial');
@@ -122,9 +123,9 @@ const round=x=>x==null?null:+x.toFixed(2);
      },trial);
      const before=clock.now();
      const down=cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[origin]});
-     if(trial===8){await down;await page.waitForTimeout(100);}
+     if(trial>=8){await down;await page.waitForTimeout(100);}
      const move=cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[moved]});
-     await new Promise(resolve=>setTimeout(resolve,trial===8?300:40));
+     await new Promise(resolve=>setTimeout(resolve,trial>=8?300:40));
      const releaseAt=clock.now();
      const up=cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
      await Promise.all([down,move,up]);
@@ -164,7 +165,7 @@ const round=x=>x==null?null:+x.toFixed(2);
      assert.equal(result.aimActive,false,'right stick must release');
      assert.equal(result.postReleaseBirths,0,'no ghost projectile after release');
      assert.equal(result.status,'playing');
-     trials.push({trial,control:trial===8,
+     trials.push({trial,control:trial>=8,normalSpeedControl:trial===9,
       canceled:result.events.some(x=>x.type==='pointercancel'),
       protocolGapMs:round(releaseAt-before),
       inputArmed:result.edges.some(x=>x.type==='move'&&x.armed),
@@ -180,6 +181,8 @@ const round=x=>x==null?null:+x.toFixed(2);
     }
     assert.deepEqual(errors,[],'no composed game page errors');
     assert.ok(trials.some(x=>x.renderCount>0),'must sample actual final game renderer');
+    assert.ok(trials[9].inputArmed&&trials[9].heldSamples>0&&trials[9].births>0,
+     'CPU x1 long control must arm, be sampled, and create a real Scout projectile');
     const short=trials.filter(x=>!x.control);
     results.push({scale,initial,cpuThrottle:4,attempts:short.length,
      armedButUnsampled:short.filter(x=>x.inputArmed&&!x.heldSamples).length,
@@ -187,7 +190,7 @@ const round=x=>x==null?null:+x.toFixed(2);
      canceled:short.filter(x=>x.canceled).length,
      totalBirths:short.reduce((n,x)=>n+x.births,0),
      sampledHeldAttempts:short.filter(x=>x.heldSamples>0).length,
-     control:trials.at(-1),trials,
+     controlThrottled:trials[8],controlNormal:trials[9],trials,
      caveat:'CDP touch events and JS render-call time only; no physical Android latency, GPU timing, or guaranteed matched worlds'});
     console.log('NOVA_TOUCH_CLARITY_ARM '+JSON.stringify(results.at(-1)));
    }finally{
