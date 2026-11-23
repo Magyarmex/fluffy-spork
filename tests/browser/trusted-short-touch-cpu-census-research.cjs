@@ -82,7 +82,8 @@ const {chromium}=require('playwright');
   const summary=[];
   for(const rate of [1,4]){
    await cdp.send('Emulation.setCPUThrottlingRate',{rate});
-   for(let trial=0;trial<8;trial++){
+   // A 300ms control at each rate distinguishes a broken fixture from missed short pulses.
+   for(let trial=0;trial<9;trial++){
     const id=summary.length;
     await page.evaluate(i=>{
      const g=window.__novaPulseGame,w=window.__novaPulseWitness;
@@ -97,7 +98,7 @@ const {chromium}=require('playwright');
     },id);
     await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[origin]});
     await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[extended]});
-    await page.waitForTimeout(40);
+    await page.waitForTimeout(trial===8?300:40);
     await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
     await page.waitForTimeout(110);
     const result=await page.evaluate(i=>{
@@ -125,7 +126,8 @@ const {chromium}=require('playwright');
     const move=result.events.find(e=>e.type==='pointermove');
     const up=result.events.find(e=>e.type==='pointerup');
     assert.ok(down.at<=move.at&&move.at<=up.at);
-    summary.push({rate,trial,deliveredHoldMs:+(up.at-move.at).toFixed(2),
+    summary.push({rate,trial,control:trial===8,
+     deliveredHoldMs:+(up.at-move.at).toFixed(2),
      inputArmed:result.inputEdges.some(e=>e.type==='move'&&e.armed),
      samples:result.sampleCount,heldSamples:result.heldSamples,births:result.births});
    }
@@ -133,9 +135,17 @@ const {chromium}=require('playwright');
   await cdp.send('Emulation.setCPUThrottlingRate',{rate:1});
   assert.deepEqual(errors,[],'real composed game must not throw');
   for(const rate of [1,4]){
-   const rows=summary.filter(x=>x.rate===rate);
+   const rows=summary.filter(x=>x.rate===rate&&!x.control);
+   const control=summary.find(x=>x.rate===rate&&x.control);
+   assert.ok(control&&control.inputArmed,'long control must arm the real Input');
+   if(rate===1){
+    assert.ok(control.heldSamples>0,'normal-speed long control must reach Game.update');
+    assert.ok(control.births>0,'normal-speed long control must produce a real projectile');
+   }
    console.log('NOVA_TRUSTED_SHORT_TOUCH_CPU_CENSUS '+JSON.stringify({
     cpuThrottle:rate,attempts:rows.length,
+    control:{deliveredHoldMs:control.deliveredHoldMs,
+     heldSamples:control.heldSamples,births:control.births},
     inputNotArmed:rows.filter(x=>!x.inputArmed).length,
     armedButUnsampled:rows.filter(x=>x.inputArmed&&x.heldSamples===0).length,
     deliveredHeldWithoutUpdate:rows.filter(x=>x.heldSamples===0).length,
