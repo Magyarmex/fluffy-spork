@@ -130,6 +130,7 @@ const {chromium}=require('playwright');
      const events=w.events.filter(e=>e.trial===i);
      const samples=w.samples.filter(s=>s.trial===i);
      const births=w.births.filter(b=>b.trial===i);
+     const release=events.find(e=>e.type==='pointerup'||e.type==='pointercancel');
      const inputEdges=w.inputEdges.filter(e=>e.trial===i);
      const gaps=samples.slice(1).map((v,j)=>v.at-samples[j].at)
       .filter(v=>Number.isFinite(v)&&v>0).sort((a,b)=>a-b);
@@ -138,7 +139,9 @@ const {chromium}=require('playwright');
       maxUpdateGapMs:gaps.length?gaps.at(-1):null,
       sampleCount:samples.length,
       heldSamples:samples.filter(s=>s.held).length,
-      births:births.length,stuckAim:!!g.input.aim.active,
+      births:births.length,
+      postReleaseBirths:release?births.filter(b=>b.at>release.at).length:null,
+      stuckAim:!!g.input.aim.active,
       gameStatus:g.status};
     },id);
     assert.ok(result.events.some(e=>e.type==='pointerdown'));
@@ -148,6 +151,8 @@ const {chromium}=require('playwright');
     assert.ok(result.inputEdges.some(e=>e.type==='release'&&!e.armed),
      'the real Input owner must observe release and clear firing');
     assert.equal(result.stuckAim,false,'touch release must clear right-stick aim');
+    assert.equal(result.postReleaseBirths,0,
+     'shipping Scout must never invent a new volley after release/cancel');
     assert.equal(result.gameStatus,'playing');
     const down=result.events.find(e=>e.type==='pointerdown');
     const move=result.events.find(e=>e.type==='pointermove');
