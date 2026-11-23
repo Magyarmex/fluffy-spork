@@ -124,3 +124,18 @@ test('movement owner does not advance unrelated cached goals', () => {
   assert.equal(g.moveTank(tank, 0, 0, 1/60), 'moved');
   assert.equal(route.index, 0);
 });
+
+test('movement cursor maintenance is bounded to a reached, unexpired waypoint', () => {
+  for (const mode of ['distant', 'expired']) {
+    const { g, tank, pickup, route } = setup();
+    tank.y = mode === 'distant' ? 0 : 95;
+    tank.hp = 10;
+    tank.maxHp = 100;
+    tank.ai = { __v181Mode: 'resource', __v181BiasW: 1.05,
+      __v181ResourceId: 'heal' };
+    g.powerups = [{ ...pickup, type: 'heal' }];
+    if (mode === 'expired') route.until = 9;
+    assert.equal(g.moveTank(tank, 0, 0, 1/60), 'moved');
+    assert.equal(route.index, 0, mode + ' route must not be advanced');
+  }
+});
