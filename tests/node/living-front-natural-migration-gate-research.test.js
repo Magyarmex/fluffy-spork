@@ -15,12 +15,14 @@ function run(seed,observe){
    heatReady:0,cooldownReady:0,bothReady:0,unblockedReady:0,
    candidateBloom:0,candidateMigration:0,candidateStar:0,candidateNone:0,
    activeBloom:0,activeMigration:0,activeStar:0,
-   maxOutbound:0,firstReadyAt:null,firstMigrationAt:null};
+   maxOutbound:0,firstReadyAt:null,firstMigrationAt:null,
+   pausedAt:null};
   try{
    g.status='playing';g.paused=false;
    for(let tick=0;tick<TICKS;tick++){
     g.update(1/60);
     if(g.status!=='playing')break;
+    if(g.paused){census.pausedAt=+g.time.toFixed(3);break;}
     census.activeTicks++;
     if(!observe||tick%6!==0)continue;
     const st=g.__lfState;
