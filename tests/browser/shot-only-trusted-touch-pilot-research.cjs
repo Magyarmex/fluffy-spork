@@ -49,6 +49,8 @@ const {performance:clock}=require('node:perf_hooks');
     return attach.apply(this,args);
    };
    Game.prototype.update=function(...args){
+    if(!this.__novaDecorativeWorld&&this.player&&this.status==='playing')
+     window.__novaShotPilotGame=this;
     if(this.__novaDecorativeWorld||this!==window.__novaShotPilotGame)
      return update.apply(this,args);
     const w=witness,input=this.input;
@@ -93,20 +95,6 @@ const {performance:clock}=require('node:perf_hooks');
   const canvas=page.locator('canvas.absolute.inset-0');
   await canvas.waitFor({state:'visible',timeout:30000});
   await page.locator('.nv-loading').waitFor({state:'hidden',timeout:20000});
-  await page.waitForFunction(()=>{
-   const g=window.__novaMakeRequire('')('game/engine').Game;
-   return !!window.__novaShotPilotGame||!!document.querySelector('canvas.absolute.inset-0');
-  },null,{timeout:20000});
-  await page.evaluate(()=>{
-   const Game=window.__novaMakeRequire('')('game/engine').Game;
-   // The first non-decorative Game update owns the active match.
-   const original=Game.prototype.update;
-   Game.prototype.update=function(...args){
-    if(!this.__novaDecorativeWorld&&this.player&&this.status==='playing')
-     window.__novaShotPilotGame=this;
-    return original.apply(this,args);
-   };
-  });
   await page.waitForFunction(()=>window.__novaShotPilotGame?.status==='playing',null,{timeout:20000});
   await page.evaluate(()=>{
    const g=window.__novaShotPilotGame;g.setClass(g.player,'scout');
