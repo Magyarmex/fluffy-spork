@@ -137,6 +137,14 @@ jobs:
         if: ${{ github.event_name == 'pull_request' }}
         timeout-minutes: 3
         run: node tests/browser/trusted-short-touch-clarity-cpu-research.cjs
+      - name: Archive touch clarity research evidence
+        if: ${{ github.event_name == 'pull_request' && always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: touch-clarity-cpu-research
+          path: artifacts/browser/touch-clarity-cpu-research.json
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Run real React + Chromium smoke
         run: |
           node tests/browser/real-touch-gameplay.cjs
