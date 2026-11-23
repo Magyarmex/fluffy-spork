@@ -393,8 +393,8 @@ wrap('game/engine',function(engine,require){
     try{
       /* The movement owner, not strategic pickup pricing, advances a cached
        * exact-heal route when its next waypoint has been reached. Keep this
-       * bounded to an existing matching route: never create an extra plan
-       * just to maintain a cursor or steal another movement goal. */
+       * bounded to a reached waypoint on an existing matching route;
+       * unrelated goals and distant route cursors remain untouched. */
       if(ctx&&ctx.lineage==='resource'&&ctx.target){
         var existing=this.__v1102Routes&&this.__v1102Routes[cacheKey(t.id,pad)];
         var next=existing&&existing.points&&existing.points[existing.index];
