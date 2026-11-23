@@ -29,7 +29,10 @@ const {chromium}=require('playwright');
      const result=oldMove.apply(this,arguments);
      if(e.pointerType==='touch'){
       const w=window.__novaPulseWitness;
-      w.inputEdges.push({trial:w.trial,type:'move',armed:!!this.firing,at:performance.now()});
+      w.inputEdges.push({trial:w.trial,type:'move',
+       armed:!!this.firing&&!!this.aim.active&&
+        Math.hypot(this.aim.dx,this.aim.dy)>=9,
+       at:performance.now()});
      }
      return result;
     };
