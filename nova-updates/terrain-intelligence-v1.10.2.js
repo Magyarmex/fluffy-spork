@@ -399,7 +399,8 @@ wrap('game/engine',function(engine,require){
         var existing=this.__v1102Routes&&this.__v1102Routes[cacheKey(t.id,pad)];
         var next=existing&&existing.points&&existing.points[existing.index];
         var reach=20+pad*.65;
-        if(existing&&existing.gx===ctx.target.x&&existing.gy===ctx.target.y&&
+        if(existing&&Number.isFinite(existing.until)&&now<=existing.until&&
+           existing.gx===ctx.target.x&&existing.gy===ctx.target.y&&
            next&&d2(t.x,t.y,next.x,next.y)<reach*reach)
           this.novaBattlefieldWaypoint(t.x,t.y,ctx.target.x,ctx.target.y,pad,t.id);
       }
