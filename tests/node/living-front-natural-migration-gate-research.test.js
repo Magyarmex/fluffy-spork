@@ -8,7 +8,9 @@ const {bootGame,withSeed,digest,physical}=require('../research/audio-rng-causal-
 const SEEDS=[1517800,1517802,1517810],TICKS=1800;
 function run(seed,observe){
  return withSeed(seed,draws=>{
-  const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
+  const g=bootGame();if(!g.player)g.redeploy();
+  assert.ok(g.player&&g.player.alive,'real player must be spawned');
+  g.sfx.muted=true;g.sfx.startMusic=()=>{};
   const census={activeTicks:0,withState:0,heatSamples:0,maxHeat:0,
    heatReady:0,cooldownReady:0,bothReady:0,unblockedReady:0,
    candidateBloom:0,candidateMigration:0,candidateStar:0,candidateNone:0,
