@@ -88,3 +88,27 @@ test('an unavailable exact-goal certificate retains the existing waypoint fallba
  assert.equal(h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}}),650);
  assert.deepEqual(calls,['certificate-miss','waypoint','length']);
 });
+
+
+test('a clear direct path never consults a stale route certificate or planner',()=>{
+ const h=hooks(),t={...bot,x:0,y:0},p={x:400,y:0};
+ const g={
+  hasLineOfSight:()=>true,
+  novaReadOnlyExactRouteLength:()=>{throw Error('direct LOS must not inspect route cache');},
+  novaBattlefieldWaypoint:()=>{throw Error('direct LOS must not plan');}
+ };
+ assert.equal(h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}}),400);
+});
+
+test('a nonfinite certificate fails closed into the existing live planner',()=>{
+ const h=hooks(),t={...bot,x:0,y:0},p={x:400,y:0},calls=[];
+ const g={
+  hasLineOfSight:()=>false,
+  isTerrainSafe:()=>true,
+  novaReadOnlyExactRouteLength:()=>{calls.push('uncertified');return Infinity;},
+  novaBattlefieldWaypoint:()=>{calls.push('waypoint');return{x:100,y:100};},
+  novaRouteLength:()=>{calls.push('length');return 650;}
+ };
+ assert.equal(h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}}),650);
+ assert.deepEqual(calls,['uncertified','waypoint','length']);
+});
