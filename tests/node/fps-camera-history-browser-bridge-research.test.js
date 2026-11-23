@@ -202,6 +202,14 @@ test('scaled CSS pointer survives browser replay into actual player projectile b
   assert.ok(owner.pending&&owner.pending.world);
   assert.ok(Math.abs(owner.pending.world.x-200)<1e-8);
   assert.ok(Math.abs(owner.pending.world.y)<1e-8);
+  // The old inverse used Game.w/h as CSS pixels and incorrectly returned
+  // (600,350), despite the visible CSS rectangle being 400x300.
+  // At the later camera x=100 the original world target x=200 is shown at
+  // client x=350; y=200 remains centered. Assert exact geometry, not only
+  // the eventual projectile's positive x velocity.
+  const replay=owner.resolveMouse(owner.pending.mouse);
+  assert.ok(Math.abs(replay.x-350)<1e-8, 'replayed CSS-scaled x must match the visible world target');
+  assert.ok(Math.abs(replay.y-200)<1e-8, 'replayed CSS-scaled y must remain centered');
   Object.assign(g.player,{x:0,y:0,angle:0,fireCd:0});
   const born=[];const fire=g.tryFire;
   g.tryFire=function(t,...args){
