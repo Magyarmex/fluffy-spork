@@ -5,7 +5,9 @@ process.env.NOVA_OVERLAY_AUDIO_RNG_CAUSAL='1';
 const test=require('node:test');
 const assert=require('node:assert/strict');
 const {bootGame,withSeed,digest,physical}=require('../research/audio-rng-causal-pilot.cjs');
-const SEEDS=[1517800,1517802,1517810],TICKS=1800;
+// Ninety simulated seconds expose the match-age BLOOM window without changing pilot behavior.
+// Natural death/pauses censor the horizon; do not interpret a short trace as 90s exposure.
+const SEEDS=[1517800,1517802,1517810],TICKS=5400,SEGMENT_SECONDS=30;
 function run(seed,observe){
  return withSeed(seed,draws=>{
   const g=bootGame();if(!g.player)g.redeploy();
@@ -16,7 +18,7 @@ function run(seed,observe){
    candidateBloom:0,candidateMigration:0,candidateStar:0,candidateNone:0,
    activeBloom:0,activeMigration:0,activeStar:0,
    maxOutbound:0,firstReadyAt:null,firstMigrationAt:null,
-   pausedAt:null};
+   pausedAt:null,segments:[]};
   try{
    g.status='playing';g.paused=false;
    for(let tick=0;tick<TICKS;tick++){
@@ -30,14 +32,28 @@ function run(seed,observe){
     const T=g.__testWindow.__NOVA_LIVING_FRONT_TEST__;
     assert.ok(T&&typeof T.directorDecision==='function','real Director decision export');
     census.withState++;
+    const segmentIndex=Math.max(0,Math.floor(Math.max(0,g.time-1e-9)/SEGMENT_SECONDS));
+    while(census.segments.length<=segmentIndex){
+     const n=census.segments.length;
+     census.segments.push({from:n*SEGMENT_SECONDS,to:(n+1)*SEGMENT_SECONDS,
+      samples:0,maxHeat:0,heatReadySamples:0,transitionsAtEnd:0,
+      bloomsAtEnd:0,migrationsAtEnd:0,starsAtEnd:0});
+    }
+    const segment=census.segments[segmentIndex];
+    segment.samples++;
+    segment.transitionsAtEnd=Number(st.migrationTransitions)||0;
+    segment.bloomsAtEnd=Number(st.stats&&st.stats.blooms)||0;
+    segment.migrationsAtEnd=Number(st.stats&&st.stats.migrations)||0;
+    segment.starsAtEnd=Number(st.stats&&st.stats.starAnnouncements)||0;
     const heat=Number(st.migrationHeat);
     if(Number.isFinite(heat)){
      census.heatSamples++;
      census.maxHeat=Math.max(census.maxHeat,heat);
+     segment.maxHeat=Math.max(segment.maxHeat,heat);
     }
     const ready=Number.isFinite(heat)&&heat>=5;
     const cool=Number(st.cooldowns&&st.cooldowns.migration)<=0;
-    if(ready)census.heatReady++;
+    if(ready){census.heatReady++;segment.heatReadySamples++;}
     if(cool)census.cooldownReady++;
     if(ready&&cool){
      census.bothReady++;
@@ -87,6 +103,9 @@ test('natural composed Director migration gate census is read-only and A/A ident
   assert.ok(observed.census.activeTicks>0,'no real gameplay ticks');
   assert.ok(observed.census.withState>0,'Director state never materialized');
   assert.ok(observed.census.heatSamples>0,'migration heat never sampled');
+  assert.ok(observed.census.segments.length>0,'no time-window exposure');
+  assert.equal(observed.census.segments.reduce((n,s)=>n+s.samples,0),observed.census.withState,
+   'segmented exposure must cover every sampled Director state');
   assert.ok(observed.census.bothReady<=observed.census.heatReady);
   assert.ok(observed.census.bothReady<=observed.census.cooldownReady);
   assert.equal(observed.census.unblockedReady,
