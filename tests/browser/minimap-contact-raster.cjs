@@ -346,6 +346,51 @@ async function run(browser,width,dpr){
    },{normal:normal.toString('base64'),
     pixelated:pixelated.toString('base64'),color:result.enemyColor,dpr});
   }
+  // Independent 4x4 phase sweep: a crowded rival has only its 3px core,
+  // without the isolated-contact keyline. Compare actual CSS compositing,
+  // not an assumed nearest-neighbor implementation or one lucky dot phase.
+  const phasePilot={};
+  for(const mode of ['auto','pixelated']){
+   await page.evaluate(mode=>{
+    const panel=document.createElement('div');panel.id='nova-minimap-phase-panel';
+    panel.style.cssText='position:fixed;left:0;top:0;width:240px;height:240px;display:grid;grid-template-columns:repeat(4,60px);z-index:2147483647;pointer-events:none;background:#0d1a2a';
+    for(let i=0;i<16;i++){
+     const c=document.createElement('canvas');c.width=c.height=216;
+     c.style.cssText='width:60px;height:60px;image-rendering:'+mode;
+     const ctx=c.getContext('2d');ctx.fillStyle='#0d1a2a';ctx.fillRect(0,0,216,216);
+     ctx.fillStyle='#ffffff';ctx.fillRect(102+i%4,102+Math.floor(i/4),3,3);
+     panel.appendChild(c);
+    }
+    document.body.appendChild(panel);
+   },mode);
+   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+   const capture=await page.locator('#nova-minimap-phase-panel').screenshot({
+    path:path.join(out,'minimap-css-phase-'+width+'-dpr'+dpr+'-'+mode+'.png')});
+   phasePilot[mode]=await page.evaluate(async ({png,dpr})=>{
+    const img=new Image();img.src='data:image/png;base64,'+png;await img.decode();
+    const canvas=document.createElement('canvas');canvas.width=img.naturalWidth;canvas.height=img.naturalHeight;
+    const ctx=canvas.getContext('2d',{willReadFrequently:true});ctx.drawImage(img,0,0);
+    const {data}=ctx.getImageData(0,0,canvas.width,canvas.height);
+    if(canvas.width!==240*dpr||canvas.height!==240*dpr)
+     throw Error('phase screenshot DPR/geometry mismatch');
+    const levels=[];
+    for(let cell=0;cell<16;cell++){
+     const ox=(cell%4)*60*dpr,oy=Math.floor(cell/4)*60*dpr;
+     let peak=0;
+     for(let y=25*dpr;y<35*dpr;y++)for(let x=25*dpr;x<35*dpr;x++){
+      const i=((oy+y)*canvas.width+ox+x)*4;
+      peak=Math.max(peak,data[i]-13,data[i+1]-26,data[i+2]-42);
+     }
+     levels.push(peak);
+    }
+    return {peakAboveBackground:levels,fullyAbsent:levels.filter(v=>v===0).length,
+     weakUnder40:levels.filter(v=>v<40).length};
+   },{png:capture.toString('base64'),dpr});
+   await page.locator('#nova-minimap-phase-panel').evaluate(el=>el.remove());
+  }
+  result.phasePilot=phasePilot;
+  console.log('NOVA_MINIMAP_PHASE_RESAMPLING '+JSON.stringify({width,dpr,phasePilot,
+   caveat:'Synthetic 3px public-contact core, real Chromium CSS screenshot; no keyline, physical phone, or human recognition.'}));
   result.resamplingPilot=resamplingPilot;
   console.log('NOVA_MINIMAP_CSS_RESAMPLING_RESEARCH '+JSON.stringify({
    width,dpr,pilot:resamplingPilot,
