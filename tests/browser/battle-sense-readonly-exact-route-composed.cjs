@@ -10,6 +10,16 @@ const { chromium } = require('playwright');
     page.on('pageerror', e => errors.push(String(e)));
     await page.goto('http://127.0.0.1:8765/', { waitUntil: 'domcontentloaded', timeout: 45000 });
     await page.getByRole('button', { name: /DEPLOY/i }).first().waitFor({ timeout: 45000 });
+    await page.evaluate(() => {
+      const Game = window.__novaMakeRequire('')('game/engine').Game;
+      const original = Game.prototype.update;
+      Game.prototype.update = function () {
+        if (!this.__novaDecorativeWorld) window.__novaReadOnlyRouteGame = this;
+        return original.apply(this, arguments);
+      };
+    });
+    await page.getByRole('button', { name: /DEPLOY/i }).first().click();
+    await page.waitForFunction(() => window.__novaReadOnlyRouteGame?.status === 'playing', { timeout: 30000 });
     const result = await page.evaluate(() => {
       const Game = window.__novaMakeRequire('')('game/engine').Game;
       const choose = window.__NOVA_BATTLE_SENSE_TEST__?.routeDistance;
@@ -18,7 +28,8 @@ const { chromium } = require('playwright');
           typeof Game.prototype.novaReadOnlyExactRouteLength !== 'function' ||
           typeof Game.prototype.novaBattlefieldWaypoint !== 'function')
         throw Error('missing composed Battle Sense / Terrain Intelligence');
-      const g = new Game();
+      const g = window.__novaReadOnlyRouteGame;
+      g.setPaused(true);
       const t = { id: 7, cls: 'guard', x: 0, y: 0 };
       const p = { id: 'heal', x: 100, y: 0 };
       const calls = [];
