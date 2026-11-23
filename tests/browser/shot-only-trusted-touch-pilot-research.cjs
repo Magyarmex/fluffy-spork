@@ -19,19 +19,18 @@ const {performance:clock}=require('node:perf_hooks');
    const Input=req('game/input').Input,attach=Input.prototype.attach;
    const update=Game.prototype.update,fire=Game.prototype.tryFire;
    const witness=window.__novaShotPilot={trial:-1,enabled:false,armed:false,
-    sampled:false,pending:null,events:[],births:[],recovered:[],rejected:[]};
+    sampled:false,pending:null,lastAimStamp:null,events:[],births:[],recovered:[],rejected:[]};
    Input.prototype.attach=function(...args){
     const move=this.pm,release=this.pu;
     this.pm=function(e){
      const out=move.apply(this,arguments);
      if(e.pointerType==='touch'&&this.stickId?.aim===e.pointerId&&this.firing&&
         this.aim.active&&Math.hypot(this.aim.dx,this.aim.dy)>=9){
-      witness.armed=true;
-     }
+      witness.armed=true;\n      witness.lastAimStamp=e.isTrusted&&Number.isFinite(e.timeStamp)?e.timeStamp:null;\n     }
      return out;
     };
     this.pu=function(e){
-     const valid=e.isTrusted===true&&Number.isFinite(e.timeStamp)&&e.timeStamp>0&&\n      e.pointerType==='touch'&&e.type==='pointerup'&&
+     const valid=e.isTrusted===true&&Number.isFinite(e.timeStamp)&&e.timeStamp>0&&\n      Number.isFinite(witness.lastAimStamp)&&witness.lastAimStamp>0&&\n      e.timeStamp>=witness.lastAimStamp&&e.timeStamp-witness.lastAimStamp<=250&&\n      e.pointerType==='touch'&&e.type==='pointerup'&&
       this.stickId?.aim===e.pointerId&&this.firing&&this.aim.active&&
       Math.hypot(this.aim.dx,this.aim.dy)>=9;
      const aim=valid?{dx:this.aim.dx,dy:this.aim.dy}:null;
@@ -119,7 +118,7 @@ const {performance:clock}=require('node:perf_hooks');
      await page.evaluate(({id,enabled})=>{
       const w=window.__novaShotPilot,g=window.__novaShotPilotGame;
       if(!g||g.status!=='playing')throw Error('match lost');
-      w.trial=id;w.enabled=enabled;w.armed=false;w.sampled=false;w.pending=null;
+      w.trial=id;w.enabled=enabled;w.armed=false;w.sampled=false;w.pending=null;\n      w.lastAimStamp=null;
       g.input.autofire=false;g.player.fireCd=0;g.player.spawnShieldT=20;
      },{id,enabled});
      const down=cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[origin]});
