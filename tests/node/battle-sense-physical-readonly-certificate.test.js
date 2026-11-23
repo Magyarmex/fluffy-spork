@@ -9,6 +9,7 @@ const root = path.resolve(__dirname, '../..');
 function setup() {
   function Game() {}
   Game.prototype.novaBattlefieldWaypoint = function () { throw Error('unexpected live route plan'); };
+  Game.prototype.moveTank = function () { return 'moved'; };
   const classes = { CLASSES: { guard: { size: 15 } }, lineageForClass: () => 'guardian' };
   const modules = {
     'game/engine': m => { m.exports = { Game }; },
@@ -91,5 +92,35 @@ test('a newly blocked cached leg is rejected without mutating the cached cursor'
   assert.equal(g.novaReadOnlyExactRouteLength(0,0,100,0,23,7), null);
   assert.throws(() => distance(g,tank,pickup,100,classes), /unexpected live route plan/);
   assert.strictEqual(g.__v1102Routes['7:6'], route);
+  assert.equal(route.index, 0);
+});
+
+test('movement owner advances a reached cached heal waypoint without strategic pricing', () => {
+  const { g, tank, pickup, route } = setup();
+  tank.y = 95;
+  tank.hp = 10;
+  tank.maxHp = 100;
+  tank.ai = { __v181Mode: 'resource', __v181BiasW: 1.05,
+    __v181ResourceId: 'heal' };
+  g.powerups = [{ ...pickup, type: 'heal' }];
+  g.tanks = [tank];
+  assert.equal(route.index, 0);
+  assert.equal(g.moveTank(tank, 0, 0, 1/60), 'moved');
+  assert.equal(route.index, 1,
+    'movement, not strategic scoring, owns the reached-corner cursor');
+  assert.equal(g.__v1102RouteContext, undefined,
+    'temporary resource goal context must be restored');
+});
+
+test('movement owner does not advance unrelated cached goals', () => {
+  const { g, tank, pickup, route } = setup();
+  tank.y = 95;
+  tank.hp = 10;
+  tank.maxHp = 100;
+  tank.ai = { __v181Mode: 'resource', __v181BiasW: 1.05,
+    __v181ResourceId: 'heal' };
+  g.powerups = [{ ...pickup, type: 'heal' }];
+  route.gx = 110; // another goal may own this movement route
+  assert.equal(g.moveTank(tank, 0, 0, 1/60), 'moved');
   assert.equal(route.index, 0);
 });
