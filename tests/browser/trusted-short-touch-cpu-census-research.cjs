@@ -18,7 +18,25 @@ const {chromium}=require('playwright');
   await page.evaluate(()=>{
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const update=Game.prototype.update,fire=Game.prototype.tryFire;
-   window.__novaPulseWitness={trial:-1,events:[],samples:[],births:[]};
+   const Input=window.__novaMakeRequire('')('game/input').Input;
+   const originalMove=Input.prototype.pm,originalRelease=Input.prototype.pu;
+   window.__novaPulseWitness={trial:-1,events:[],samples:[],births:[],inputEdges:[]};
+   Input.prototype.pm=function(e){
+    const result=originalMove.apply(this,arguments);
+    if(e.pointerType==='touch'){
+     const w=window.__novaPulseWitness;
+     w.inputEdges.push({trial:w.trial,type:'move',armed:!!this.firing,at:performance.now()});
+    }
+    return result;
+   };
+   Input.prototype.pu=function(e){
+    const result=originalRelease.apply(this,arguments);
+    if(e.pointerType==='touch'){
+     const w=window.__novaPulseWitness;
+     w.inputEdges.push({trial:w.trial,type:'release',armed:!!this.firing,at:performance.now()});
+    }
+    return result;
+   };
    Game.prototype.update=function(...args){
     if(!this.__novaDecorativeWorld&&this.player&&this.status==='playing'){
      window.__novaPulseGame=this;
@@ -80,7 +98,8 @@ const {chromium}=require('playwright');
      const events=w.events.filter(e=>e.trial===i);
      const samples=w.samples.filter(s=>s.trial===i);
      const births=w.births.filter(b=>b.trial===i);
-     return {events,sampleCount:samples.length,
+     const inputEdges=w.inputEdges.filter(e=>e.trial===i);
+     return {events,inputEdges,sampleCount:samples.length,
       heldSamples:samples.filter(s=>s.held).length,
       births:births.length,stuckAim:!!g.input.aim.active,
       gameStatus:g.status};
@@ -89,6 +108,10 @@ const {chromium}=require('playwright');
     assert.ok(result.events.some(e=>e.type==='pointermove'));
     assert.ok(result.events.some(e=>e.type==='pointerup'));
     assert.ok(result.events.every(e=>e.trusted),'CDP events must be browser-trusted');
+    assert.ok(result.inputEdges.some(e=>e.type==='move'),
+     'the real Input owner must receive the extended right-stick motion');
+    assert.ok(result.inputEdges.some(e=>e.type==='release'&&!e.armed),
+     'the real Input owner must observe release and clear firing');
     assert.equal(result.stuckAim,false,'touch release must clear right-stick aim');
     assert.equal(result.gameStatus,'playing');
     const down=result.events.find(e=>e.type==='pointerdown');
@@ -96,6 +119,7 @@ const {chromium}=require('playwright');
     const up=result.events.find(e=>e.type==='pointerup');
     assert.ok(down.at<=move.at&&move.at<=up.at);
     summary.push({rate,trial,deliveredHoldMs:+(up.at-move.at).toFixed(2),
+     inputArmed:result.inputEdges.some(e=>e.type==='move'&&e.armed),
      samples:result.sampleCount,heldSamples:result.heldSamples,births:result.births});
    }
   }
@@ -105,6 +129,8 @@ const {chromium}=require('playwright');
    const rows=summary.filter(x=>x.rate===rate);
    console.log('NOVA_TRUSTED_SHORT_TOUCH_CPU_CENSUS '+JSON.stringify({
     cpuThrottle:rate,attempts:rows.length,
+    inputNotArmed:rows.filter(x=>!x.inputArmed).length,
+    armedButUnsampled:rows.filter(x=>x.inputArmed&&x.heldSamples===0).length,
     deliveredHeldWithoutUpdate:rows.filter(x=>x.heldSamples===0).length,
     deliveredHeldWithoutProjectile:rows.filter(x=>x.births===0).length,
     deliveredHoldMs:rows.map(x=>x.deliveredHoldMs),
