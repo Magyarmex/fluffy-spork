@@ -55,7 +55,7 @@ const round=x=>x==null?null:+x.toFixed(2);
      };
      const originalAttach=Input.prototype.attach;
      window.__novaTouchClarity={trial:-1,events:[],edges:[],samples:[],births:[],
-      renders:[],longTasks:[],game:null,
+      renders:[],longTasks:[],game:null,updatesSinceRender:0,
       longTaskSupported:typeof PerformanceObserver!=='undefined'&&
        PerformanceObserver.supportedEntryTypes?.includes('longtask')===true};
      if(window.__novaTouchClarity.longTaskSupported){
@@ -93,6 +93,7 @@ const round=x=>x==null?null:+x.toFixed(2);
      Game.prototype.update=function(...args){
       if(!this.__novaDecorativeWorld&&this.status==='playing'&&this.player){
        const w=window.__novaTouchClarity;w.game=this;
+       w.updatesSinceRender++;
        if(!w.initialFingerprint){
         const compact=(arr,keys)=>(arr||[]).map(o=>keys.map(k=>o?.[k]??null));
         const snapshot=JSON.stringify({
@@ -129,7 +130,10 @@ const round=x=>x==null?null:+x.toFixed(2);
       finally{
        if(!g.__novaDecorativeWorld&&g.status==='playing')
         window.__novaTouchClarity.renders.push({
-         trial:window.__novaTouchClarity.trial,ms:performance.now()-start});
+         trial:window.__novaTouchClarity.trial,ms:performance.now()-start,
+         updates:window.__novaTouchClarity.updatesSinceRender});
+       if(!g.__novaDecorativeWorld&&g.status==='playing')
+        window.__novaTouchClarity.updatesSinceRender=0;
       }
      };
      for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
@@ -190,7 +194,8 @@ const round=x=>x==null?null:+x.toFixed(2);
       const edges=w.edges.filter(x=>x.trial===i);
       const samples=w.samples.filter(x=>x.trial===i);
       const births=w.births.filter(x=>x.trial===i);
-      const renders=w.renders.filter(x=>x.trial===i).map(x=>x.ms);
+      const renderFrames=w.renders.filter(x=>x.trial===i);
+      const renders=renderFrames.map(x=>x.ms);
       const rafWork=samples.map(x=>x.priorRafWorkMs)
        .filter(x=>Number.isFinite(x)&&x>=0).sort((a,b)=>a-b);
       const deflection=events.find(x=>x.type==='pointermove');
@@ -223,7 +228,10 @@ const round=x=>x==null?null:+x.toFixed(2);
        medianPriorRafWorkMs:rafWork.length?rafWork[Math.floor(rafWork.length/2)]:null,
        medianNearTouchRafWorkMs:nearTouchRaf.length?
         nearTouchRaf[Math.floor(nearTouchRaf.length/2)]:null,
-       renderCount:renders.length,medianRenderMs:renders.length?
+       renderCount:renders.length,
+       twoUpdateFrames:renderFrames.filter(x=>x.updates===2).length,
+       maxUpdatesPerFrame:renderFrames.length?Math.max(...renderFrames.map(x=>x.updates)):0,
+       medianRenderMs:renders.length?
         [...renders].sort((a,b)=>a-b)[Math.floor(renders.length/2)]:null,
        aimActive:!!g.input.aim.active,status:g.status};
      },trial);
@@ -246,6 +254,8 @@ const round=x=>x==null?null:+x.toFixed(2);
       moveToNextUpdateMs:round(result.moveToNextUpdateMs),
       updateWithinHold:result.updateWithinHold,heldSamples:result.heldSamples,
       births:result.births,renderCount:result.renderCount,
+      twoUpdateFrames:result.twoUpdateFrames,
+      maxUpdatesPerFrame:result.maxUpdatesPerFrame,
       medianUpdateGapMs:round(result.medianUpdateGapMs),
       maxUpdateGapMs:round(result.maxUpdateGapMs),
       medianRenderMs:round(result.medianRenderMs),
@@ -304,6 +314,7 @@ const round=x=>x==null?null:+x.toFixed(2);
     'event age is performance.now minus DOM event.timeStamp, not hardware latency',
     'renderer JS duration and prior RAF callback work exclude GPU completion or physical touch-to-photon',
     'Long Tasks are main-thread tasks of at least 50ms, not a complete browser scheduling or compositor trace; window is move minus 120ms to release plus 120ms',
+    'Two-update frames count consecutive live Game.update calls before one final Game render; they do not prove why the scheduler permitted catch-up',
     'CPU x4 CDP throttling is not equivalent to Android thermal throttling',
     'no assertion of causal FPS benefit; compare arm distributions and replicate']};
   fs.mkdirSync('artifacts/browser',{recursive:true});
