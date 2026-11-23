@@ -39,7 +39,7 @@ function run(seed, observe) {
               observer.ai.__v181ObservedShotAt !== this.time) continue;
           const victims = new Map();
           for (const victim of this.tanks || []) {
-            if (victim.id === shooter.id || victim.id === observer.id ||
+            if (!victim || victim.id === shooter.id || victim.id === observer.id ||
                 !hostile(this,shooter,victim) ||
                 !visible(this,T,C,observer,victim) ||
                 (this.hasLineOfSight &&
@@ -76,7 +76,7 @@ function run(seed, observe) {
           if (!visible(g,T,C,observer,shooter)) continue;
           if (observer.ai.__v1112TargetId !== shooter.id) continue;
           for (const victim of g.tanks || []) {
-            if (victim.id === shooter.id || victim.id === observer.id ||
+            if (!victim || victim.id === shooter.id || victim.id === observer.id ||
                 !hostile(g,shooter,victim) ||
                 !visible(g,T,C,observer,victim) ||
                 (g.hasLineOfSight &&
