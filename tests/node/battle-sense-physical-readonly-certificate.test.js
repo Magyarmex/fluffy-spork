@@ -108,6 +108,10 @@ test('movement owner advances a reached cached heal waypoint without strategic p
   assert.equal(g.moveTank(tank, 0, 0, 1/60), 'moved');
   assert.equal(route.index, 1,
     'movement, not strategic scoring, owns the reached-corner cursor');
+  assert.equal(tank.ai.__v172Waypoint.x, 100);
+  assert.equal(tank.ai.__v172Waypoint.y, 100);
+  assert.strictEqual(tank.ai.__v172WaypointRouteRef, route);
+  assert.equal(tank.ai.__v172WaypointResourceGoal, '100:0');
   assert.equal(g.__v1102RouteContext, undefined,
     'temporary resource goal context must be restored');
 });
