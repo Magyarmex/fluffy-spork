@@ -50,7 +50,10 @@ const {chromium}=require('playwright');
     if(!this.__novaDecorativeWorld&&this.player&&this.status==='playing'){
      window.__novaPulseGame=this;
      const w=window.__novaPulseWitness;
-     w.samples.push({trial:w.trial,at:performance.now(),held:!!this.input.firing});
+     w.samples.push({trial:w.trial,at:performance.now(),
+      held:!!this.input.firing&&!!this.input.aim.active&&
+       Math.hypot(this.input.aim.dx,this.input.aim.dy)>=9,
+      rawFiring:!!this.input.firing});
     }
     return update.apply(this,args);
    };
