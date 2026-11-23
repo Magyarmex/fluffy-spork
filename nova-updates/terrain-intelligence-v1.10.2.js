@@ -401,8 +401,21 @@ wrap('game/engine',function(engine,require){
         var reach=20+pad*.65;
         if(existing&&Number.isFinite(existing.until)&&now<=existing.until&&
            existing.gx===ctx.target.x&&existing.gy===ctx.target.y&&
-           next&&d2(t.x,t.y,next.x,next.y)<reach*reach)
-          this.novaBattlefieldWaypoint(t.x,t.y,ctx.target.x,ctx.target.y,pad,t.id);
+           next&&d2(t.x,t.y,next.x,next.y)<reach*reach){
+          var progressed=this.novaBattlefieldWaypoint(t.x,t.y,ctx.target.x,ctx.target.y,pad,t.id);
+          var current=this.__v1102Routes&&this.__v1102Routes[cacheKey(t.id,pad)];
+          if(progressed&&current===existing&&
+             current.gx===ctx.target.x&&current.gy===ctx.target.y&&
+             routeSafe(this,progressed.x,progressed.y,pad)&&
+             routeVisible(this,t.x,t.y,progressed.x,progressed.y,pad)){
+            /* Combined Arms owns the local steering waypoint. Keep it in
+             * sync with the certified route cursor we just advanced. */
+            t.ai.__v172Waypoint=progressed;
+            t.ai.__v172WaypointUntil=now+.95;
+            t.ai.__v172WaypointResourceGoal=ctx.target.x+':'+ctx.target.y;
+            t.ai.__v172WaypointRouteRef=current;
+          }
+        }
       }
       return oldMove.call(this,t,vx,vy,dt);
     }finally{this.__v1102RouteContext=prev;}
