@@ -228,3 +228,28 @@ test('scaled CSS pointer survives browser replay into actual player projectile b
   assert.equal(owner.intents,1);
  }finally{owner.detach();g.destroy();}
 });
+
+test('nonuniform CSS scale and camera zoom preserve historical world aim through core mouse proxy',()=>{
+ const {bootGame}=require('../research/audio-rng-causal-pilot.cjs');
+ const {DirectShotIntent}=require('../research/direct-shot-intent.cjs');
+ const g=bootGame(),i=g.input,win=g.__testWindow;
+ g.w=800;g.h=600;g.zoom=2;
+ Object.assign(g.cam,{x:100,y:-50,zoom:2});
+ i.canvas.getBoundingClientRect=()=>({left:40,top:70,width:320,height:270});
+ const owner=new DirectShotIntent(g,{window:win,document:win.document,rebindDomListeners:false});
+ try{
+  const captured=owner.captureMouse({clientX:200,clientY:160});
+  assert.ok(captured.world);
+  assert.ok(Math.abs(captured.world.x-100)<1e-8);
+  assert.ok(Math.abs(captured.world.y+100)<1e-8);
+  g.zoom=1.5;Object.assign(g.cam,{x:240,y:-120,zoom:1.5});
+  const proxy=owner.resolveMouse(captured);
+  assert.ok(Math.abs(proxy.x-230)<1e-8);
+  assert.ok(Math.abs(proxy.y-400)<1e-8);
+  const rect=i.canvas.getBoundingClientRect();
+  const worldX=g.cam.x+(proxy.x-rect.left-g.w/2)/g.zoom;
+  const worldY=g.cam.y+(proxy.y-rect.top-g.h/2)/g.zoom;
+  assert.ok(Math.abs(worldX-captured.world.x)<1e-8);
+  assert.ok(Math.abs(worldY-captured.world.y)<1e-8);
+ }finally{owner.detach();g.destroy();}
+});
