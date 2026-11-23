@@ -242,6 +242,11 @@ function installDeathTitleFit(){
  style.textContent='@media(max-width:360px){'+
   '.absolute.inset-0.z-50 > .panel.anim-pop > .font-display.text-red-400{'+
   'font-size:24px;letter-spacing:.12em;line-height:1.25}}'+
+  /* At 280 CSS px the 24px TERMINATED glyphs still protrude beyond the
+   * card's padded content box. Narrow only this exact modal and width. */
+  '@media(max-width:300px) and (orientation:portrait){'+
+  '.absolute.inset-0.z-50 > .panel.anim-pop > .font-display.text-red-400{'+
+  'font-size:22px;letter-spacing:.10em;line-height:1.25}}'+
   /* A short landscape phone has only 320px of height. Keep the existing
    * death card and its earned statistics, but make its full contents
    * scrollable rather than clipping Redeploy or hiding the title offscreen.
