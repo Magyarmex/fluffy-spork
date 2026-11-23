@@ -4,6 +4,7 @@
 // Distinguish event delivery, Input arming, Game.update sampling, projectile birth,
 // and actual final renderer CPU cost. Never assert a particular FPS or loss rate.
 const assert=require('node:assert/strict');
+const fs=require('node:fs');
 const {chromium}=require('playwright');
 const {performance:clock}=require('node:perf_hooks');
 const scales=[100,80,65];
@@ -192,12 +193,16 @@ const round=x=>x==null?null:+x.toFixed(2);
    'clarity arms must reduce real canvas backing area');
   assert.equal(new Set(results.map(x=>x.initial.quality)).size,1,
    'do not confound clarity with quality mode');
-  console.log('NOVA_TOUCH_CLARITY_RESEARCH '+JSON.stringify({
+  const report={
    researchOnly:true,results,backingPixels:pixels,
    caveats:['independent worlds and trials are not matched physical states',
     'event age is performance.now minus DOM event.timeStamp, not hardware latency',
     'renderer JS duration is not GPU completion or physical touch-to-photon',
     'CPU x4 CDP throttling is not equivalent to Android thermal throttling',
-    'no assertion of causal FPS benefit; compare arm distributions and replicate']}));
+    'no assertion of causal FPS benefit; compare arm distributions and replicate']};
+  fs.mkdirSync('artifacts/browser',{recursive:true});
+  fs.writeFileSync('artifacts/browser/touch-clarity-cpu-research.json',
+   JSON.stringify(report,null,2)+'\\n');
+  console.log('NOVA_TOUCH_CLARITY_RESEARCH '+JSON.stringify(report));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
