@@ -5,6 +5,7 @@
 // Do not assert a particular loss rate from shared-runner timing.
 const assert=require('node:assert/strict');
 const {chromium}=require('playwright');
+const {performance:nodeClock}=require('node:perf_hooks');
 
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
@@ -112,6 +113,7 @@ const {chromium}=require('playwright');
     // round-trip inflation. The long positive control instead separates
     // centered press and deliberate deflection, avoiding move coalescing.
     // Actual DOM move-to-up time, not the Node timer, is authoritative.
+    const protocolStartAt=nodeClock.now();
     const startDelivery=cdp.send('Input.dispatchTouchEvent',
      {type:'touchStart',touchPoints:[origin]});
     if(trial===8){
@@ -121,6 +123,7 @@ const {chromium}=require('playwright');
     const moveDelivery=cdp.send('Input.dispatchTouchEvent',
      {type:'touchMove',touchPoints:[extended]});
     await new Promise(resolve=>setTimeout(resolve,trial===8?300:40));
+    const protocolReleaseAt=nodeClock.now();
     const endDelivery=cdp.send('Input.dispatchTouchEvent',
      {type:'touchEnd',touchPoints:[]});
     await Promise.all([startDelivery,moveDelivery,endDelivery]);
@@ -161,6 +164,7 @@ const {chromium}=require('playwright');
     if(move)assert.ok(down.at<=move.at&&move.at<=up.at,
      'delivered deflection must occur within the press');
     summary.push({rate,trial,control:trial===8,
+     protocolGapMs:+(protocolReleaseAt-protocolStartAt).toFixed(2),
      canceled:up.type==='pointercancel',moveDelivered:!!move,
      pressDurationMs:+(up.at-down.at).toFixed(2),
      deliveredHoldMs:move?+(up.at-move.at).toFixed(2):null,
@@ -194,10 +198,11 @@ const {chromium}=require('playwright');
     deliveredHeldWithoutProjectile:rows.filter(x=>x.births===0).length,
     deliveredHoldMs:rows.map(x=>x.deliveredHoldMs),
     pressDurationMs:rows.map(x=>x.pressDurationMs),
+    protocolGapMs:rows.map(x=>x.protocolGapMs),
     samples:rows.map(x=>x.heldSamples),births:rows.map(x=>x.births),
     medianUpdateGapMs:rows.map(x=>x.medianUpdateGapMs),
     maxUpdateGapMs:rows.map(x=>x.maxUpdateGapMs),
-    caveat:'Chromium/CDP browser-trusted touch; not a physical Android trial, fixed 40ms request is not guaranteed delivery duration'
+    caveat:'Node-side CDP commands are spaced ~40ms; DOM delivery may compress them under CPU load. Neither is a physical Android touch or photon measurement.'
    }));
   }
  }finally{await context.close();await browser.close();}
