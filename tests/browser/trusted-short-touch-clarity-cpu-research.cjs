@@ -55,7 +55,17 @@ const round=x=>x==null?null:+x.toFixed(2);
      };
      const originalAttach=Input.prototype.attach;
      window.__novaTouchClarity={trial:-1,events:[],edges:[],samples:[],births:[],
-      renders:[],game:null};
+      renders:[],longTasks:[],game:null};
+     if(typeof PerformanceObserver!=='undefined'&&
+        PerformanceObserver.supportedEntryTypes?.includes('longtask')){
+      const observer=new PerformanceObserver(list=>{
+       const w=window.__novaTouchClarity;
+       for(const entry of list.getEntries())
+        w.longTasks.push({at:entry.startTime,ms:entry.duration});
+      });
+      observer.observe({type:'longtask',buffered:false});
+      window.__novaTouchClarity.longTaskObserver=observer;
+     }
      Input.prototype.attach=function(canvas){
       const oldMove=this.pm,oldRelease=this.pu;
       this.pm=function(e){
@@ -99,7 +109,8 @@ const round=x=>x==null?null:+x.toFixed(2);
        }
        w.samples.push({trial:w.trial,at:performance.now(),
         held:!!this.input.firing&&!!this.input.aim.active&&
-         Math.hypot(this.input.aim.dx,this.input.aim.dy)>=9});
+         Math.hypot(this.input.aim.dx,this.input.aim.dy)>=9,
+        priorRafWorkMs:Number.isFinite(this.__novaRafWorkMs)?this.__novaRafWorkMs:null});
       }
       return oldUpdate.apply(this,args);
      };
@@ -179,9 +190,13 @@ const round=x=>x==null?null:+x.toFixed(2);
       const samples=w.samples.filter(x=>x.trial===i);
       const births=w.births.filter(x=>x.trial===i);
       const renders=w.renders.filter(x=>x.trial===i).map(x=>x.ms);
+      const rafWork=samples.map(x=>x.priorRafWorkMs)
+       .filter(x=>Number.isFinite(x)&&x>=0).sort((a,b)=>a-b);
       const deflection=events.find(x=>x.type==='pointermove');
       const released=events.find(x=>x.type==='pointerup'||x.type==='pointercancel');
       const next=deflection?samples.find(x=>x.at>=deflection.at):null;
+      const longTasks=deflection&&released?w.longTasks.filter(x=>
+       x.at<released.at+120&&x.at+x.ms>deflection.at-120):[];
       const updateGaps=samples.slice(1).map((x,j)=>x.at-samples[j].at)
        .filter(x=>Number.isFinite(x)&&x>0).sort((a,b)=>a-b);
       return {events,edges,samples:samples.length,heldSamples:samples.filter(x=>x.held).length,
@@ -194,6 +209,10 @@ const round=x=>x==null?null:+x.toFixed(2);
        moveEventAgeMs:deflection?deflection.at-deflection.stamp:null,
        moveToNextUpdateMs:deflection&&next?next.at-deflection.at:null,
        updateWithinHold:!!(deflection&&released&&next&&next.at<released.at),
+       longTaskCount:longTasks.length,
+       longTaskOverlapMs:longTasks.reduce((n,x)=>n+x.ms,0),
+       maxLongTaskMs:longTasks.length?Math.max(...longTasks.map(x=>x.ms)):0,
+       medianPriorRafWorkMs:rafWork.length?rafWork[Math.floor(rafWork.length/2)]:null,
        renderCount:renders.length,medianRenderMs:renders.length?
         [...renders].sort((a,b)=>a-b)[Math.floor(renders.length/2)]:null,
        aimActive:!!g.input.aim.active,status:g.status};
@@ -219,7 +238,11 @@ const round=x=>x==null?null:+x.toFixed(2);
       births:result.births,renderCount:result.renderCount,
       medianUpdateGapMs:round(result.medianUpdateGapMs),
       maxUpdateGapMs:round(result.maxUpdateGapMs),
-      medianRenderMs:round(result.medianRenderMs)});
+      medianRenderMs:round(result.medianRenderMs),
+      medianPriorRafWorkMs:round(result.medianPriorRafWorkMs),
+      longTaskCount:result.longTaskCount,
+      longTaskOverlapMs:round(result.longTaskOverlapMs),
+      maxLongTaskMs:round(result.maxLongTaskMs)});
     }
     assert.deepEqual(errors,[],'no composed game page errors');
     assert.ok(trials.some(x=>x.renderCount>0),'must sample actual final game renderer');
@@ -267,7 +290,8 @@ const round=x=>x==null?null:+x.toFixed(2);
    caveats:['matched selected initial fingerprint does not ensure matched subsequent physical worlds',
     'forward/reverse phase order reduces but cannot eliminate temporal drift',
     'event age is performance.now minus DOM event.timeStamp, not hardware latency',
-    'renderer JS duration is not GPU completion or physical touch-to-photon',
+    'renderer JS duration and prior RAF callback work exclude GPU completion or physical touch-to-photon',
+    'Long Tasks are main-thread tasks of at least 50ms, not a complete browser scheduling or compositor trace; window is move minus 120ms to release plus 120ms',
     'CPU x4 CDP throttling is not equivalent to Android thermal throttling',
     'no assertion of causal FPS benefit; compare arm distributions and replicate']};
   fs.mkdirSync('artifacts/browser',{recursive:true});
