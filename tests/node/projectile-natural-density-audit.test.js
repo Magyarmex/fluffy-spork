@@ -57,3 +57,46 @@ test('counter resets are censored instead of fabricated as negative breaks',()=>
  assert.equal(a.brokenCounterResets,1);
  assert.equal(a.coverBreaks,0);
 });
+
+test('read-only three-shot census distinguishes a pair from a witnessed non-tank world',()=>{
+ const a=census.create(),g={
+  bullets:[shot(1),shot(2),{...shot(3),pen:0}],
+  shapes:[{kind:'shape',x:400,y:400,vx:0,vy:0,
+   __novaShapeSweepEpoch:5,__novaShapeSweepPrevX:400,__novaShapeSweepPrevY:400}],
+  drones:[],__novaShapeSweepActive:true,__novaShapeSweepEpoch:5,
+  __novaFrameStartBulletEpoch:5,__novaFrameStartBulletIdCeiling:100,
+  updateBullets(){}
+ };
+ const initial=JSON.stringify({bullets:g.bullets,shapes:g.shapes});
+ census.install(g,a);
+ g.updateBullets(.01);
+ assert.equal(a.threeShotPairFrames,1);
+ assert.equal(a.threeShotWitnessedNonTankFrames,1);
+ g.shapes[0].__novaShapeSweepPrevX=100;
+ g.updateBullets(.01);
+ assert.equal(a.threeShotPairFrames,2);
+ assert.equal(a.threeShotWitnessedNonTankFrames,1,
+  'observed displacement must veto stationary-world exposure');
+ g.shapes[0].__novaShapeSweepPrevX=400;
+ g.__novaShapeSweepActive=false;
+ g.updateBullets(.01);
+ assert.equal(a.threeShotPairFrames,3);
+ assert.equal(a.threeShotWitnessedNonTankFrames,1,
+  'inactive frame witness cannot be counted as a certificate opportunity');
+ g.__novaShapeSweepActive=true;
+ g.drones.push({kind:'drone',x:600,y:600,hp:100,vx:0,vy:0,
+  __novaChronoDroneEpoch:5,__novaChronoDronePrevX:600,
+  __novaChronoDronePrevY:600,__lvVX:20});
+ g.updateBullets(.01);
+ assert.equal(a.threeShotPairFrames,4);
+ assert.equal(a.threeShotWitnessedNonTankFrames,1,
+  'Live Vector motion must veto the non-tank witness');
+ g.drones[0].hp=0;
+ g.updateBullets(.01);
+ assert.equal(a.threeShotPairFrames,5);
+ assert.equal(a.threeShotWitnessedNonTankFrames,2,
+  'noncollidable zero-HP drones are skipped by the real certificate');
+ assert.deepEqual(g.bullets.map(b=>b.id),[1,2,3],
+  'research observer never reorders or mutates projectiles');
+ assert.equal(JSON.parse(initial).bullets.length,3);
+});
