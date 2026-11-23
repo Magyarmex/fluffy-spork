@@ -31,7 +31,8 @@ function run(source,{firstSpikeMs=40,secondSpikeMs=12}={}){
   },drawMinimap(){}};
  start.call(game);
  for(frame=1;frame<=8;frame++){
-  now=Math.max(frame*50,previousEnd);work=0;step=0;
+  // Missed 20Hz vsync callbacks cannot be delivered between refresh slots.
+  now=Math.max(frame*50,Math.ceil(previousEnd/50)*50);work=0;step=0;
   const callback=raf;raf=null;
   assert.equal(typeof callback,'function');
   callback(now);
