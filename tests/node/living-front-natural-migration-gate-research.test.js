@@ -20,7 +20,7 @@ function run(seed,observe){
    maxOutbound:0,firstReadyAt:null,firstMigrationAt:null,
    pausedAt:null,segments:[],activeIntentSamples:0,totalActiveIntents:0,maxActiveIntents:0,
    rawCrossings:0,certifiedAtOwner:0,excludedCrossings:0,excludedByType:{},
-   excludedPriorIntent:{sameDestinationWithin05:0,sameDestinationWithin1:0,sameDestinationWithin2:0,
+   excludedEligibleCrossings:0,excludedPriorIntent:{sameDestinationWithin05:0,sameDestinationWithin1:0,sameDestinationWithin2:0,
     differentDestinationWithin2:0,noRecentIntent:0},excludedPriorIntentByType:{}};
   try{
    if(observe){
@@ -43,6 +43,9 @@ function run(seed,observe){
        excluded++;
        const kind=String(shape.type||'unknown');
        census.excludedByType[kind]=(census.excludedByType[kind]||0)+1;
+       // Star/Crasher crossings are intentionally outside the migration contract.
+       if(!['circle','triangle','square','pentagon'].includes(kind))continue;
+       census.excludedEligibleCrossings++;
        const prior=recentIntent.get(shape),age=prior?now-prior.at:Infinity;
        const same=prior&&prior.to===to&&prior.from===shape.__lfSector&&age>=0;
        let bucket='noRecentIntent';
@@ -177,7 +180,7 @@ test('natural composed Director migration gate census is read-only and A/A ident
    observed.census.certifiedAtOwner+observed.census.excludedCrossings,
    'raw crossing partition must be complete');
   assert.equal(Object.values(observed.census.excludedPriorIntent).reduce((a,b)=>a+b,0),
-   observed.census.excludedCrossings,'prior-intent age bins must partition every excluded crossing');
+   observed.census.excludedEligibleCrossings,'prior-intent age bins must partition eligible excluded crossings');
   assert.equal(observed.census.certifiedAtOwner,observed.physicalMigrationTransitions,
    'exact owner-certified crossings must match shipping counter');
   assert.equal(observed.census.segments.reduce((n,s)=>n+s.activeIntentSum,0),
