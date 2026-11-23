@@ -95,11 +95,14 @@ class DirectShotIntent {
       const rect=i.canvas.getBoundingClientRect();
       const z=Number(game.cam.zoom)||Number(game.zoom)||1;
       if(!Number.isFinite(z)||z<=0||!Number.isFinite(game.cam.x)||
-         !Number.isFinite(game.cam.y)||!Number.isFinite(game.w)||
-         !Number.isFinite(game.h)||!Number.isFinite(rect.left)||
-         !Number.isFinite(rect.top))return mouse;
-      const x=rect.left+game.w*.5+(mouse.world.x-game.cam.x)*z;
-      const y=rect.top+game.h*.5+(mouse.world.y-game.cam.y)*z;
+         !Number.isFinite(game.cam.y)||!(game.w>0)||!(game.h>0)||
+         !Number.isFinite(rect.left)||!Number.isFinite(rect.top)||
+         !(rect.width>0)||!(rect.height>0))return mouse;
+      // Invert captureMouse's CSS-rectangle projection, not the unscaled
+      // canvas-space dimensions. A CSS transform can change rect.width/height
+      // without changing Game.w/h; using Game.w as CSS pixels mis-aims replay.
+      const x=rect.left+rect.width*(.5+(mouse.world.x-game.cam.x)*z/game.w);
+      const y=rect.top+rect.height*(.5+(mouse.world.y-game.cam.y)*z/game.h);
       return Number.isFinite(x)&&Number.isFinite(y)?{x,y}:mouse;
     };
 
