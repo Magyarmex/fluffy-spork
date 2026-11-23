@@ -128,13 +128,13 @@ const round=x=>x==null?null:+x.toFixed(2);
      const oldRender=renderModule.render;
      renderModule.render=function(g,...args){
       const start=performance.now();
-      try{if(!window.__novaTouchClarity.suppressRender||g.__novaDecorativeWorld)
-       return oldRender.call(this,g,...args);}
+      const executed=!window.__novaTouchClarity.suppressRender||g.__novaDecorativeWorld;
+      try{if(executed)return oldRender.call(this,g,...args);}
       finally{
        if(!g.__novaDecorativeWorld&&g.status==='playing')
         window.__novaTouchClarity.renders.push({
          trial:window.__novaTouchClarity.trial,at:performance.now(),
-         ms:performance.now()-start,
+         executed,ms:performance.now()-start,
          updates:window.__novaTouchClarity.updatesSinceRender});
        if(!g.__novaDecorativeWorld&&g.status==='playing')
         window.__novaTouchClarity.updatesSinceRender=0;
@@ -235,6 +235,7 @@ const round=x=>x==null?null:+x.toFixed(2);
        medianNearTouchRafWorkMs:nearTouchRaf.length?
         nearTouchRaf[Math.floor(nearTouchRaf.length/2)]:null,
        renderCount:renders.length,
+       executedRenderCount:renderFrames.filter(x=>x.executed).length,
        twoUpdateFrames:renderFrames.filter(x=>x.updates===2).length,
        nearTouchTwoUpdateFrames:nearTouchFrames.filter(x=>x.updates===2).length,
        maxUpdatesPerFrame:renderFrames.length?Math.max(...renderFrames.map(x=>x.updates)):0,
@@ -251,6 +252,10 @@ const round=x=>x==null?null:+x.toFixed(2);
      assert.equal(result.aimActive,false,'right stick must release');
      assert.equal(result.postReleaseBirths,0,'no ghost projectile after release');
      assert.equal(result.status,'playing');
+     if(renderControl){
+      if(renderEnabled)assert.ok(result.executedRenderCount>0,'full render must execute');
+      else assert.equal(result.executedRenderCount,0,'suppressed render must not execute');
+     }
      trials.push({trial,control:trial>=8,normalSpeedControl:trial===9,
       canceled:result.events.some(x=>x.type==='pointercancel'),
       protocolGapMs:round(releaseAt-before),
@@ -261,6 +266,7 @@ const round=x=>x==null?null:+x.toFixed(2);
       moveToNextUpdateMs:round(result.moveToNextUpdateMs),
       updateWithinHold:result.updateWithinHold,heldSamples:result.heldSamples,
       births:result.births,renderCount:result.renderCount,
+      executedRenderCount:result.executedRenderCount,
       twoUpdateFrames:result.twoUpdateFrames,
       nearTouchTwoUpdateFrames:result.nearTouchTwoUpdateFrames,
       maxUpdatesPerFrame:result.maxUpdatesPerFrame,
