@@ -130,7 +130,8 @@ const round=x=>x==null?null:+x.toFixed(2);
       finally{
        if(!g.__novaDecorativeWorld&&g.status==='playing')
         window.__novaTouchClarity.renders.push({
-         trial:window.__novaTouchClarity.trial,ms:performance.now()-start,
+         trial:window.__novaTouchClarity.trial,at:performance.now(),
+         ms:performance.now()-start,
          updates:window.__novaTouchClarity.updatesSinceRender});
        if(!g.__novaDecorativeWorld&&g.status==='playing')
         window.__novaTouchClarity.updatesSinceRender=0;
@@ -203,6 +204,8 @@ const round=x=>x==null?null:+x.toFixed(2);
       const next=deflection?samples.find(x=>x.at>=deflection.at):null;
       const longTasks=deflection&&released?w.longTasks.filter(x=>
        x.at<released.at+120&&x.at+x.ms>deflection.at-120):[];
+      const nearTouchFrames=deflection&&released?renderFrames.filter(x=>
+       x.at>=deflection.at-120&&x.at<=released.at+120):[];
       const nearTouchRaf=deflection&&released?samples.filter(x=>
        x.at>=deflection.at-120&&x.at<=released.at+120)
        .map(x=>x.priorRafWorkMs).filter(x=>Number.isFinite(x)&&x>=0)
@@ -230,6 +233,7 @@ const round=x=>x==null?null:+x.toFixed(2);
         nearTouchRaf[Math.floor(nearTouchRaf.length/2)]:null,
        renderCount:renders.length,
        twoUpdateFrames:renderFrames.filter(x=>x.updates===2).length,
+       nearTouchTwoUpdateFrames:nearTouchFrames.filter(x=>x.updates===2).length,
        maxUpdatesPerFrame:renderFrames.length?Math.max(...renderFrames.map(x=>x.updates)):0,
        medianRenderMs:renders.length?
         [...renders].sort((a,b)=>a-b)[Math.floor(renders.length/2)]:null,
@@ -255,6 +259,7 @@ const round=x=>x==null?null:+x.toFixed(2);
       updateWithinHold:result.updateWithinHold,heldSamples:result.heldSamples,
       births:result.births,renderCount:result.renderCount,
       twoUpdateFrames:result.twoUpdateFrames,
+      nearTouchTwoUpdateFrames:result.nearTouchTwoUpdateFrames,
       maxUpdatesPerFrame:result.maxUpdatesPerFrame,
       medianUpdateGapMs:round(result.medianUpdateGapMs),
       maxUpdateGapMs:round(result.maxUpdateGapMs),
