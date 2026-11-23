@@ -134,11 +134,11 @@ jobs:
         timeout-minutes: 3
         run: node tests/browser/render-clarity-aa-b-research.cjs
       - name: Research-only trusted touch versus clarity (PR validation)
-        if: ${{ github.event_name == 'pull_request' }}
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 1128 }}
         timeout-minutes: 3
         run: node tests/browser/trusted-short-touch-clarity-cpu-research.cjs
       - name: Archive touch clarity research evidence
-        if: ${{ github.event_name == 'pull_request' && always() }}
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.number == 1128 && always() }}
         uses: actions/upload-artifact@v4
         with:
           name: touch-clarity-cpu-research
