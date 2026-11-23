@@ -167,12 +167,12 @@ wrap('game/input',function(input){
     var out=oldAttach.call(this,canvas);
     /* Pointer Events emit pointerup only when the LAST mouse button is
      * released. A left-button release while right remains held produces a
-     * native mouseup but no pointerup: end primary fire on that real edge.
+     * native mouseup but no pointerup: end the originating button's fire.
      * Keep mouse aim and secondary-button state unchanged. */
     if(canvas&&typeof window!=='undefined'&&!this.__novaPrimaryMouseUp){
       var self=this;
       this.__novaPrimaryMouseUp=function(e){
-        if(e&&e.button===0&&!self.touchSeen&&self.__novaMouseFireOwner===0){self.firing=false;self.__novaMouseFireOwner=null;}
+        if(e&&!self.touchSeen&&e.button===self.__novaMouseFireOwner){self.firing=false;self.__novaMouseFireOwner=null;}
       };
       window.addEventListener('mouseup',this.__novaPrimaryMouseUp);
     }
