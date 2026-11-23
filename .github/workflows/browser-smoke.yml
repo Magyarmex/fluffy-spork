@@ -222,6 +222,7 @@ jobs:
           node tests/browser/fair-health-joined-wall-composed.cjs
           node tests/browser/public-class-contest-composed.cjs
           node tests/browser/mixed-resource-strategic-owner-composed.cjs
+          node tests/browser/battle-sense-readonly-exact-route-composed.cjs
           node tests/browser/tactical-frontlines-memory.cjs
           node tests/browser/frontlines-early-warning.cjs
           node tests/browser/frontlines-bloom-compass.cjs
