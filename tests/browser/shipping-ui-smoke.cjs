@@ -299,6 +299,20 @@ async function scenario(browser, label, options) {
     assert.ok(live.age>0,label+': ecological match age must advance');
     assert.equal(live.sectors?.length,16,label+': all ecological sectors present');
     if(label.startsWith('mobile'))await assertPortraitHud(page,label+'-scout','SCOUT');
+    if(label==='mobile-280'){
+      // A second HUD row must hold a real long Apex name, not just SCOUT.
+      await page.evaluate(()=>{
+        const g=window.__novaBrowserLiveGame;
+        g.setClass(g.player,'needlestorm');g.syncHud();
+      });
+      await page.waitForTimeout(100);
+      await assertPortraitHud(page,label+'-long-apex','NEEDLE STORM');
+      await page.screenshot({path:path.join(output,label+'-long-apex.png')});
+      await page.evaluate(()=>{
+        const g=window.__novaBrowserLiveGame;
+        g.setClass(g.player,'scout');g.syncHud();
+      });
+    }
     await page.screenshot({path:path.join(output,label+'-playing.png')});
 
     if(label==='desktop'){
