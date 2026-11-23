@@ -61,3 +61,30 @@ test('contested pickup travel uses the complete cached route without a second pl
  assert.ok(clear>400&&clear<650,
   'a physically clear final leg retains the cheap-corner fallback');
 });
+
+
+test('a safe-origin exact-goal certified route is read without advancing the live movement cursor',()=>{
+ const h=hooks(),t={...bot,x:0,y:0},p={x:400,y:0},calls=[];
+ const g={
+  hasLineOfSight:()=>false,
+  isTerrainSafe:()=>true,
+  novaReadOnlyExactRouteLength:(x,y,gx,gy,pad,seed)=>{calls.push(['certified',pad,seed]);return 650;},
+  novaBattlefieldWaypoint:()=>{calls.push(['mutating-waypoint']);return{x:100,y:100};}
+ };
+ assert.equal(h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}}),650);
+ assert.deepEqual(calls,[['certified',23,t.id]],
+  'safe starts must not mutate a valid exact-goal movement route during strategic pricing');
+});
+
+test('an unavailable exact-goal certificate retains the existing waypoint fallback',()=>{
+ const h=hooks(),t={...bot,x:0,y:0},p={x:400,y:0},calls=[];
+ const g={
+  hasLineOfSight:()=>false,
+  isTerrainSafe:()=>true,
+  novaReadOnlyExactRouteLength:()=>{calls.push('certificate-miss');return null;},
+  novaBattlefieldWaypoint:()=>{calls.push('waypoint');return{x:100,y:100};},
+  novaRouteLength:()=>{calls.push('length');return 650;}
+ };
+ assert.equal(h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}}),650);
+ assert.deepEqual(calls,['certificate-miss','waypoint','length']);
+});
