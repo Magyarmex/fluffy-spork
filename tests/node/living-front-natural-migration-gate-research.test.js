@@ -18,7 +18,7 @@ function run(seed,observe){
    candidateBloom:0,candidateMigration:0,candidateStar:0,candidateNone:0,
    activeBloom:0,activeMigration:0,activeStar:0,
    maxOutbound:0,firstReadyAt:null,firstMigrationAt:null,
-   pausedAt:null,segments:[]};
+   pausedAt:null,segments:[],activeIntentSamples:0,totalActiveIntents:0,maxActiveIntents:0};
   try{
    g.status='playing';g.paused=false;
    for(let tick=0;tick<TICKS;tick++){
@@ -37,7 +37,8 @@ function run(seed,observe){
      const n=census.segments.length;
      census.segments.push({from:n*SEGMENT_SECONDS,to:(n+1)*SEGMENT_SECONDS,
       samples:0,maxHeat:0,heatReadySamples:0,transitionsAtEnd:0,
-      bloomsAtEnd:0,migrationsAtEnd:0,starsAtEnd:0});
+      bloomsAtEnd:0,migrationsAtEnd:0,starsAtEnd:0,
+      activeIntentSum:0,maxActiveIntents:0});
     }
     const segment=census.segments[segmentIndex];
     segment.samples++;
@@ -45,6 +46,22 @@ function run(seed,observe){
     segment.bloomsAtEnd=Number(st.stats&&st.stats.blooms)||0;
     segment.migrationsAtEnd=Number(st.stats&&st.stats.migrations)||0;
     segment.starsAtEnd=Number(st.stats&&st.stats.starAnnouncements)||0;
+    // A crossing may be rare because few shapes choose to migrate, or because
+    // their pressure-driven intent expires before they reach a sector edge.
+    // Observe existing intent only; never steer or extend it in this pilot.
+    const LF=g.__testLivingFront;
+    let activeIntents=0;
+    for(const shape of g.shapes||[]){
+     if(!shape||!(shape.hp>0))continue;
+     const to=shape.__lfMigrationIntent;
+     if(Number.isInteger(to)&&to>=0&&to<16&&to!==LF.sectorIndex(shape.x,shape.y))
+      activeIntents++;
+    }
+    if(activeIntents>0)census.activeIntentSamples++;
+    census.totalActiveIntents+=activeIntents;
+    census.maxActiveIntents=Math.max(census.maxActiveIntents,activeIntents);
+    segment.activeIntentSum+=activeIntents;
+    segment.maxActiveIntents=Math.max(segment.maxActiveIntents,activeIntents);
     const heat=Number(st.migrationHeat);
     if(Number.isFinite(heat)){
      census.heatSamples++;
@@ -104,6 +121,8 @@ test('natural composed Director migration gate census is read-only and A/A ident
   assert.ok(observed.census.withState>0,'Director state never materialized');
   assert.ok(observed.census.heatSamples>0,'migration heat never sampled');
   assert.ok(observed.census.segments.length>0,'no time-window exposure');
+  assert.equal(observed.census.segments.reduce((n,s)=>n+s.activeIntentSum,0),
+   observed.census.totalActiveIntents,'intent census must partition by time window');
   assert.equal(observed.census.segments.reduce((n,s)=>n+s.samples,0),observed.census.withState,
    'segmented exposure must cover every sampled Director state');
   assert.ok(observed.census.bothReady<=observed.census.heatReady);
