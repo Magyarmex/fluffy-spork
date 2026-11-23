@@ -70,6 +70,12 @@ const {performance:clock}=require('node:perf_hooks');
      witness.births.push({trial:witness.trial,at:performance.now()});
     return result;
    };
+   // A focus/visibility interruption invalidates even a fresh release intent.
+   window.addEventListener('blur',()=>{witness.pending=null;});
+   window.addEventListener('pagehide',()=>{witness.pending=null;});
+   document.addEventListener('visibilitychange',()=>{
+    if(document.hidden)witness.pending=null;
+   });
    for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     document.addEventListener(type,e=>{
      if(e.pointerType==='touch')witness.events.push({trial:witness.trial,type,
