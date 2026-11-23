@@ -259,6 +259,9 @@ const round=x=>x==null?null:+x.toFixed(2);
        maxUpdateGapMs:updateGaps.length?updateGaps.at(-1):null,
        births:births.length,postReleaseBirths:released?
         births.filter(x=>x.at>released.at).length:null,
+       postStampedReleaseBirths:released?
+        births.filter(x=>x.at>released.stamp&&x.at<=released.at).length:null,
+       releaseEventAgeMs:released?released.at-released.stamp:null,
        deliveredHoldMs:deflection&&released?released.at-deflection.at:null,
        stampedHoldMs:deflection&&released?released.stamp-deflection.stamp:null,
        moveEventAgeMs:deflection?deflection.at-deflection.stamp:null,
@@ -302,6 +305,8 @@ const round=x=>x==null?null:+x.toFixed(2);
       deliveredHoldMs:round(result.deliveredHoldMs),
       stampedHoldMs:round(result.stampedHoldMs),
       moveEventAgeMs:round(result.moveEventAgeMs),
+      releaseEventAgeMs:round(result.releaseEventAgeMs),
+      postStampedReleaseBirths:result.postStampedReleaseBirths,
       moveToNextUpdateMs:round(result.moveToNextUpdateMs),
       updateWithinHold:result.updateWithinHold,heldSamples:result.heldSamples,
       updateSamples:result.samples,simTime:round(result.simTime),
@@ -375,6 +380,7 @@ const round=x=>x==null?null:+x.toFixed(2);
    caveats:['matched selected initial fingerprint does not ensure matched subsequent physical worlds',
     'forward/reverse phase order reduces but cannot eliminate temporal drift',
     'event age is performance.now minus DOM event.timeStamp, not hardware latency',
+    'postStampedReleaseBirths is a synthetic timestamp-relative risk witness, not proof of shots after physical finger lift',
     'renderer JS duration and prior RAF callback work exclude GPU completion or physical touch-to-photon',
     'Long Tasks are main-thread tasks of at least 50ms, not a complete browser scheduling or compositor trace; window is move minus 120ms to release plus 120ms',
     'Two-update frames count consecutive live Game.update calls before one final Game render; they do not prove why the scheduler permitted catch-up',
