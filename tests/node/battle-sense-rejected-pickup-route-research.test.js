@@ -68,7 +68,7 @@ test('research: real Terrain Intelligence can retain a rejected one-wall heal ro
  const g=new m.exports.Game(),t={id:7,cls:'guard',x:0,y:0,
   hp:60,maxHp:100,alive:true,ai:{}},wall={id:99,x:100,y:0,w:40,h:400,solid:true},
   a={id:'rejected',type:'heal',x:200,y:0},
-  b={id:'chosen',type:'heal',x:-180,y:60};
+  b={id:'chosen',type:'shield',x:-180,y:60};
  function hit(ax,ay,bx,by,pad=0){
   const x0=wall.x-wall.w/2-pad,x1=wall.x+wall.w/2+pad,
    y0=wall.y-wall.h/2-pad,y1=wall.y+wall.h/2+pad,
@@ -85,7 +85,7 @@ test('research: real Terrain Intelligence can retain a rejected one-wall heal ro
  g.isTerrainSafe=(x,y,pad=0)=>Math.abs(x-wall.x)>wall.w/2+pad||
   Math.abs(y-wall.y)>wall.h/2+pad;
  const selected=w.__NOVA_BATTLE_SENSE_TEST__.chooseResource(g,t,classes);
- assert.equal(selected,b,'direct heal B should win over physically long occluded A');
+ assert.equal(selected,b,'direct shield B should win over physically long occluded heal A');
  const route=g.__v1102Routes?.['7:6'];
  assert.ok(route,'pricing rejected A should have created a real route cache entry');
  assert.equal(route.gx,a.x);
