@@ -70,7 +70,8 @@ const {performance:nodeClock}=require('node:perf_hooks');
     document.addEventListener(type,e=>{
      if(e.pointerType==='touch'){
       const w=window.__novaPulseWitness;
-      w.events.push({trial:w.trial,type,at:performance.now(),trusted:e.isTrusted});
+      w.events.push({trial:w.trial,type,at:performance.now(),
+       eventStamp:e.timeStamp,trusted:e.isTrusted});
      }
     },{capture:true,passive:true});
   });
@@ -168,6 +169,7 @@ const {performance:nodeClock}=require('node:perf_hooks');
      canceled:up.type==='pointercancel',moveDelivered:!!move,
      pressDurationMs:+(up.at-down.at).toFixed(2),
      deliveredHoldMs:move?+(up.at-move.at).toFixed(2):null,
+     eventStampHoldMs:move?+(up.eventStamp-move.eventStamp).toFixed(2):null,
      inputArmed:result.inputEdges.some(e=>e.type==='move'&&e.armed),
      samples:result.sampleCount,heldSamples:result.heldSamples,births:result.births,
      medianUpdateGapMs:result.medianUpdateGapMs,
@@ -197,12 +199,13 @@ const {performance:nodeClock}=require('node:perf_hooks');
     deliveredHeldWithoutUpdate:rows.filter(x=>x.heldSamples===0).length,
     deliveredHeldWithoutProjectile:rows.filter(x=>x.births===0).length,
     deliveredHoldMs:rows.map(x=>x.deliveredHoldMs),
+    eventStampHoldMs:rows.map(x=>x.eventStampHoldMs),
     pressDurationMs:rows.map(x=>x.pressDurationMs),
     protocolGapMs:rows.map(x=>x.protocolGapMs),
     samples:rows.map(x=>x.heldSamples),births:rows.map(x=>x.births),
     medianUpdateGapMs:rows.map(x=>x.medianUpdateGapMs),
     maxUpdateGapMs:rows.map(x=>x.maxUpdateGapMs),
-    caveat:'Node-side CDP commands are spaced ~40ms; DOM delivery may compress them under CPU load. Neither is a physical Android touch or photon measurement.'
+    caveat:'Compare CDP command spacing, DOM handler spacing and PointerEvent.timeStamp spacing; none is physical Android touch-to-photon latency.'
    }));
   }
  }finally{await context.close();await browser.close();}
