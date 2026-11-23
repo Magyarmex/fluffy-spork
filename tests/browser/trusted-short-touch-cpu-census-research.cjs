@@ -145,6 +145,8 @@ const {performance:nodeClock}=require('node:perf_hooks');
      return {events,inputEdges,
       downToNextUpdateMs:down&&nextUpdateAfterDown?nextUpdateAfterDown.at-down.at:null,
       moveToNextUpdateMs:move&&nextUpdateAfterMove?nextUpdateAfterMove.at-move.at:null,
+      updateWithinDeliveredHold:!!(move&&release&&nextUpdateAfterMove&&
+       nextUpdateAfterMove.at<release.at),
       medianUpdateGapMs:gaps.length?gaps[Math.floor(gaps.length/2)]:null,
       maxUpdateGapMs:gaps.length?gaps.at(-1):null,
       sampleCount:samples.length,
@@ -179,6 +181,7 @@ const {performance:nodeClock}=require('node:perf_hooks');
      moveEventAgeAtCaptureMs:move?+move.eventAgeAtCaptureMs.toFixed(2):null,
      releaseEventAgeAtCaptureMs:+up.eventAgeAtCaptureMs.toFixed(2),
      moveToNextUpdateMs:result.moveToNextUpdateMs===null?null:+result.moveToNextUpdateMs.toFixed(2),
+     updateWithinDeliveredHold:result.updateWithinDeliveredHold,
      downToNextUpdateMs:result.downToNextUpdateMs===null?null:+result.downToNextUpdateMs.toFixed(2),
      inputArmed:result.inputEdges.some(e=>e.type==='move'&&e.armed),
      samples:result.sampleCount,heldSamples:result.heldSamples,births:result.births,
@@ -213,13 +216,14 @@ const {performance:nodeClock}=require('node:perf_hooks');
     moveEventAgeAtCaptureMs:rows.map(x=>x.moveEventAgeAtCaptureMs),
     releaseEventAgeAtCaptureMs:rows.map(x=>x.releaseEventAgeAtCaptureMs),
     moveToNextUpdateMs:rows.map(x=>x.moveToNextUpdateMs),
+    updateWithinDeliveredHold:rows.map(x=>x.updateWithinDeliveredHold),
     downToNextUpdateMs:rows.map(x=>x.downToNextUpdateMs),
     pressDurationMs:rows.map(x=>x.pressDurationMs),
     protocolGapMs:rows.map(x=>x.protocolGapMs),
     samples:rows.map(x=>x.heldSamples),births:rows.map(x=>x.births),
     medianUpdateGapMs:rows.map(x=>x.medianUpdateGapMs),
     maxUpdateGapMs:rows.map(x=>x.maxUpdateGapMs),
-    caveat:'Event age at capture is performance.now minus DOM event.timeStamp at document capture, not hardware-to-JS latency. Move-to-next-update is measured after handler delivery and can occur after release; only heldSamples proves a sampled fire state. CDP scheduling, throttled JS, compositor and OS latency remain unmeasured; none is physical Android touch-to-photon latency.'
+    caveat:'Event age at capture is performance.now minus DOM event.timeStamp at document capture, not hardware-to-JS latency. Move-to-next-update is measured after handler delivery and can occur after release; only heldSamples proves a sampled armed fire state. updateWithinDeliveredHold reports timing only and is not a substitute for armed Input ownership. CDP scheduling, throttled JS, compositor and OS latency remain unmeasured; none is physical Android touch-to-photon latency.'
    }));
   }
  }finally{await context.close();await browser.close();}
