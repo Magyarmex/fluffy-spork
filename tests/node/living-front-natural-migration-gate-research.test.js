@@ -39,7 +39,7 @@ function run(seed,observe){
      census.bothReady++;
      if(census.firstReadyAt==null)census.firstReadyAt=+g.time.toFixed(3);
      const signal=st.signal,now=g.time;
-     if((!signal||now>=signal.until)&&now-Number(st.lastSignalAt||-99)>=8){
+     if((!signal||now>=signal.until)&&!(now-Number(st.lastSignalAt)<8)){
       census.unblockedReady++;
       const d=T.directorDecision(st,{enabled:st.directorEnabled,now,
        hasStar:(g.shapes||[]).some(s=>s&&s.type==='star'&&s.hp>0)});
