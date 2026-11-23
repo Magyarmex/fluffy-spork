@@ -390,7 +390,18 @@ wrap('game/engine',function(engine,require){
     if(st.escapeUntil>now&&ctx&&ctx.lineage==='resource')ctx=null;
     if(st.escapeUntil>now&&sp>1){var e=applyEscape(st,vx,vy);vx=e.x;vy=e.y;}
     var prev=this.__v1102RouteContext;this.__v1102RouteContext=ctx;
-    try{return oldMove.call(this,t,vx,vy,dt);}finally{this.__v1102RouteContext=prev;}
+    try{
+      /* The movement owner, not strategic pickup pricing, advances a cached
+       * exact-heal route when its next waypoint has been reached. Keep this
+       * bounded to an existing matching route: never create an extra plan
+       * just to maintain a cursor or steal another movement goal. */
+      if(ctx&&ctx.lineage==='resource'&&ctx.target){
+        var existing=this.__v1102Routes&&this.__v1102Routes[cacheKey(t.id,pad)];
+        if(existing&&existing.gx===ctx.target.x&&existing.gy===ctx.target.y)
+          this.novaBattlefieldWaypoint(t.x,t.y,ctx.target.x,ctx.target.y,pad,t.id);
+      }
+      return oldMove.call(this,t,vx,vy,dt);
+    }finally{this.__v1102RouteContext=prev;}
   };
 
   var oldDrones=Game.prototype.updateDrones;
