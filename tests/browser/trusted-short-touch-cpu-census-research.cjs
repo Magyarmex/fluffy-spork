@@ -119,11 +119,8 @@ const {chromium}=require('playwright');
       gameStatus:g.status};
     },id);
     assert.ok(result.events.some(e=>e.type==='pointerdown'));
-    assert.ok(result.events.some(e=>e.type==='pointermove'));
     assert.ok(result.events.some(e=>e.type==='pointerup'));
     assert.ok(result.events.every(e=>e.trusted),'CDP events must be browser-trusted');
-    assert.ok(result.inputEdges.some(e=>e.type==='move'),
-     'the real Input owner must receive the extended right-stick motion');
     assert.ok(result.inputEdges.some(e=>e.type==='release'&&!e.armed),
      'the real Input owner must observe release and clear firing');
     assert.equal(result.stuckAim,false,'touch release must clear right-stick aim');
@@ -131,9 +128,13 @@ const {chromium}=require('playwright');
     const down=result.events.find(e=>e.type==='pointerdown');
     const move=result.events.find(e=>e.type==='pointermove');
     const up=result.events.find(e=>e.type==='pointerup');
-    assert.ok(down.at<=move.at&&move.at<=up.at);
+    assert.ok(down.at<=up.at,'trusted press must precede release');
+    if(move)assert.ok(down.at<=move.at&&move.at<=up.at,
+     'delivered deflection must occur within the press');
     summary.push({rate,trial,control:trial===8,
-     deliveredHoldMs:+(up.at-move.at).toFixed(2),
+     moveDelivered:!!move,
+     pressDurationMs:+(up.at-down.at).toFixed(2),
+     deliveredHoldMs:move?+(up.at-move.at).toFixed(2):null,
      inputArmed:result.inputEdges.some(e=>e.type==='move'&&e.armed),
      samples:result.sampleCount,heldSamples:result.heldSamples,births:result.births});
    }
@@ -150,13 +151,16 @@ const {chromium}=require('playwright');
    }
    console.log('NOVA_TRUSTED_SHORT_TOUCH_CPU_CENSUS '+JSON.stringify({
     cpuThrottle:rate,attempts:rows.length,
-    control:{deliveredHoldMs:control.deliveredHoldMs,
+    control:{moveDelivered:control.moveDelivered,
+     deliveredHoldMs:control.deliveredHoldMs,
      heldSamples:control.heldSamples,births:control.births},
+    missingDeflection:rows.filter(x=>!x.moveDelivered).length,
     inputNotArmed:rows.filter(x=>!x.inputArmed).length,
     armedButUnsampled:rows.filter(x=>x.inputArmed&&x.heldSamples===0).length,
     deliveredHeldWithoutUpdate:rows.filter(x=>x.heldSamples===0).length,
     deliveredHeldWithoutProjectile:rows.filter(x=>x.births===0).length,
     deliveredHoldMs:rows.map(x=>x.deliveredHoldMs),
+    pressDurationMs:rows.map(x=>x.pressDurationMs),
     samples:rows.map(x=>x.heldSamples),births:rows.map(x=>x.births),
     caveat:'Chromium/CDP browser-trusted touch; not a physical Android trial, fixed 40ms request is not guaranteed delivery duration'
    }));
