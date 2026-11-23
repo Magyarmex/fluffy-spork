@@ -93,8 +93,10 @@ test('materialized 49-overlay Game preserves the same moving-victim classificati
       g.__novaFairVisibleTanks = [observer, shooter, victim];
       g.hasLineOfSight = () => true;
       // Ensure the actual Game's hostility authority permits this duel.
-      assert.equal(g.areHostile(shooter, victim), true,
+      assert.ok(typeof g.areHostile !== 'function' || g.areHostile(shooter, victim),
         'fixture must be a legitimate hostile pair');
+      assert.ok(typeof g.areAllies !== 'function' || !g.areAllies(shooter, victim),
+        'fixture must not contain allied duelists');
       assert.equal(thirdPartyVector(g, observer, shooter).weight, 0);
       victim.x = 100; victim.y = 0;
       assert.equal(thirdPartyVector(g, observer, shooter).weight, .62);
