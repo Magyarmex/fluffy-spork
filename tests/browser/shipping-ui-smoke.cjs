@@ -299,8 +299,8 @@ async function scenario(browser, label, options) {
     assert.ok(live.age>0,label+': ecological match age must advance');
     assert.equal(live.sectors?.length,16,label+': all ecological sectors present');
     if(label.startsWith('mobile'))await assertPortraitHud(page,label+'-scout','SCOUT');
-    if(label==='mobile-280'){
-      // A second HUD row must hold a real long Apex name, not just SCOUT.
+    if(['mobile-280','mobile-320','mobile-360'].includes(label)){
+      // The compact HUD must hold a real long Apex name, not just SCOUT.
       await page.evaluate(()=>{
         const g=window.__novaBrowserLiveGame;
         g.setClass(g.player,'needlestorm');g.syncHud();
