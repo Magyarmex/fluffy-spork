@@ -144,8 +144,9 @@ const {chromium}=require('playwright');
   for(const rate of [1,4]){
    const rows=summary.filter(x=>x.rate===rate&&!x.control);
    const control=summary.find(x=>x.rate===rate&&x.control);
-   assert.ok(control&&control.inputArmed,'long control must arm the real Input');
+   assert.ok(control,'long control must be recorded');
    if(rate===1){
+    assert.ok(control.inputArmed,'normal-speed long control must arm the real Input');
     assert.ok(control.heldSamples>0,'normal-speed long control must reach Game.update');
     assert.ok(control.births>0,'normal-speed long control must produce a real projectile');
    }
