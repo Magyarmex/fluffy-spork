@@ -44,10 +44,10 @@ function run(seed, observe) {
                 !visible(this,T,C,observer,victim) ||
                 (this.hasLineOfSight &&
                   !this.hasLineOfSight(shooter.x,shooter.y,victim.x,victim.y,3))) continue;
-            victims.set(victim.id, {x:victim.x,y:victim.y});
+            victims.set(victim.id, {ref:victim,x:victim.x,y:victim.y});
           }
           shots.set(observer.id, {
-            at:this.time, shooterId:shooter.id,
+            at:this.time, observerRef:observer, shooterRef:shooter, shooterId:shooter.id,
             angle:observer.ai.__v181ObservedShotAngle,
             sx:observer.ai.__v181ObservedShotX,
             sy:observer.ai.__v181ObservedShotY, victims
@@ -67,13 +67,13 @@ function run(seed, observe) {
         if (!observe || tick % 6) continue;
         for (const observer of g.tanks || []) {
           const shot = shots.get(observer?.id);
-          if (!shot || !alive(observer) || !observer.ai) continue;
+          if (!shot || shot.observerRef !== observer || !alive(observer) || !observer.ai) continue;
           const age = g.time-shot.at;
           if (age < 0 || age > 1.25 ||
               observer.ai.__v181ObservedShotAt !== shot.at ||
               observer.ai.__v181ObservedShotId !== shot.shooterId) continue;
           const shooter = g.getTank(shot.shooterId);
-          if (!visible(g,T,C,observer,shooter)) continue;
+          if (shooter !== shot.shooterRef || !visible(g,T,C,observer,shooter)) continue;
           if (observer.ai.__v1112TargetId !== shooter.id) continue;
           for (const victim of g.tanks || []) {
             if (!victim || victim.id === shooter.id || victim.id === observer.id ||
@@ -84,7 +84,7 @@ function run(seed, observe) {
                 Math.hypot(victim.x-shooter.x,victim.y-shooter.y) >= 430) continue;
             count.matchedPrimaryPairs++;
             const initial = shot.victims.get(victim.id);
-            if (!initial) { count.newlyVisiblePairs++; continue; }
+            if (!initial || initial.ref !== victim) { count.newlyVisiblePairs++; continue; }
             count.eligibleFollowupPairs++;
             const dx0=initial.x-shot.sx, dy0=initial.y-shot.sy;
             const dx1=victim.x-shot.sx, dy1=victim.y-shot.sy;
