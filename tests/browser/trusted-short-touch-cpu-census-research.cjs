@@ -143,7 +143,6 @@ const {performance:nodeClock}=require('node:perf_hooks');
      const gaps=samples.slice(1).map((v,j)=>v.at-samples[j].at)
       .filter(v=>Number.isFinite(v)&&v>0).sort((a,b)=>a-b);
      return {events,inputEdges,
-      eventHandlerDelayMs:events.map(e=>({type:e.type,delayMs:e.eventAgeAtCaptureMs})),
       downToNextUpdateMs:down&&nextUpdateAfterDown?nextUpdateAfterDown.at-down.at:null,
       moveToNextUpdateMs:move&&nextUpdateAfterMove?nextUpdateAfterMove.at-move.at:null,
       medianUpdateGapMs:gaps.length?gaps[Math.floor(gaps.length/2)]:null,
