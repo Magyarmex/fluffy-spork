@@ -19,15 +19,21 @@ function run(seed,observe){
    activeBloom:0,activeMigration:0,activeStar:0,
    maxOutbound:0,firstReadyAt:null,firstMigrationAt:null,
    pausedAt:null,segments:[],activeIntentSamples:0,totalActiveIntents:0,maxActiveIntents:0,
-   rawCrossings:0,certifiedAtOwner:0,excludedCrossings:0,excludedByType:{}};
+   rawCrossings:0,certifiedAtOwner:0,excludedCrossings:0,excludedByType:{},
+   excludedEligibleCrossings:0,excludedPriorIntent:{sameDestinationWithin05:0,sameDestinationWithin1:0,sameDestinationWithin2:0,
+    otherRecentIntentWithin2:0,noRecentIntent:0},excludedPriorIntentByType:{},
+   recentSameDestinationMotion:{aligned:0,transverse:0,opposed:0,stationary:0,evadingTriangle:0}};
   try{
    if(observe){
+    // Weak identity ownership prevents respawned/reused shape IDs from inheriting intent.
+    const recentIntent=new WeakMap();
     const LF=g.__testLivingFront,oldBehavior=LF&&LF.behaviorTick;
     assert.equal(typeof oldBehavior,'function','shipping behavior owner must exist');
     // Observe the exact transition boundary: physics already moved shapes,
     // but transition() has not yet replaced their previous-sector stamp.
     LF.behaviorTick=function(game,st,defs,dt){
      let raw=0,certified=0,excluded=0;
+     const now=Number(game.time)||0;
      for(const shape of game.shapes||[]){
       if(!shape||!(shape.hp>0)||!Number.isInteger(shape.__lfSector))continue;
       const to=LF.sectorIndex(shape.x,shape.y);
@@ -38,10 +44,43 @@ function run(seed,observe){
        excluded++;
        const kind=String(shape.type||'unknown');
        census.excludedByType[kind]=(census.excludedByType[kind]||0)+1;
+       // Star/Crasher crossings are intentionally outside the migration contract.
+       if(!['circle','triangle','square','pentagon'].includes(kind))continue;
+       census.excludedEligibleCrossings++;
+       const saved=recentIntent.get(shape),prior=saved&&saved.id===shape.id?saved:null;
+       const age=prior?now-prior.at:Infinity;
+       const same=prior&&prior.to===to&&prior.from===shape.__lfSector&&age>=0;
+       let bucket='noRecentIntent';
+       if(same&&age<=.5)bucket='sameDestinationWithin05';
+       else if(same&&age<=1)bucket='sameDestinationWithin1';
+       else if(same&&age<=2)bucket='sameDestinationWithin2';
+       else if(prior&&age>=0&&age<=2)bucket='otherRecentIntentWithin2';
+       census.excludedPriorIntent[bucket]++;
+       if(same&&age<=2){
+        const dx=to%4-shape.__lfSector%4,dy=Math.floor(to/4)-Math.floor(shape.__lfSector/4);
+        const vx=Number(shape.vx)||0,vy=Number(shape.vy)||0;
+        const v=Math.hypot(vx,vy),d=Math.hypot(dx,dy);
+        const motion=census.recentSameDestinationMotion;
+        if(v<1||d===0)motion.stationary++;
+        else {const cosine=(vx*dx+vy*dy)/(v*d);
+         if(cosine>=.5)motion.aligned++;
+         else if(cosine<=0)motion.opposed++;
+         else motion.transverse++;}
+        if(kind==='triangle'&&now<(Number(shape.__lfEvadeUntil)||0))motion.evadingTriangle++;
+       }
+       const byType=census.excludedPriorIntentByType[kind]||(census.excludedPriorIntentByType[kind]={});
+       byType[bucket]=(byType[bucket]||0)+1;
       }
      }
      const before=Number(st.migrationTransitions)||0;
      const result=oldBehavior.apply(this,arguments);
+     // Record intent only after the real owner has updated it; never steer or extend it.
+     for(const shape of game.shapes||[]){
+      if(!shape||!(shape.hp>0))continue;
+      const to=shape.__lfMigrationIntent,from=shape.__lfSector;
+      if(Number.isInteger(to)&&to>=0&&to<16&&Number.isInteger(from)&&to!==from)
+       recentIntent.set(shape,{id:shape.id,to,from,at:now});
+     }
      assert.equal((Number(st.migrationTransitions)||0)-before,certified,
       'read-only pre-owner crossing certificate disagrees with shipping transition');
      census.rawCrossings+=raw;
@@ -154,6 +193,14 @@ test('natural composed Director migration gate census is read-only and A/A ident
   assert.equal(observed.census.rawCrossings,
    observed.census.certifiedAtOwner+observed.census.excludedCrossings,
    'raw crossing partition must be complete');
+  assert.equal(Object.values(observed.census.excludedPriorIntent).reduce((a,b)=>a+b,0),
+   observed.census.excludedEligibleCrossings,'prior-intent age bins must partition eligible excluded crossings');
+  assert.equal(Object.entries(observed.census.recentSameDestinationMotion)
+   .filter(([k])=>k!=='evadingTriangle').reduce((a,[,n])=>a+n,0),
+   observed.census.excludedPriorIntent.sameDestinationWithin05+
+   observed.census.excludedPriorIntent.sameDestinationWithin1+
+   observed.census.excludedPriorIntent.sameDestinationWithin2,
+   'motion bins must partition recent same-destination crossings');
   assert.equal(observed.census.certifiedAtOwner,observed.physicalMigrationTransitions,
    'exact owner-certified crossings must match shipping counter');
   assert.equal(observed.census.segments.reduce((n,s)=>n+s.activeIntentSum,0),
