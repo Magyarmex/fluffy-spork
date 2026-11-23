@@ -66,6 +66,13 @@ const {chromium}=require('playwright');
   await canvas.waitFor({state:'visible',timeout:30000});
   await page.locator('.nv-loading').waitFor({state:'hidden',timeout:20000});
   await page.waitForFunction(()=>window.__novaPulseGame?.status==='playing',null,{timeout:20000});
+  // Hold the class constant so a missed projectile is not a class cooldown artifact.
+  await page.evaluate(()=>{
+   const g=window.__novaPulseGame;
+   g.setClass(g.player,'scout');
+   g.input.autofire=false;
+   g.player.spawnShieldT=20;
+  });
   const rect=await canvas.boundingBox();
   assert.ok(rect&&rect.width>200&&rect.height>200);
   const origin={x:rect.x+rect.width*.72,y:rect.y+rect.height*.68,
