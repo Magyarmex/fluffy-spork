@@ -59,7 +59,7 @@ const {performance:clock}=require('node:perf_hooks');
     const p=w.pending;w.pending=null;
     if(!p)return update.apply(this,args);
     const age=performance.now()-p.at;
-    if(age<0||age>100||p.player!==this.player||this.player?.cls!=='scout'||this.status!=='playing'||
+    if(age<0||age>100||p.player!==this.player||this.player?.cls!=='scout'||input.autofire||this.status!=='playing'||
        this.paused||input.__novaInputPaused||document.hidden){
      w.rejected.push({trial:p.trial,age});return update.apply(this,args);
     }
