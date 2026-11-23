@@ -28,7 +28,7 @@ function frame(t){
  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-<\/script></body></html>`;
+</script></body></html>`;
 const median=a=>a.length?[...a].sort((x,y)=>x-y)[Math.floor(a.length/2)]:null;
 const round=n=>n==null?null:+n.toFixed(2);
 (async()=>{
