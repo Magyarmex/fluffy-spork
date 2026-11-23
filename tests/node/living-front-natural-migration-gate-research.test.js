@@ -67,7 +67,8 @@ function run(seed,observe){
    return {status:g.status,time:+g.time.toFixed(3),
     hash:digest(physical(g)),draws:draws(),
     blooms:stats.blooms||0,migrations:stats.migrations||0,
-    stars:stats.starsSpawned||0,census};
+    stars:stats.starsSpawned||0,
+    physicalMigrationTransitions:st.migrationTransitions||0,census};
   }finally{g.destroy();}
  });
 }
@@ -89,6 +90,7 @@ test('natural composed Director migration gate census is read-only and A/A ident
    observed.census.candidateStar+observed.census.candidateNone);
   rows.push({seed,status:observed.status,time:observed.time,
    blooms:observed.blooms,migrations:observed.migrations,stars:observed.stars,
+   physicalMigrationTransitions:observed.physicalMigrationTransitions,
    ...observed.census});
  }
  console.log('NOVA_LIVING_FRONT_NATURAL_MIGRATION_GATE '+JSON.stringify(rows));
