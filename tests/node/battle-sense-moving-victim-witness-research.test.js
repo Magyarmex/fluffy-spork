@@ -70,3 +70,36 @@ test('reverse victim motion can erase historical crossfire without a new shot', 
   assert.equal(thirdPartyVector(g, observer, shooter).weight, 0);
   // Do not infer actual hit, intent or natural incidence from this fixture.
 });
+
+test('materialized 49-overlay Game preserves the same moving-victim classification', () => {
+  const { bootGame, withSeed } = require('../research/audio-rng-causal-pilot.cjs');
+  withSeed(1517800, () => {
+    const g = bootGame();
+    try {
+      const bots = g.tanks.filter(t => t && t.ai && !t.isPlayer);
+      assert.ok(bots.length >= 3, 'need three actual composed AI tanks');
+      const [observer, shooter, victim] = bots;
+      const thirdPartyVector = g.__testWindow.__NOVA_BATTLE_SENSE_TEST__.thirdPartyVector;
+      assert.equal(typeof thirdPartyVector, 'function');
+      Object.assign(observer, { x: 0, y: -80, alive: true, hp: 100 });
+      Object.assign(shooter, { x: 0, y: 0, alive: true, hp: 100 });
+      Object.assign(victim, { x: 0, y: 100, alive: true, hp: 100 });
+      Object.assign(observer.ai, {
+        __v181ObservedShotId: shooter.id, __v181ObservedShotAt: 10,
+        __v181ObservedShotAngle: 0, __v181ObservedShotX: 0,
+        __v181ObservedShotY: 0
+      });
+      g.time = 10.5;
+      g.__novaFairVisibleTanks = [observer, shooter, victim];
+      g.hasLineOfSight = () => true;
+      // Ensure the actual Game's hostility authority permits this duel.
+      assert.equal(g.areHostile(shooter, victim), true,
+        'fixture must be a legitimate hostile pair');
+      assert.equal(thirdPartyVector(g, observer, shooter).weight, 0);
+      victim.x = 100; victim.y = 0;
+      assert.equal(thirdPartyVector(g, observer, shooter).weight, .62);
+      g.time = 11.26;
+      assert.equal(thirdPartyVector(g, observer, shooter).weight, 0);
+    } finally { g.destroy(); }
+  });
+});
