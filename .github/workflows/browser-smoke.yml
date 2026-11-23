@@ -181,6 +181,18 @@ jobs:
           path: artifacts/browser/touch-desync-control-research.json
           if-no-files-found: ignore
           retention-days: 14
+      - name: Research-only sequential CDP touch transport falsifier
+        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'research/touch-sequential-delivery-20261123' }}
+        timeout-minutes: 3
+        run: NOVA_TOUCH_DESYNC_CONTROL=1 NOVA_TOUCH_SEQUENTIAL_CONTROL=1 node tests/browser/trusted-short-touch-clarity-cpu-research.cjs
+      - name: Archive sequential touch transport evidence
+        if: ${{ always() && github.event_name == 'pull_request' && github.head_ref == 'research/touch-sequential-delivery-20261123' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: touch-sequential-transport-research
+          path: artifacts/browser/touch-desync-control-research.json
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Run real React + Chromium smoke
         run: |
           node tests/browser/real-touch-gameplay.cjs
