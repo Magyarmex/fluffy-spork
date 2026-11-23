@@ -241,7 +241,7 @@ const round=x=>x==null?null:+x.toFixed(2);
        maxUpdatesPerFrame:renderFrames.length?Math.max(...renderFrames.map(x=>x.updates)):0,
        medianRenderMs:renders.length?
         [...renders].sort((a,b)=>a-b)[Math.floor(renders.length/2)]:null,
-       aimActive:!!g.input.aim.active,status:g.status};
+       aimActive:!!g.input.aim.active,status:g.status,simTime:g.time};
      },trial);
      assert.ok(result.events.some(x=>x.type==='pointerdown'),'trusted down required');
      assert.ok(result.events.some(x=>x.type==='pointerup'||x.type==='pointercancel'),
@@ -265,6 +265,7 @@ const round=x=>x==null?null:+x.toFixed(2);
       moveEventAgeMs:round(result.moveEventAgeMs),
       moveToNextUpdateMs:round(result.moveToNextUpdateMs),
       updateWithinHold:result.updateWithinHold,heldSamples:result.heldSamples,
+      updateSamples:result.samples,simTime:round(result.simTime),
       births:result.births,renderCount:result.renderCount,
       executedRenderCount:result.executedRenderCount,
       twoUpdateFrames:result.twoUpdateFrames,
@@ -287,6 +288,7 @@ const round=x=>x==null?null:+x.toFixed(2);
     const short=trials.filter(x=>!x.control);
     results.push({arm,scale,renderEnabled,initial,cpuThrottle:4,attempts:short.length,
      armedButUnsampled:short.filter(x=>x.inputArmed&&!x.heldSamples).length,
+     totalUpdateSamples:short.reduce((n,x)=>n+x.updateSamples,0),
      noProjectile:short.filter(x=>!x.births).length,
      canceled:short.filter(x=>x.canceled).length,
      totalBirths:short.reduce((n,x)=>n+x.births,0),
