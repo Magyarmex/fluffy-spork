@@ -1,3 +1,4 @@
+/* Baseline-only A/B probe for existing route-acquisition gates; no runtime behavior change. */
 /* NOVA TANKS v1.8.1 — Battle Sense
  * Strategic awareness above Predator Doctrine: contested resources, local force/risk
  * reading, observed reload punishment, third-party geometry, and safer lane choice.
