@@ -26,11 +26,16 @@ const {performance:clock}=require('node:perf_hooks');
      const out=move.apply(this,arguments);
      if(e.pointerType==='touch'&&this.stickId?.aim===e.pointerId&&this.firing&&
         this.aim.active&&Math.hypot(this.aim.dx,this.aim.dy)>=9){
-      witness.armed=true;\n      witness.lastAimStamp=e.isTrusted&&Number.isFinite(e.timeStamp)?e.timeStamp:null;\n     }
+      witness.armed=true;
+      witness.lastAimStamp=e.isTrusted&&Number.isFinite(e.timeStamp)?e.timeStamp:null;
+     }
      return out;
     };
     this.pu=function(e){
-     const valid=e.isTrusted===true&&Number.isFinite(e.timeStamp)&&e.timeStamp>0&&\n      Number.isFinite(witness.lastAimStamp)&&witness.lastAimStamp>0&&\n      e.timeStamp>=witness.lastAimStamp&&e.timeStamp-witness.lastAimStamp<=250&&\n      e.pointerType==='touch'&&e.type==='pointerup'&&
+     const valid=e.isTrusted===true&&Number.isFinite(e.timeStamp)&&e.timeStamp>0&&
+      Number.isFinite(witness.lastAimStamp)&&witness.lastAimStamp>0&&
+      e.timeStamp>=witness.lastAimStamp&&e.timeStamp-witness.lastAimStamp<=250&&
+      e.pointerType==='touch'&&e.type==='pointerup'&&
       this.stickId?.aim===e.pointerId&&this.firing&&this.aim.active&&
       Math.hypot(this.aim.dx,this.aim.dy)>=9;
      const aim=valid?{dx:this.aim.dx,dy:this.aim.dy}:null;
@@ -118,7 +123,8 @@ const {performance:clock}=require('node:perf_hooks');
      await page.evaluate(({id,enabled})=>{
       const w=window.__novaShotPilot,g=window.__novaShotPilotGame;
       if(!g||g.status!=='playing')throw Error('match lost');
-      w.trial=id;w.enabled=enabled;w.armed=false;w.sampled=false;w.pending=null;\n      w.lastAimStamp=null;
+      w.trial=id;w.enabled=enabled;w.armed=false;w.sampled=false;w.pending=null;
+      w.lastAimStamp=null;
       g.input.autofire=false;g.player.fireCd=0;g.player.spawnShieldT=20;
      },{id,enabled});
      const down=cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[origin]});
@@ -144,7 +150,11 @@ const {performance:clock}=require('node:perf_hooks');
      assert.equal(outcome.stuck,false,'right stick must release');
      assert.equal(outcome.pending,false,'pilot must not retain input');
      if(!enabled)assert.equal(outcome.recovered,0);
-     if(enabled){\n      assert.ok(outcome.recovered<=1,'one recovered update maximum');\n      if(outcome.recovered)assert.ok(outcome.births>=1,\n       'a recovered Scout firing opportunity must create a real projectile');\n     }
+     if(enabled){
+      assert.ok(outcome.recovered<=1,'one recovered update maximum');
+      if(outcome.recovered)assert.ok(outcome.births>=1,
+       'a recovered Scout firing opportunity must create a real projectile');
+     }
      rows.push({rate,enabled,trial,...outcome});
     }
    }
