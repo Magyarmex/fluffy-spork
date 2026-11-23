@@ -82,8 +82,11 @@ const {performance:clock}=require('node:perf_hooks');
    });
    for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
     document.addEventListener(type,e=>{
-     if(e.pointerType==='touch')witness.events.push({trial:witness.trial,type,
-      stamp:e.timeStamp,at:performance.now(),trusted:e.isTrusted});
+     if(e.pointerType==='touch'){
+      if(type==='pointerdown'||type==='pointercancel')witness.pending=null;
+      witness.events.push({trial:witness.trial,type,
+       stamp:e.timeStamp,at:performance.now(),trusted:e.isTrusted});
+     }
     },{capture:true,passive:true});
   });
   await page.getByRole('button',{name:/DEPLOY/i}).first().click();
