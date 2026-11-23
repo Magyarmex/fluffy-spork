@@ -125,7 +125,12 @@ const {chromium}=require('playwright');
      const samples=w.samples.filter(s=>s.trial===i);
      const births=w.births.filter(b=>b.trial===i);
      const inputEdges=w.inputEdges.filter(e=>e.trial===i);
-     return {events,inputEdges,sampleCount:samples.length,
+     const gaps=samples.slice(1).map((v,j)=>v.at-samples[j].at)
+      .filter(v=>Number.isFinite(v)&&v>0).sort((a,b)=>a-b);
+     return {events,inputEdges,
+      medianUpdateGapMs:gaps.length?gaps[Math.floor(gaps.length/2)]:null,
+      maxUpdateGapMs:gaps.length?gaps.at(-1):null,
+      sampleCount:samples.length,
       heldSamples:samples.filter(s=>s.held).length,
       births:births.length,stuckAim:!!g.input.aim.active,
       gameStatus:g.status};
@@ -148,7 +153,9 @@ const {chromium}=require('playwright');
      pressDurationMs:+(up.at-down.at).toFixed(2),
      deliveredHoldMs:move?+(up.at-move.at).toFixed(2):null,
      inputArmed:result.inputEdges.some(e=>e.type==='move'&&e.armed),
-     samples:result.sampleCount,heldSamples:result.heldSamples,births:result.births});
+     samples:result.sampleCount,heldSamples:result.heldSamples,births:result.births,
+     medianUpdateGapMs:result.medianUpdateGapMs,
+     maxUpdateGapMs:result.maxUpdateGapMs});
    }
   }
   await cdp.send('Emulation.setCPUThrottlingRate',{rate:1});
@@ -175,6 +182,8 @@ const {chromium}=require('playwright');
     deliveredHoldMs:rows.map(x=>x.deliveredHoldMs),
     pressDurationMs:rows.map(x=>x.pressDurationMs),
     samples:rows.map(x=>x.heldSamples),births:rows.map(x=>x.births),
+    medianUpdateGapMs:rows.map(x=>x.medianUpdateGapMs),
+    maxUpdateGapMs:rows.map(x=>x.maxUpdateGapMs),
     caveat:'Chromium/CDP browser-trusted touch; not a physical Android trial, fixed 40ms request is not guaranteed delivery duration'
    }));
   }
