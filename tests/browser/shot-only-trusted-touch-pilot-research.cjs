@@ -136,7 +136,11 @@ const {performance:clock}=require('node:perf_hooks');
      const outcome=await page.evaluate(id=>{
       const w=window.__novaShotPilot,g=window.__novaShotPilotGame;
       const events=w.events.filter(x=>x.trial===id);
+      const move=events.find(x=>x.type==='pointermove');
+      const release=events.find(x=>x.type==='pointerup'||x.type==='pointercancel');
       return {armed:w.armed,sampled:w.sampled,
+       deliveredHoldMs:move&&release?release.at-move.at:null,
+       eventStampHoldMs:move&&release?release.stamp-move.stamp:null,
        recovered:w.recovered.filter(x=>x.trial===id).length,
        births:w.births.filter(x=>x.trial===id).length,
        canceled:events.some(x=>x.type==='pointercancel'),
@@ -152,6 +156,8 @@ const {performance:clock}=require('node:perf_hooks');
      if(!enabled)assert.equal(outcome.recovered,0);
      if(enabled){
       assert.ok(outcome.recovered<=1,'one recovered update maximum');
+      if(outcome.recovered)assert.ok(outcome.armed&&!outcome.sampled&&!outcome.canceled,
+       'recovery must only apply to genuinely armed, unsampled, uncanceled touch');
       if(outcome.recovered)assert.ok(outcome.births>=1,
        'a recovered Scout firing opportunity must create a real projectile');
      }
@@ -169,6 +175,9 @@ const {performance:clock}=require('node:perf_hooks');
     recovered:group.reduce((n,x)=>n+x.recovered,0),
     births:group.reduce((n,x)=>n+x.births,0),
     armedUnsampled:group.filter(x=>x.armed&&!x.sampled).length,
+    compressedRecovered:group.filter(x=>x.recovered&&x.deliveredHoldMs!==null&&x.deliveredHoldMs<2&&x.eventStampHoldMs>=30).length,
+    deliveredHoldMs:group.map(x=>x.deliveredHoldMs),
+    eventStampHoldMs:group.map(x=>x.eventStampHoldMs),
     caveat:'Research-only Scout pulse A/B, sequential browser arms and synthetic CDP CPU throttling; not physical touch or Controller/Cannon/Sniper safety evidence.'}));
   }
  }finally{await context.close();await browser.close();}
