@@ -21,7 +21,7 @@ function run(seed,observe){
    pausedAt:null,segments:[],activeIntentSamples:0,totalActiveIntents:0,maxActiveIntents:0,
    rawCrossings:0,certifiedAtOwner:0,excludedCrossings:0,excludedByType:{},
    excludedEligibleCrossings:0,excludedPriorIntent:{sameDestinationWithin05:0,sameDestinationWithin1:0,sameDestinationWithin2:0,
-    differentDestinationWithin2:0,noRecentIntent:0},excludedPriorIntentByType:{},
+    otherRecentIntentWithin2:0,noRecentIntent:0},excludedPriorIntentByType:{},
    recentSameDestinationMotion:{aligned:0,transverse:0,opposed:0,stationary:0,evadingTriangle:0}};
   try{
    if(observe){
@@ -54,7 +54,7 @@ function run(seed,observe){
        if(same&&age<=.5)bucket='sameDestinationWithin05';
        else if(same&&age<=1)bucket='sameDestinationWithin1';
        else if(same&&age<=2)bucket='sameDestinationWithin2';
-       else if(prior&&age>=0&&age<=2)bucket='differentDestinationWithin2';
+       else if(prior&&age>=0&&age<=2)bucket='otherRecentIntentWithin2';
        census.excludedPriorIntent[bucket]++;
        if(same&&age<=2){
         const dx=to%4-shape.__lfSector%4,dy=Math.floor(to/4)-Math.floor(shape.__lfSector/4);
