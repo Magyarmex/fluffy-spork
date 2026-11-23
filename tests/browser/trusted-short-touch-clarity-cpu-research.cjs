@@ -7,6 +7,7 @@ const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {chromium}=require('playwright');
 const {performance:clock}=require('node:perf_hooks');
+const {injectBattlefieldSeed}=require('../research/battlefield-layout-fixture.cjs');
 const scales=[100,80,65];
 const round=x=>x==null?null:+x.toFixed(2);
 (async()=>{
@@ -16,12 +17,23 @@ const round=x=>x==null?null:+x.toFixed(2);
   for(const scale of scales){
    const context=await browser.newContext({viewport:{width:320,height:700},
     deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
+   let layoutIntercepts=0;
+   await context.route('**/nova-updates/battlefield-v1.6.0.js',async route=>{
+    const response=await route.fetch();
+    assert.equal(response.status(),200,'canonical Battlefield overlay must load');
+    layoutIntercepts++;
+    await route.fulfill({response,body:injectBattlefieldSeed(await response.text(),0x12345678)});
+   });
    const page=await context.newPage(),errors=[];
    page.on('pageerror',e=>errors.push(String(e.stack||e)));
    const cdp=await context.newCDPSession(page);
    try{
     await context.addInitScript(value=>{
      localStorage.setItem('novatanks_pilot_settings_v1',JSON.stringify({renderScale:value}));
+     let state=0x9e3779b9;
+     window.__novaResearchResetRng=()=>{state=0x9e3779b9;};
+     Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;
+      return (state>>>0)/4294967296;};
     },scale);
     await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
     const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
@@ -31,6 +43,14 @@ const round=x=>x==null?null:+x.toFixed(2);
      const Game=requireGame('game/engine').Game;
      const Input=requireGame('game/input').Input;
      const renderModule=requireGame('game/render');
+     const oldSpawn=Game.prototype.spawnPlayer;
+     Game.prototype.spawnPlayer=function(...args){
+      if(!this.__novaResearchInitialSpawnSeeded){
+       window.__novaResearchResetRng();
+       this.__novaResearchInitialSpawnSeeded=true;
+      }
+      return oldSpawn.apply(this,args);
+     };
      const originalAttach=Input.prototype.attach;
      window.__novaTouchClarity={trial:-1,events:[],edges:[],samples:[],births:[],
       renders:[],game:null};
@@ -60,6 +80,21 @@ const round=x=>x==null?null:+x.toFixed(2);
      Game.prototype.update=function(...args){
       if(!this.__novaDecorativeWorld&&this.status==='playing'&&this.player){
        const w=window.__novaTouchClarity;w.game=this;
+       if(!w.initialFingerprint){
+        const compact=(arr,keys)=>(arr||[]).map(o=>keys.map(k=>o?.[k]??null));
+        const snapshot=JSON.stringify({
+         battlefield:this.__novaBattlefield?.seed??null,
+         player:this.player&&[this.player.x,this.player.y,this.player.cls],
+         tanks:compact(this.tanks,['id','x','y','cls','hp']),
+         shapes:compact(this.shapes,['id','x','y','type','hp']),
+         terrain:compact(this.__novaTerrain,['id','x','y','w','h','r','type','hp','solid'])
+        });
+        let hash=2166136261;
+        for(let i=0;i<snapshot.length;i++){
+         hash^=snapshot.charCodeAt(i);hash=Math.imul(hash,16777619);
+        }
+        w.initialFingerprint=(hash>>>0).toString(16).padStart(8,'0')+':'+snapshot.length;
+       }
        w.samples.push({trial:w.trial,at:performance.now(),
         held:!!this.input.firing&&!!this.input.aim.active&&
          Math.hypot(this.input.aim.dx,this.input.aim.dy)>=9});
@@ -101,9 +136,14 @@ const round=x=>x==null?null:+x.toFixed(2);
      const g=window.__novaTouchClarity.game;
      g.setClass(g.player,'scout');g.input.autofire=false;g.player.spawnShieldT=20;
      return {scale:JSON.parse(localStorage.getItem('novatanks_pilot_settings_v1')).renderScale,
-      quality:g.quality,dpr:g.dpr,css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height]};
+      quality:g.quality,dpr:g.dpr,css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height],
+      battlefieldSeed:g.__novaBattlefield?.seed??null,
+      initialFingerprint:window.__novaTouchClarity.initialFingerprint};
     });
     assert.equal(initial.scale,scale,'settings must preserve requested clarity');
+    assert.equal(layoutIntercepts,1,'exactly one Battlefield overlay must be seeded');
+    assert.equal(initial.battlefieldSeed,0x12345678,'seeded Battlefield must reach the real Game');
+    assert.match(initial.initialFingerprint,/^[0-9a-f]{8}:[0-9]+$/);
     const rect=await canvas.boundingBox();
     assert.ok(rect&&rect.width>200&&rect.height>200);
     const origin={x:rect.x+rect.width*.72,y:rect.y+rect.height*.68,
@@ -204,6 +244,8 @@ const round=x=>x==null?null:+x.toFixed(2);
    'clarity arms must reduce real canvas backing area');
   assert.equal(new Set(results.map(x=>x.initial.quality)).size,1,
    'do not confound clarity with quality mode');
+  assert.equal(new Set(results.map(x=>x.initial.initialFingerprint)).size,1,
+   'research clarity arms must start from the same selected physical world');
   const report={
    researchOnly:true,results,backingPixels:pixels,
    caveats:['independent worlds and trials are not matched physical states',
