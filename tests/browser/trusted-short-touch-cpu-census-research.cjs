@@ -71,7 +71,7 @@ const {performance:nodeClock}=require('node:perf_hooks');
      if(e.pointerType==='touch'){
       const w=window.__novaPulseWitness;
       w.events.push({trial:w.trial,type,at:performance.now(),
-       eventStamp:e.timeStamp,handlerDelayMs:performance.now()-e.timeStamp,trusted:e.isTrusted});
+       eventStamp:e.timeStamp,eventAgeAtCaptureMs:performance.now()-e.timeStamp,trusted:e.isTrusted});
      }
     },{capture:true,passive:true});
   });
@@ -143,7 +143,7 @@ const {performance:nodeClock}=require('node:perf_hooks');
      const gaps=samples.slice(1).map((v,j)=>v.at-samples[j].at)
       .filter(v=>Number.isFinite(v)&&v>0).sort((a,b)=>a-b);
      return {events,inputEdges,
-      eventHandlerDelayMs:events.map(e=>({type:e.type,delayMs:e.handlerDelayMs})),
+      eventHandlerDelayMs:events.map(e=>({type:e.type,delayMs:e.eventAgeAtCaptureMs})),
       downToNextUpdateMs:down&&nextUpdateAfterDown?nextUpdateAfterDown.at-down.at:null,
       moveToNextUpdateMs:move&&nextUpdateAfterMove?nextUpdateAfterMove.at-move.at:null,
       medianUpdateGapMs:gaps.length?gaps[Math.floor(gaps.length/2)]:null,
@@ -177,8 +177,8 @@ const {performance:nodeClock}=require('node:perf_hooks');
      pressDurationMs:+(up.at-down.at).toFixed(2),
      deliveredHoldMs:move?+(up.at-move.at).toFixed(2):null,
      eventStampHoldMs:move?+(up.eventStamp-move.eventStamp).toFixed(2):null,
-     moveHandlerDelayMs:move?+move.handlerDelayMs.toFixed(2):null,
-     releaseHandlerDelayMs:+up.handlerDelayMs.toFixed(2),
+     moveEventAgeAtCaptureMs:move?+move.eventAgeAtCaptureMs.toFixed(2):null,
+     releaseEventAgeAtCaptureMs:+up.eventAgeAtCaptureMs.toFixed(2),
      moveToNextUpdateMs:result.moveToNextUpdateMs===null?null:+result.moveToNextUpdateMs.toFixed(2),
      downToNextUpdateMs:result.downToNextUpdateMs===null?null:+result.downToNextUpdateMs.toFixed(2),
      inputArmed:result.inputEdges.some(e=>e.type==='move'&&e.armed),
@@ -211,8 +211,8 @@ const {performance:nodeClock}=require('node:perf_hooks');
     deliveredHeldWithoutProjectile:rows.filter(x=>x.births===0).length,
     deliveredHoldMs:rows.map(x=>x.deliveredHoldMs),
     eventStampHoldMs:rows.map(x=>x.eventStampHoldMs),
-    moveHandlerDelayMs:rows.map(x=>x.moveHandlerDelayMs),
-    releaseHandlerDelayMs:rows.map(x=>x.releaseHandlerDelayMs),
+    moveEventAgeAtCaptureMs:rows.map(x=>x.moveEventAgeAtCaptureMs),
+    releaseEventAgeAtCaptureMs:rows.map(x=>x.releaseEventAgeAtCaptureMs),
     moveToNextUpdateMs:rows.map(x=>x.moveToNextUpdateMs),
     downToNextUpdateMs:rows.map(x=>x.downToNextUpdateMs),
     pressDurationMs:rows.map(x=>x.pressDurationMs),
@@ -220,7 +220,7 @@ const {performance:nodeClock}=require('node:perf_hooks');
     samples:rows.map(x=>x.heldSamples),births:rows.map(x=>x.births),
     medianUpdateGapMs:rows.map(x=>x.medianUpdateGapMs),
     maxUpdateGapMs:rows.map(x=>x.maxUpdateGapMs),
-    caveat:'Handler delay is performance.now minus DOM event.timeStamp at document capture, not hardware-to-JS latency. Move-to-next-update is measured after handler delivery and can occur after release; only heldSamples proves a sampled fire state. CDP scheduling, throttled JS, compositor and OS latency remain unmeasured; none is physical Android touch-to-photon latency.'
+    caveat:'Event age at capture is performance.now minus DOM event.timeStamp at document capture, not hardware-to-JS latency. Move-to-next-update is measured after handler delivery and can occur after release; only heldSamples proves a sampled fire state. CDP scheduling, throttled JS, compositor and OS latency remain unmeasured; none is physical Android touch-to-photon latency.'
    }));
   }
  }finally{await context.close();await browser.close();}
