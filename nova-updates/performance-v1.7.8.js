@@ -153,7 +153,29 @@ wrap('game/input',function(input){
       };
       this.__novaPauseKeyGate=true;
     }
+    /* Track which mouse button actually started firing. A right-first chord
+     * must keep firing when the later left button is released. */
+    if(!this.__novaMouseFireOwnerGate){
+      var self=this,oldPd=this.pd;
+      this.pd=function(e){
+        if(e&&e.pointerType==='mouse'&&!self.touchSeen&&!self.firing)
+          self.__novaMouseFireOwner=e.button;
+        return oldPd.call(self,e);
+      };
+      this.__novaMouseFireOwnerGate=true;
+    }
     var out=oldAttach.call(this,canvas);
+    /* Pointer Events emit pointerup only when the LAST mouse button is
+     * released. A left-button release while right remains held produces a
+     * native mouseup but no pointerup: end the originating button's fire.
+     * Keep mouse aim and secondary-button state unchanged. */
+    if(canvas&&typeof window!=='undefined'&&!this.__novaPrimaryMouseUp){
+      var self=this;
+      this.__novaPrimaryMouseUp=function(e){
+        if(e&&!self.touchSeen&&e.button===self.__novaMouseFireOwner){self.firing=false;self.__novaMouseFireOwner=null;}
+      };
+      window.addEventListener('mouseup',this.__novaPrimaryMouseUp);
+    }
     if(canvas&&canvas.getBoundingClientRect&&!this.__novaRectOriginal){
       var self=this,originalMethod=canvas.getBoundingClientRect,original=originalMethod.bind(canvas);
       this.__novaRectOriginal=originalMethod;
@@ -171,6 +193,10 @@ wrap('game/input',function(input){
     return out;
   };
   Input.prototype.detach=function(){
+    if(this.__novaPrimaryMouseUp&&typeof window!=='undefined'){
+      window.removeEventListener('mouseup',this.__novaPrimaryMouseUp);
+      this.__novaPrimaryMouseUp=null;
+    }
     if(this.__novaPauseSuppressedKeys)this.__novaPauseSuppressedKeys.clear();
     if(this.__novaStickPaintRaf&&typeof cancelAnimationFrame==='function'){cancelAnimationFrame(this.__novaStickPaintRaf);this.__novaStickPaintRaf=0;}
     var canvas=this.canvas,refresh=this.__novaRectRefresh;
