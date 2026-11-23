@@ -152,14 +152,17 @@ const round=x=>x==null?null:+x.toFixed(2);
        aimActive:!!g.input.aim.active,status:g.status};
      },trial);
      assert.ok(result.events.some(x=>x.type==='pointerdown'),'trusted down required');
-     assert.ok(result.events.some(x=>x.type==='pointerup'),'trusted release required');
+     assert.ok(result.events.some(x=>x.type==='pointerup'||x.type==='pointercancel'),
+      'trusted release or cancellation required');
      assert.ok(result.events.every(x=>x.trusted),'all touch events must be browser trusted');
      assert.ok(result.edges.some(x=>x.type==='release'&&!x.armed&&!x.active),
       'real Input must clear firing and aim on release');
      assert.equal(result.aimActive,false,'right stick must release');
      assert.equal(result.postReleaseBirths,0,'no ghost projectile after release');
      assert.equal(result.status,'playing');
-     trials.push({trial,control:trial===8,protocolGapMs:round(releaseAt-before),
+     trials.push({trial,control:trial===8,
+      canceled:result.events.some(x=>x.type==='pointercancel'),
+      protocolGapMs:round(releaseAt-before),
       inputArmed:result.edges.some(x=>x.type==='move'&&x.armed),
       deliveredHoldMs:round(result.deliveredHoldMs),
       stampedHoldMs:round(result.stampedHoldMs),
