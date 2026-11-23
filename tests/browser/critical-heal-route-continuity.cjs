@@ -159,11 +159,29 @@ const {chromium}=require('playwright');
       }
       return wp;
      };
-     const readOnlyPricing={calls:0,certificates:0};
+     // Passive, bounded chronology of strategic certificates. No planner
+     // calls, no RNG and no changes to the route owner or the returned cost.
+     const readOnlyPricing={calls:0,certificates:0,mutations:0,events:[]};
      if(typeof originals.readOnly==='function')g.novaReadOnlyExactRouteLength=function(...args){
       readOnlyPricing.calls++;
+      const [x,y,gx,gy,pad,seed]=args,now=Number(this.time)||0,
+       key=String(seed==null?'x':seed)+':'+Math.round((pad||8)/4),
+       route=this.__v1102Routes?.[key],index=route?.index??null,
+       next=route?.points?.[index];
       const cost=originals.readOnly.apply(this,args);
       if(Number.isFinite(cost))readOnlyPricing.certificates++;
+      const after=this.__v1102Routes?.[key];
+      if(after!==route||(after?.index??null)!==index)readOnlyPricing.mutations++;
+      if(readOnlyPricing.events.length<64)readOnlyPricing.events.push({
+       t:+(now-10).toFixed(3),x:+x.toFixed(2),y:+y.toFixed(2),
+       goal:[gx,gy],routeGoal:route?[route.gx,route.gy]:null,
+       index,validateIn:route&&Number.isFinite(route.validateAt)?
+        +(route.validateAt-now).toFixed(3):null,
+       cornerDistance:next?+Math.hypot(x-next.x,y-next.y).toFixed(2):null,
+       certified:Number.isFinite(cost),
+       cost:Number.isFinite(cost)?+cost.toFixed(3):null,
+       indexAfter:after?.index??null,sameRoute:after===route
+      });
       return cost;
      };
      let state=0x6d2b79f5;Math.random=()=>{state^=state<<13;state^=state>>>17;state^=state<<5;return(state>>>0)/4294967296;};
@@ -291,6 +309,8 @@ const {chromium}=require('playwright');
     throw Error('physical route violated wall clearance: '+JSON.stringify(arm));
    if(arm.resourceFrames<100)
     throw Error('AI did not maintain meaningful resource pursuit: '+JSON.stringify(arm));
+   if(arm.readOnlyPricing.mutations)
+    throw Error('read-only strategic route certificate mutated movement cache: '+JSON.stringify(arm.readOnlyPricing));
    if(!['upper','lower'].includes(arm.acquiredId))
     throw Error('acquired identity is not an eligible fixture heal: '+JSON.stringify(arm));
    // A bot may legally collect a different nearby heal while moving toward its
