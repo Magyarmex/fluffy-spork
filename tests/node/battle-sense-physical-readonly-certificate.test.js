@@ -73,6 +73,7 @@ test('a physically certified detour is priced read-only from a safe start', () =
 test('expired route is rejected rather than treated as a fresh certificate', () => {
   const { g, tank, pickup, classes, distance } = setup();
   g.time = 12;
+  g.novaBattlefieldWaypoint = () => { throw Error('unexpected live route plan'); };
   assert.equal(g.novaReadOnlyExactRouteLength(0,0,100,0,23,7), null);
   // The normal planner fallback is deliberately a throwing sentinel.
   assert.throws(() => distance(g,tank,pickup,100,classes), /unexpected live route plan/);
@@ -82,6 +83,7 @@ test('a newly blocked cached leg is rejected without mutating the cached cursor'
   const { g, tank, pickup, classes, route, distance } = setup();
   // Move the wall to obstruct the detour's first leg while preserving the
   // direct pickup occlusion, then verify certification fails closed.
+  g.novaBattlefieldWaypoint = () => { throw Error('unexpected live route plan'); };
   const originalLOS = g.hasLineOfSight;
   g.hasLineOfSight = (ax,ay,bx,by,pad) =>
     !(ax===0 && ay===0 && bx===0 && by===100) &&
