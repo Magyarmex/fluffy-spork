@@ -153,6 +153,17 @@ wrap('game/input',function(input){
       };
       this.__novaPauseKeyGate=true;
     }
+    /* Track which mouse button actually started firing. A right-first chord
+     * must keep firing when the later left button is released. */
+    if(!this.__novaMouseFireOwnerGate){
+      var self=this,oldPd=this.pd;
+      this.pd=function(e){
+        if(e&&e.pointerType==='mouse'&&!self.touchSeen&&!self.firing)
+          self.__novaMouseFireOwner=e.button;
+        return oldPd.call(self,e);
+      };
+      this.__novaMouseFireOwnerGate=true;
+    }
     var out=oldAttach.call(this,canvas);
     /* Pointer Events emit pointerup only when the LAST mouse button is
      * released. A left-button release while right remains held produces a
@@ -161,7 +172,7 @@ wrap('game/input',function(input){
     if(canvas&&typeof window!=='undefined'&&!this.__novaPrimaryMouseUp){
       var self=this;
       this.__novaPrimaryMouseUp=function(e){
-        if(e&&e.button===0&&!self.touchSeen)self.firing=false;
+        if(e&&e.button===0&&!self.touchSeen&&self.__novaMouseFireOwner===0){self.firing=false;self.__novaMouseFireOwner=null;}
       };
       window.addEventListener('mouseup',this.__novaPrimaryMouseUp);
     }
