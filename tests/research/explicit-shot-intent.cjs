@@ -2,7 +2,7 @@
 /* RESEARCH ONLY: exact shipping Game source is patched solely by the opt-in
  * test harness. The production materializer and playable input remain intact.
  * A one-tick shot intent is read by player firing, not Controller drones. */
-const {SubtickFirePulse}=require('./subtick-fire-pulse.cjs');
+const {SubtickFirePulse,ownerDocumentHidden}=require('./subtick-fire-pulse.cjs');
 function once(source,needle,replacement,label){
  const i=source.indexOf(needle);
  if(i<0||source.indexOf(needle,i+needle.length)>=0)
@@ -49,9 +49,24 @@ class ExplicitShotIntent {
   const self=this;
   game.update=function(...args){
    const p=self.pulse&&self.pulse.pending,input=self.input;
-   const canPlay=!!p&&p.player===game.player&&game.status==='playing'&&!game.paused&&!input.__novaInputPaused&&
-     !(game.__testWindow&&game.__testWindow.document.hidden);
-   if(!canPlay)return self.oldUpdate.apply(this,args);
+   const now=performance.now();
+   const age=p&&Number.isFinite(p.queuedAt)?now-p.queuedAt:Infinity;
+   const physicalAge=p&&p.physicalAt!==null?now-p.physicalAt:null;
+   const holdMs=p&&p.physicalDownAt!==null&&p.physicalAt!==null
+    ?p.physicalAt-p.physicalDownAt:null;
+   const canPlay=!!p&&p.player===game.player&&game.player?.alive!==false&&
+     age>=0&&age<=50&&
+     (p.physicalDownAt===null)===(p.physicalAt===null)&&
+     (physicalAge===null||(physicalAge>=0&&physicalAge<=50))&&
+     (holdMs===null||(holdMs>=0&&holdMs<=50))&&
+     game.status==='playing'&&!game.paused&&!input.__novaInputPaused&&
+     !ownerDocumentHidden(game);
+   if(!canPlay){
+    // A stale or revoked release is not a recovered pulse. Clear it before
+    // the underlying research counter can mistake it for a fired intent.
+    if(p)self.pulse.release();
+    return self.oldUpdate.apply(this,args);
+   }
    const touch=p.type==='touch'||p.type==='pen';
    const dx=input.aim.dx,dy=input.aim.dy,len=Math.hypot(dx,dy);
    const valid=touch?Number.isFinite(len)&&len>=9:p.type==='mouse';
