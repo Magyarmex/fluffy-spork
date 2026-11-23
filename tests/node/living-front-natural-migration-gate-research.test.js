@@ -22,7 +22,7 @@ function run(seed,observe){
    rawCrossings:0,certifiedAtOwner:0,excludedCrossings:0,excludedByType:{},
    excludedEligibleCrossings:0,excludedPriorIntent:{sameDestinationWithin05:0,sameDestinationWithin1:0,sameDestinationWithin2:0,
     differentDestinationWithin2:0,noRecentIntent:0},excludedPriorIntentByType:{},
-   recentSameDestinationMotion:{aligned:0,transverse:0,opposed:0,stationary:0,evadingTriangle:0}}};
+   recentSameDestinationMotion:{aligned:0,transverse:0,opposed:0,stationary:0,evadingTriangle:0}};
   try{
    if(observe){
     // Weak identity ownership prevents respawned/reused shape IDs from inheriting intent.
