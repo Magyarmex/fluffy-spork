@@ -202,14 +202,19 @@ test('scaled CSS pointer survives browser replay into actual player projectile b
   assert.ok(owner.pending&&owner.pending.world);
   assert.ok(Math.abs(owner.pending.world.x-200)<1e-8);
   assert.ok(Math.abs(owner.pending.world.y)<1e-8);
-  // The old inverse used Game.w/h as CSS pixels and incorrectly returned
-  // (600,350), despite the visible CSS rectangle being 400x300.
-  // At the later camera x=100 the original world target x=200 is shown at
-  // client x=350; y=200 remains centered. Assert exact geometry, not only
-  // the eventual projectile's positive x velocity.
+  // The historical target appears at physical CSS client (350,200)
+  // after the camera moves. But core Game.update projects mouseX using
+  // rect.left + Game.w/2, not rect.width/2. resolveMouse intentionally
+  // supplies its *game-coordinate proxy* (600,350), not CSS client pixels.
+  // This distinction is essential until the production mouse projection
+  // itself has a separately validated CSS-scale policy.
   const replay=owner.resolveMouse(owner.pending.mouse);
-  assert.ok(Math.abs(replay.x-350)<1e-8, 'replayed CSS-scaled x must match the visible world target');
-  assert.ok(Math.abs(replay.y-200)<1e-8, 'replayed CSS-scaled y must remain centered');
+  assert.ok(Math.abs(replay.x-600)<1e-8, 'core-compatible mouse x proxy');
+  assert.ok(Math.abs(replay.y-350)<1e-8, 'core-compatible mouse y proxy');
+  const wx=g.cam.x+(replay.x-100-g.w/2)/g.zoom;
+  const wy=g.cam.y+(replay.y-50-g.h/2)/g.zoom;
+  assert.ok(Math.abs(wx-owner.pending.world.x)<1e-8, 'core must reconstruct the historical world x');
+  assert.ok(Math.abs(wy-owner.pending.world.y)<1e-8, 'core must reconstruct the historical world y');
   Object.assign(g.player,{x:0,y:0,angle:0,fireCd:0});
   const born=[];const fire=g.tryFire;
   g.tryFire=function(t,...args){
