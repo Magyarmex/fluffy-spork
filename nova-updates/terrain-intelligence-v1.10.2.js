@@ -397,7 +397,10 @@ wrap('game/engine',function(engine,require){
        * just to maintain a cursor or steal another movement goal. */
       if(ctx&&ctx.lineage==='resource'&&ctx.target){
         var existing=this.__v1102Routes&&this.__v1102Routes[cacheKey(t.id,pad)];
-        if(existing&&existing.gx===ctx.target.x&&existing.gy===ctx.target.y)
+        var next=existing&&existing.points&&existing.points[existing.index];
+        var reach=20+pad*.65;
+        if(existing&&existing.gx===ctx.target.x&&existing.gy===ctx.target.y&&
+           next&&d2(t.x,t.y,next.x,next.y)<reach*reach)
           this.novaBattlefieldWaypoint(t.x,t.y,ctx.target.x,ctx.target.y,pad,t.id);
       }
       return oldMove.call(this,t,vx,vy,dt);
