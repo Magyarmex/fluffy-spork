@@ -8,7 +8,6 @@ const fs=require('node:fs');
 const {chromium}=require('playwright');
 const {performance:clock}=require('node:perf_hooks');
 const scales=[100,80,65];
-const median=a=>{if(!a.length)return null;const s=[...a].sort((x,y)=>x-y);return s[Math.floor(s.length/2)]};
 const round=x=>x==null?null:+x.toFixed(2);
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
