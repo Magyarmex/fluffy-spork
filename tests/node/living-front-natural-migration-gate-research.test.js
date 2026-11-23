@@ -6,32 +6,12 @@ const test=require('node:test');
 const assert=require('node:assert/strict');
 const {bootGame,withSeed,digest,physical}=require('../research/audio-rng-causal-pilot.cjs');
 const SEEDS=[1517800,1517802,1517810],TICKS=1800;
-// Mirror only the source's public physical-flow eligibility, not its decisions.
-function dominantFlow(st){
- let bestOutbound=0,found=false;
- for(const [from,sector] of (st.sectors||[]).entries()){
-  const outbound=Number(sector&&sector.outbound)||0;
-  if(!(outbound>bestOutbound)||!sector||!sector.flowTo)continue;
-  let best=1e-6,runner=0,hasTo=false;
-  for(const [to,raw] of sector.flowTo.entries()){
-   if(to===from)continue;
-   const weight=Number(raw)||0;
-   if(!(weight>0))continue;
-   if(weight>best){runner=best;best=weight;hasTo=true;}
-   else if(weight>runner)runner=weight;
-  }
-  if(hasTo&&best>runner+1e-6&&Math.hypot(Number(sector.flowX)||0,Number(sector.flowY)||0)>1e-6){
-   bestOutbound=outbound;found=true;
-  }
- }
- return found;
-}
-
 function run(seed,observe){
  return withSeed(seed,draws=>{
   const g=bootGame();g.sfx.muted=true;g.sfx.startMusic=()=>{};
   const census={activeTicks:0,withState:0,heatSamples:0,maxHeat:0,
-   heatReady:0,cooldownReady:0,flowReady:0,bothReady:0,allReady:0,unblockedReady:0,
+   heatReady:0,cooldownReady:0,bothReady:0,unblockedReady:0,
+   candidateBloom:0,candidateMigration:0,candidateStar:0,candidateNone:0,
    activeBloom:0,activeMigration:0,activeStar:0,
    maxOutbound:0,firstReadyAt:null,firstMigrationAt:null};
   try{
@@ -43,6 +23,8 @@ function run(seed,observe){
     if(!observe||tick%6!==0)continue;
     const st=g.__lfState;
     if(!st)continue;
+    const T=g.__testWindow.__NOVA_LIVING_FRONT_TEST__;
+    assert.ok(T&&typeof T.directorDecision==='function','real Director decision export');
     census.withState++;
     const heat=Number(st.migrationHeat);
     if(Number.isFinite(heat)){
@@ -53,15 +35,19 @@ function run(seed,observe){
     const cool=Number(st.cooldowns&&st.cooldowns.migration)<=0;
     if(ready)census.heatReady++;
     if(cool)census.cooldownReady++;
-    const flow=dominantFlow(st);
-    if(flow)census.flowReady++;
-    if(ready&&cool&&flow)census.allReady++;
     if(ready&&cool){
      census.bothReady++;
      if(census.firstReadyAt==null)census.firstReadyAt=+g.time.toFixed(3);
      const signal=st.signal,now=g.time;
-     if(flow&&(!signal||now>=signal.until)&&now-Number(st.lastSignalAt||-99)>=8)
+     if((!signal||now>=signal.until)&&now-Number(st.lastSignalAt||-99)>=8){
       census.unblockedReady++;
+      const d=T.directorDecision(st,{enabled:st.directorEnabled,now,
+       hasStar:(g.shapes||[]).some(s=>s&&s.type==='star'&&s.hp>0)});
+      if(d&&d.type==='BLOOM')census.candidateBloom++;
+      else if(d&&d.type==='MIGRATION')census.candidateMigration++;
+      else if(d&&d.type==='ROGUE STAR')census.candidateStar++;
+      else census.candidateNone++;
+     }
     }
     const signal=st.signal;
     if(signal&&g.time>=signal.started&&g.time<signal.until){
@@ -98,8 +84,9 @@ test('natural composed Director migration gate census is read-only and A/A ident
   assert.ok(observed.census.heatSamples>0,'migration heat never sampled');
   assert.ok(observed.census.bothReady<=observed.census.heatReady);
   assert.ok(observed.census.bothReady<=observed.census.cooldownReady);
-  assert.ok(observed.census.allReady<=observed.census.bothReady);
-  assert.ok(observed.census.allReady<=observed.census.flowReady);
+  assert.equal(observed.census.unblockedReady,
+   observed.census.candidateBloom+observed.census.candidateMigration+
+   observed.census.candidateStar+observed.census.candidateNone);
   rows.push({seed,status:observed.status,time:observed.time,
    blooms:observed.blooms,migrations:observed.migrations,stars:observed.stars,
    ...observed.census});
