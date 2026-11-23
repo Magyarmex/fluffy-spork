@@ -47,7 +47,8 @@ function run(seed,observe){
        // Star/Crasher crossings are intentionally outside the migration contract.
        if(!['circle','triangle','square','pentagon'].includes(kind))continue;
        census.excludedEligibleCrossings++;
-       const prior=recentIntent.get(shape),age=prior?now-prior.at:Infinity;
+       const saved=recentIntent.get(shape),prior=saved&&saved.id===shape.id?saved:null;
+       const age=prior?now-prior.at:Infinity;
        const same=prior&&prior.to===to&&prior.from===shape.__lfSector&&age>=0;
        let bucket='noRecentIntent';
        if(same&&age<=.5)bucket='sameDestinationWithin05';
@@ -78,7 +79,7 @@ function run(seed,observe){
       if(!shape||!(shape.hp>0))continue;
       const to=shape.__lfMigrationIntent,from=shape.__lfSector;
       if(Number.isInteger(to)&&to>=0&&to<16&&Number.isInteger(from)&&to!==from)
-       recentIntent.set(shape,{to,from,at:now});
+       recentIntent.set(shape,{id:shape.id,to,from,at:now});
      }
      assert.equal((Number(st.migrationTransitions)||0)-before,certified,
       'read-only pre-owner crossing certificate disagrees with shipping transition');
