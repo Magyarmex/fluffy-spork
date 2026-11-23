@@ -9,11 +9,12 @@ const SEEDS=[1517800,1517802,1517810],TICKS=1800;
 // Mirror only the source's public physical-flow eligibility, not its decisions.
 function dominantFlow(st){
  let bestOutbound=0,found=false;
- for(const sector of st.sectors||[]){
+ for(const [from,sector] of (st.sectors||[]).entries()){
   const outbound=Number(sector&&sector.outbound)||0;
   if(!(outbound>bestOutbound)||!sector||!sector.flowTo)continue;
   let best=1e-6,runner=0,hasTo=false;
   for(const [to,raw] of sector.flowTo.entries()){
+   if(to===from)continue;
    const weight=Number(raw)||0;
    if(!(weight>0))continue;
    if(weight>best){runner=best;best=weight;hasTo=true;}
