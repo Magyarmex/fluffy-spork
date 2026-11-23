@@ -15,16 +15,19 @@ const guard='priorWork < 18 && earlierWork < 18';
 assert.equal(shipping.split(guard).length-1,1,'shipping historical work gate');
 const guarded=shipping.replace(guard,
   guard+' && performance.now() - workStart < 18');
-function run(source,{firstSpikeMs=40,secondSpikeMs=12}={}){
+function run(source,{firstSpikeMs=40,secondSpikeMs=12,pulse=null}={}){
  let now=0,work=0,raf=null,frame=0,step=0,sim=0,previousEnd=0;
- const rows=[];
+ const rows=[];let sampledHeld=0,nextEvent=0;
+ const events=pulse?[{at:pulse[0],firing:true},{at:pulse[1],firing:false}]:[];
  const start=new Function('performance','requestAnimationFrame','render_1',
   'return ({'+source+'}).start')({now:()=>now+work},
   fn=>{raf=fn;return 1},{render(){work+=4;}});
  const game={paused:false,__novaDestroyed:false,mmTimer:.08,
+  input:{firing:false},
   sfx:{startMusic(){}},update(dt){
    assert.ok(dt>0&&dt<=1/30+1e-9);
    sim+=dt;step++;
+   if(this.input.firing)sampledHeld++;
    // Second active callback: a new 40ms first-update spike after
    // cheap preceding work. A second 12ms update breaches 50ms budget.
    work+=frame===2?(step===1?firstSpikeMs:secondSpikeMs):1;
@@ -33,11 +36,17 @@ function run(source,{firstSpikeMs=40,secondSpikeMs=12}={}){
  for(frame=1;frame<=8;frame++){
   // Missed 20Hz vsync callbacks cannot be delivered between refresh slots.
   now=Math.max(frame*50,Math.ceil(previousEnd/50)*50);work=0;step=0;
+  // Browser event handlers deliver all pending edges before the next RAF.
+  // This is a discrete input-state model, NOT a trusted DOM/pointer bridge.
+  while(nextEvent<events.length&&events[nextEvent].at<=now){
+   game.input.firing=events[nextEvent++].firing;
+  }
   const callback=raf;raf=null;
   assert.equal(typeof callback,'function');
   callback(now);
   previousEnd=now+work;
-  rows.push({frame,atMs:now,steps:step,workMs:work,simSec:sim});
+  rows.push({frame,atMs:now,steps:step,workMs:work,simSec:sim,
+   sampledHeld});
  }
  return rows;
 }
@@ -74,5 +83,27 @@ test('naive current-work guard can discard a safe cheap second update',()=>{
  console.log('NOVA_RAF_CURRENT_WORK_FALSE_VETO '+JSON.stringify({
   baseline:baseline[1],candidate:candidate[1],
   caveat:'constructed costs; guard is not a production-ready policy'
+ }));
+});
+
+test('missed refresh can swallow a 40ms held-fire pulse between real RAF updates',()=>{
+ // A 145-185ms press/release spans the candidate's 150ms callback but
+ // falls entirely between shipping's 100ms and 200ms callbacks after a
+ // synthetic 56ms CPU overrun. This is a browser-shaped timing falsifier,
+ // not proof of real touch-event delivery or a gameplay firing bug rate.
+ const pulse=[145,185];
+ const baseline=run(shipping,{pulse}),candidate=run(guarded,{pulse});
+ assert.equal(baseline[2].atMs,200);
+ assert.equal(candidate[2].atMs,150);
+ assert.equal(baseline.at(-1).sampledHeld,0,
+  'shipping has no simulation update while the synthetic pulse is held');
+ assert.ok(candidate.at(-1).sampledHeld>=1,
+  'guarded callback observes the same pulse before release');
+ assert.ok(baseline.at(-1).simSec>0&&candidate.at(-1).simSec>0);
+ console.log('NOVA_RAF_CPU_SPIKE_PULSE_RESEARCH '+JSON.stringify({
+  pulse,baselineSamples:baseline.at(-1).sampledHeld,
+  candidateSamples:candidate.at(-1).sampledHeld,
+  baselineRaf:baseline.map(r=>r.atMs),candidateRaf:candidate.map(r=>r.atMs),
+  caveat:'modeled event delivery and stubbed Game.update, not actual touch-to-photon'
  }));
 });
