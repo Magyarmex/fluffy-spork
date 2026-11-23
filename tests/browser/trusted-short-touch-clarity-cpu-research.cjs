@@ -359,7 +359,7 @@ const round=x=>x==null?null:+x.toFixed(2);
     totalBirths:arms.reduce((n,x)=>n+x.totalBirths,0)}];
   }));
   const report={
-   researchOnly:true,renderControl,desyncControl,phaseOrder:scales,grouped,results,backingPixels:pixels,
+   researchOnly:true,renderControl,desyncControl,sequentialControl,phaseOrder:scales,grouped,results,backingPixels:pixels,
    desyncGrouped:desyncControl?Object.fromEntries([false,true].map(enabled=>{
     const arms=results.filter(x=>x.desyncEnabled===enabled);
     return [enabled?'desynchronized':'default',{
@@ -374,6 +374,7 @@ const round=x=>x==null?null:+x.toFixed(2);
     'Long Tasks are main-thread tasks of at least 50ms, not a complete browser scheduling or compositor trace; window is move minus 120ms to release plus 120ms',
     'Two-update frames count consecutive live Game.update calls before one final Game render; they do not prove why the scheduler permitted catch-up',
     'CPU x4 CDP throttling is not equivalent to Android thermal throttling',
+    'sequential CDP mode waits for the move command acknowledgement before holding; it is a different stimulus, not physical finger evidence',
     'render suppression preserves Game.update but deliberately removes presentation work, so it is not playable and cannot isolate JS canvas from compositor cost',
     'desynchronized canvas may trade presentation ordering or tearing for latency; this is an opt-in research-only browser context and not Android proof',
     'no assertion of causal FPS benefit; compare arm distributions and replicate']};
