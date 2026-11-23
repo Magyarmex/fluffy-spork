@@ -108,10 +108,16 @@ const {chromium}=require('playwright');
       if(!game||game.status!=='playing'||!game.player)throw Error('player no longer active');
      }
     },id);
-    // Queue protocol events in order without serial round-trip inflation.
-    // The measured DOM move-to-up interval, not this timer, is authoritative.
+    // Short trials queue protocol events in order without serial
+    // round-trip inflation. The long positive control instead separates
+    // centered press and deliberate deflection, avoiding move coalescing.
+    // Actual DOM move-to-up time, not the Node timer, is authoritative.
     const startDelivery=cdp.send('Input.dispatchTouchEvent',
      {type:'touchStart',touchPoints:[origin]});
+    if(trial===8){
+     await startDelivery;
+     await page.waitForTimeout(100);
+    }
     const moveDelivery=cdp.send('Input.dispatchTouchEvent',
      {type:'touchMove',touchPoints:[extended]});
     await new Promise(resolve=>setTimeout(resolve,trial===8?300:40));
