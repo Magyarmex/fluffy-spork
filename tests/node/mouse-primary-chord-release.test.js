@@ -78,6 +78,16 @@ test('right-first chord retains right-origin fire when left is released',()=>{
  assert.equal(input.firing,false,'final right release stops firing');
  input.detach();
 });
+test('right-origin fire ends when right is released while left remains held',()=>{
+ const {input,emit}=fixture();
+ input.pd({pointerType:'mouse',button:2,buttons:2,clientX:100,clientY:100});
+ input.pm({pointerType:'mouse',button:0,buttons:3,clientX:100,clientY:100});
+ emit('mouseup',{button:2,buttons:1});
+ assert.equal(input.firing,false,'originating right release must end firing');
+ input.pu({pointerType:'mouse',button:0,buttons:0});
+ assert.equal(input.firing,false);
+ input.detach();
+});
 test('reattach does not duplicate native mouseup owners',()=>{
  const {input,count}=fixture();
  assert.equal(count('mouseup'),1);
