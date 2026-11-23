@@ -292,6 +292,64 @@ async function run(browser,width,dpr){
    'keyline must affect the real DPR-scaled contact-center pixels');
   // No threshold is imposed on crowded readability: report the measured
   // pixels and original class-color fidelity before selecting any visual intervention.
+  // Research-only CSS resampling A/B: no marker, radar, backing-canvas or
+  // gameplay change. Pixelated presentation may help low-DPR cores but
+  // could make terrain/neutral symbols jagged. Measure actual Chromium
+  // compositor output; never infer human recognition from RGB distance.
+  const resamplingPilot={};
+  for(const [mode,normal] of [
+   ['bare',cloneBare],['crowded',cloneCrowded],
+   ['separatedBare',cloneSeparatedBare]]){
+   const el=page.locator('#nova-minimap-css-'+mode);
+   await el.evaluate(node=>{node.style.imageRendering='pixelated';});
+   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
+   const pixelated=await el.screenshot({
+    path:path.join(out,'minimap-css-pixelated-'+width+'-dpr'+dpr+'-'+mode+'.png')});
+   resamplingPilot[mode]=await page.evaluate(async ({normal,pixelated,color,dpr})=>{
+    const rgb=c=>{
+     const sw=document.createElement('canvas');sw.width=sw.height=1;
+     const ctx=sw.getContext('2d');ctx.fillStyle=c;ctx.fillRect(0,0,1,1);
+     return [...ctx.getImageData(0,0,1,1).data].slice(0,3);
+    };
+    async function decode(base64){
+     const im=new Image();im.src='data:image/png;base64,'+base64;await im.decode();
+     const canvas=document.createElement('canvas');
+     canvas.width=im.naturalWidth;canvas.height=im.naturalHeight;
+     const ctx=canvas.getContext('2d',{willReadFrequently:true});
+     ctx.drawImage(im,0,0);return {w:canvas.width,h:canvas.height,
+      data:ctx.getImageData(0,0,canvas.width,canvas.height).data};
+    }
+    const a=await decode(normal),b=await decode(pixelated);
+    if(a.w!==60*dpr||a.h!==60*dpr||b.w!==a.w||b.h!==a.h)
+     throw Error('CSS resampling must preserve the 60px footprint and device DPR');
+    const ref=rgb(color),x=Math.floor(a.w/2),y=Math.floor(a.h/2);
+    const pixel=(img,xx,yy)=>[...img.data.slice((yy*img.w+xx)*4,(yy*img.w+xx)*4+3)];
+    const dist=(u,v)=>Math.hypot(...u.map((z,i)=>z-v[i]));
+    const metric=img=>{
+     const center=pixel(img,x,y),rad=Math.max(1,Math.round(4*dpr));
+     const neighbors=[pixel(img,x-rad,y),pixel(img,x+rad,y),
+      pixel(img,x,y-rad),pixel(img,x,y+rad)];
+     return {center,centerColorError:dist(center,ref),
+      peakCenterContrast:Math.max(...neighbors.map(p=>dist(center,p)))};
+    };
+    let changedPixels=0,squared=0;
+    for(let i=0;i<a.data.length;i+=4){
+     let changed=false;
+     for(let c=0;c<3;c++){
+      const delta=a.data[i+c]-b.data[i+c];
+      squared+=delta*delta;if(delta)changed=true;
+     }
+     if(changed)changedPixels++;
+    }
+    return {smooth:metric(a),pixelated:metric(b),changedPixels,
+     totalPixels:a.w*a.h,rgbRms:Math.sqrt(squared/(a.w*a.h*3))};
+   },{normal:normal.toString('base64'),
+    pixelated:pixelated.toString('base64'),color:result.enemyColor,dpr});
+  }
+  result.resamplingPilot=resamplingPilot;
+  console.log('NOVA_MINIMAP_CSS_RESAMPLING_RESEARCH '+JSON.stringify({
+   width,dpr,pilot:resamplingPilot,
+   caveat:'Chromium CSS screenshot only; no physical phone or player recognition, and no change to shipping minimap or radar.'}));
   result.displayed=displayed;
   delete result.keyed.backingUrl;delete result.bare.backingUrl;delete result.crowded.backingUrl;delete result.separatedBare.backingUrl;delete result.separatedKeyed.backingUrl;delete result.separatedBoth.backingUrl;delete result.diagonalBare.backingUrl;delete result.diagonalBoth.backingUrl;
   console.log('NOVA_MINIMAP_COMPOSITOR '+JSON.stringify({width,dpr,
