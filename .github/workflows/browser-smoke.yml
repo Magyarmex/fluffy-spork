@@ -157,6 +157,18 @@ jobs:
           path: artifacts/browser/touch-minimal-control-research.json
           if-no-files-found: ignore
           retention-days: 14
+      - name: Research-only composed render suppression versus full render
+        if: ${{ github.event_name == 'pull_request' && github.head_ref == 'research/touch-composed-render-suppression-20261123' }}
+        timeout-minutes: 3
+        run: NOVA_TOUCH_RENDER_CONTROL=1 node tests/browser/trusted-short-touch-clarity-cpu-research.cjs
+      - name: Archive composed render suppression evidence
+        if: ${{ always() && github.event_name == 'pull_request' && github.head_ref == 'research/touch-composed-render-suppression-20261123' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: touch-render-control-research
+          path: artifacts/browser/touch-render-control-research.json
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Run real React + Chromium smoke
         run: |
           node tests/browser/real-touch-gameplay.cjs
