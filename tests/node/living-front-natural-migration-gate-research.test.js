@@ -21,7 +21,8 @@ function run(seed,observe){
    pausedAt:null,segments:[],activeIntentSamples:0,totalActiveIntents:0,maxActiveIntents:0,
    rawCrossings:0,certifiedAtOwner:0,excludedCrossings:0,excludedByType:{},
    excludedEligibleCrossings:0,excludedPriorIntent:{sameDestinationWithin05:0,sameDestinationWithin1:0,sameDestinationWithin2:0,
-    differentDestinationWithin2:0,noRecentIntent:0},excludedPriorIntentByType:{}};
+    differentDestinationWithin2:0,noRecentIntent:0},excludedPriorIntentByType:{},
+   recentSameDestinationMotion:{aligned:0,transverse:0,opposed:0,stationary:0,evadingTriangle:0}}};
   try{
    if(observe){
     // Weak identity ownership prevents respawned/reused shape IDs from inheriting intent.
@@ -54,6 +55,18 @@ function run(seed,observe){
        else if(same&&age<=2)bucket='sameDestinationWithin2';
        else if(prior&&age>=0&&age<=2)bucket='differentDestinationWithin2';
        census.excludedPriorIntent[bucket]++;
+       if(same&&age<=2){
+        const dx=to%4-shape.__lfSector%4,dy=Math.floor(to/4)-Math.floor(shape.__lfSector/4);
+        const vx=Number(shape.vx)||0,vy=Number(shape.vy)||0;
+        const v=Math.hypot(vx,vy),d=Math.hypot(dx,dy);
+        const motion=census.recentSameDestinationMotion;
+        if(v<1||d===0)motion.stationary++;
+        else {const cosine=(vx*dx+vy*dy)/(v*d);
+         if(cosine>=.5)motion.aligned++;
+         else if(cosine<=0)motion.opposed++;
+         else motion.transverse++;}
+        if(kind==='triangle'&&now<(Number(shape.__lfEvadeUntil)||0))motion.evadingTriangle++;
+       }
        const byType=census.excludedPriorIntentByType[kind]||(census.excludedPriorIntentByType[kind]={});
        byType[bucket]=(byType[bucket]||0)+1;
       }
@@ -181,6 +194,12 @@ test('natural composed Director migration gate census is read-only and A/A ident
    'raw crossing partition must be complete');
   assert.equal(Object.values(observed.census.excludedPriorIntent).reduce((a,b)=>a+b,0),
    observed.census.excludedEligibleCrossings,'prior-intent age bins must partition eligible excluded crossings');
+  assert.equal(Object.entries(observed.census.recentSameDestinationMotion)
+   .filter(([k])=>k!=='evadingTriangle').reduce((a,[,n])=>a+n,0),
+   observed.census.excludedPriorIntent.sameDestinationWithin05+
+   observed.census.excludedPriorIntent.sameDestinationWithin1+
+   observed.census.excludedPriorIntent.sameDestinationWithin2,
+   'motion bins must partition recent same-destination crossings');
   assert.equal(observed.census.certifiedAtOwner,observed.physicalMigrationTransitions,
    'exact owner-certified crossings must match shipping counter');
   assert.equal(observed.census.segments.reduce((n,s)=>n+s.activeIntentSum,0),
