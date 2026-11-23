@@ -345,6 +345,7 @@ async function run(browser,width,dpr){
      totalPixels:a.w*a.h,rgbRms:Math.sqrt(squared/(a.w*a.h*3))};
    },{normal:normal.toString('base64'),
     pixelated:pixelated.toString('base64'),color:result.enemyColor,dpr});
+   await el.evaluate(node=>{node.style.imageRendering='auto';});
   }
   // Independent 4x4 phase sweep: a crowded rival has only its 3px core,
   // without the isolated-contact keyline. Compare actual CSS compositing,
