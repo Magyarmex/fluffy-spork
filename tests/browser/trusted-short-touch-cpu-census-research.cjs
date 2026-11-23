@@ -71,7 +71,7 @@ const {performance:nodeClock}=require('node:perf_hooks');
      if(e.pointerType==='touch'){
       const w=window.__novaPulseWitness;
       w.events.push({trial:w.trial,type,at:performance.now(),
-       eventStamp:e.timeStamp,trusted:e.isTrusted});
+       eventStamp:e.timeStamp,eventAgeAtCaptureMs:performance.now()-e.timeStamp,trusted:e.isTrusted});
      }
     },{capture:true,passive:true});
   });
@@ -136,9 +136,17 @@ const {performance:nodeClock}=require('node:perf_hooks');
      const births=w.births.filter(b=>b.trial===i);
      const release=events.find(e=>e.type==='pointerup'||e.type==='pointercancel');
      const inputEdges=w.inputEdges.filter(e=>e.trial===i);
+     const down=events.find(e=>e.type==='pointerdown');
+     const move=events.find(e=>e.type==='pointermove');
+     const nextUpdateAfterMove=move?samples.find(s=>s.at>=move.at):null;
+     const nextUpdateAfterDown=down?samples.find(s=>s.at>=down.at):null;
      const gaps=samples.slice(1).map((v,j)=>v.at-samples[j].at)
       .filter(v=>Number.isFinite(v)&&v>0).sort((a,b)=>a-b);
      return {events,inputEdges,
+      downToNextUpdateMs:down&&nextUpdateAfterDown?nextUpdateAfterDown.at-down.at:null,
+      moveToNextUpdateMs:move&&nextUpdateAfterMove?nextUpdateAfterMove.at-move.at:null,
+      updateWithinDeliveredHold:!!(move&&release&&nextUpdateAfterMove&&
+       nextUpdateAfterMove.at<release.at),
       medianUpdateGapMs:gaps.length?gaps[Math.floor(gaps.length/2)]:null,
       maxUpdateGapMs:gaps.length?gaps.at(-1):null,
       sampleCount:samples.length,
@@ -170,6 +178,11 @@ const {performance:nodeClock}=require('node:perf_hooks');
      pressDurationMs:+(up.at-down.at).toFixed(2),
      deliveredHoldMs:move?+(up.at-move.at).toFixed(2):null,
      eventStampHoldMs:move?+(up.eventStamp-move.eventStamp).toFixed(2):null,
+     moveEventAgeAtCaptureMs:move?+move.eventAgeAtCaptureMs.toFixed(2):null,
+     releaseEventAgeAtCaptureMs:+up.eventAgeAtCaptureMs.toFixed(2),
+     moveToNextUpdateMs:result.moveToNextUpdateMs===null?null:+result.moveToNextUpdateMs.toFixed(2),
+     updateWithinDeliveredHold:result.updateWithinDeliveredHold,
+     downToNextUpdateMs:result.downToNextUpdateMs===null?null:+result.downToNextUpdateMs.toFixed(2),
      inputArmed:result.inputEdges.some(e=>e.type==='move'&&e.armed),
      samples:result.sampleCount,heldSamples:result.heldSamples,births:result.births,
      medianUpdateGapMs:result.medianUpdateGapMs,
@@ -200,12 +213,17 @@ const {performance:nodeClock}=require('node:perf_hooks');
     deliveredHeldWithoutProjectile:rows.filter(x=>x.births===0).length,
     deliveredHoldMs:rows.map(x=>x.deliveredHoldMs),
     eventStampHoldMs:rows.map(x=>x.eventStampHoldMs),
+    moveEventAgeAtCaptureMs:rows.map(x=>x.moveEventAgeAtCaptureMs),
+    releaseEventAgeAtCaptureMs:rows.map(x=>x.releaseEventAgeAtCaptureMs),
+    moveToNextUpdateMs:rows.map(x=>x.moveToNextUpdateMs),
+    updateWithinDeliveredHold:rows.map(x=>x.updateWithinDeliveredHold),
+    downToNextUpdateMs:rows.map(x=>x.downToNextUpdateMs),
     pressDurationMs:rows.map(x=>x.pressDurationMs),
     protocolGapMs:rows.map(x=>x.protocolGapMs),
     samples:rows.map(x=>x.heldSamples),births:rows.map(x=>x.births),
     medianUpdateGapMs:rows.map(x=>x.medianUpdateGapMs),
     maxUpdateGapMs:rows.map(x=>x.maxUpdateGapMs),
-    caveat:'Compare CDP command spacing, DOM handler spacing and PointerEvent.timeStamp spacing; none is physical Android touch-to-photon latency.'
+    caveat:'Event age at capture is performance.now minus DOM event.timeStamp at document capture, not hardware-to-JS latency. Move-to-next-update is measured after handler delivery and can occur after release; only heldSamples proves a sampled armed fire state. updateWithinDeliveredHold reports timing only and is not a substitute for armed Input ownership. CDP scheduling, throttled JS, compositor and OS latency remain unmeasured; none is physical Android touch-to-photon latency.'
    }));
   }
  }finally{await context.close();await browser.close();}
