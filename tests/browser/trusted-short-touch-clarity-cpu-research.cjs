@@ -10,7 +10,9 @@ const {performance:clock}=require('node:perf_hooks');
 const {injectBattlefieldSeed}=require('../research/battlefield-layout-fixture.cjs');
 // Forward/reverse order is a drift check, not a matched-world causal estimate.
 const renderControl=process.env.NOVA_TOUCH_RENDER_CONTROL==='1';
-const scales=renderControl?[100,100,100,100]:[100,80,65,65,80,100];
+const desyncControl=process.env.NOVA_TOUCH_DESYNC_CONTROL==='1';
+assert.ok(!(renderControl&&desyncControl),'research controls are mutually exclusive');
+const scales=renderControl||desyncControl?[100,100,100,100]:[100,80,65,65,80,100];
 const round=x=>x==null?null:+x.toFixed(2);
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
@@ -19,9 +21,20 @@ const round=x=>x==null?null:+x.toFixed(2);
   for(let arm=0;arm<scales.length;arm++){
    const scale=scales[arm];
    const renderEnabled=!renderControl||arm===0||arm===3;
+   const desyncEnabled=desyncControl&&(arm===1||arm===2);
    const context=await browser.newContext({viewport:{width:320,height:700},
     deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
-   let layoutIntercepts=0;
+   let layoutIntercepts=0,canvasIntercepts=0;
+   if(desyncControl)await context.route('http://127.0.0.1:8765/',async route=>{
+    const response=await route.fetch();
+    assert.equal(response.status(),200,'canonical index must load');
+    const html=await response.text();
+    const needle="this.ctx = canvas.getContext('2d');";
+    assert.equal(html.split(needle).length-1,1,'one canonical gameplay canvas owner');
+    canvasIntercepts++;
+    await route.fulfill({response,body:desyncEnabled?
+     html.replace(needle,"this.ctx = canvas.getContext('2d',{desynchronized:true});"):html});
+   });
    await context.route('**/nova-updates/battlefield-v1.6.0.js',async route=>{
     const response=await route.fetch();
     assert.equal(response.status(),200,'canonical Battlefield overlay must load');
@@ -159,10 +172,16 @@ const round=x=>x==null?null:+x.toFixed(2);
      g.setClass(g.player,'scout');g.input.autofire=false;g.player.spawnShieldT=20;
      return {scale:JSON.parse(localStorage.getItem('novatanks_pilot_settings_v1')).renderScale,
       quality:g.quality,dpr:g.dpr,css:[g.w,g.h],backing:[g.canvas.width,g.canvas.height],
+      desynchronized:g.ctx.getContextAttributes().desynchronized,
       battlefieldSeed:g.__novaBattlefield?.seed??null,
       initialFingerprint:window.__novaTouchClarity.initialFingerprint};
     });
     assert.equal(initial.scale,scale,'settings must preserve requested clarity');
+    if(desyncControl){
+     assert.equal(canvasIntercepts,1,'exactly one canonical HTML canvas intercept');
+     assert.equal(initial.desynchronized,desyncEnabled,
+      'real gameplay canvas must reflect requested desynchronization');
+    }
     assert.equal(layoutIntercepts,1,'exactly one Battlefield overlay must be seeded');
     assert.equal(initial.battlefieldSeed,0x12345678,'seeded Battlefield must reach the real Game');
     assert.match(initial.initialFingerprint,/^[0-9a-f]{8}:[0-9]+$/);
@@ -286,7 +305,7 @@ const round=x=>x==null?null:+x.toFixed(2);
     assert.ok(trials[9].inputArmed&&trials[9].heldSamples>0&&trials[9].births>0,
      'CPU x1 long control must arm, be sampled, and create a real Scout projectile');
     const short=trials.filter(x=>!x.control);
-    results.push({arm,scale,renderEnabled,initial,cpuThrottle:4,attempts:short.length,
+    results.push({arm,scale,renderEnabled,desyncEnabled,initial,cpuThrottle:4,attempts:short.length,
      armedButUnsampled:short.filter(x=>x.inputArmed&&!x.heldSamples).length,
      totalUpdateSamples:short.reduce((n,x)=>n+x.updateSamples,0),
      noProjectile:short.filter(x=>!x.births).length,
@@ -303,12 +322,12 @@ const round=x=>x==null?null:+x.toFixed(2);
   }
   assert.deepEqual(results.map(x=>x.scale),scales);
   const pixels=results.map(x=>x.initial.backing[0]*x.initial.backing[1]);
-  if(!renderControl)assert.ok(pixels[0]>pixels[1]&&pixels[1]>pixels[2]&&
+  if(!renderControl&&!desyncControl)assert.ok(pixels[0]>pixels[1]&&pixels[1]>pixels[2]&&
    pixels[3]<pixels[4]&&pixels[4]<pixels[5],
    'forward/reverse clarity arms must change real canvas backing area');
-  for(const scale of (renderControl?[100]:[100,80,65])){
+  for(const scale of (renderControl||desyncControl?[100]:[100,80,65])){
    const group=results.filter(x=>x.scale===scale);
-   assert.equal(group.length,renderControl?4:2,
+   assert.equal(group.length,renderControl||desyncControl?4:2,
     'each research condition must have the expected repeated observations');
    assert.equal(group[0].initial.backing.join(','),group[1].initial.backing.join(','),
     'same clarity must have same backing across order reversal');
@@ -317,7 +336,7 @@ const round=x=>x==null?null:+x.toFixed(2);
    'do not confound clarity with quality mode');
   assert.equal(new Set(results.map(x=>x.initial.initialFingerprint)).size,1,
    'research clarity arms must start from the same selected physical world');
-  const grouped=Object.fromEntries((renderControl?[100]:[100,80,65]).map(scale=>{
+  const grouped=Object.fromEntries((renderControl||desyncControl?[100]:[100,80,65]).map(scale=>{
    const arms=results.filter(x=>x.scale===scale);
    return [scale,{runs:arms.length,attempts:arms.reduce((n,x)=>n+x.attempts,0),
     armedButUnsampled:arms.reduce((n,x)=>n+x.armedButUnsampled,0),
@@ -325,7 +344,14 @@ const round=x=>x==null?null:+x.toFixed(2);
     totalBirths:arms.reduce((n,x)=>n+x.totalBirths,0)}];
   }));
   const report={
-   researchOnly:true,renderControl,phaseOrder:scales,grouped,results,backingPixels:pixels,
+   researchOnly:true,renderControl,desyncControl,phaseOrder:scales,grouped,results,backingPixels:pixels,
+   desyncGrouped:desyncControl?Object.fromEntries([false,true].map(enabled=>{
+    const arms=results.filter(x=>x.desyncEnabled===enabled);
+    return [enabled?'desynchronized':'default',{
+     attempts:arms.reduce((n,x)=>n+x.attempts,0),
+     noProjectile:arms.reduce((n,x)=>n+x.noProjectile,0),
+     armedButUnsampled:arms.reduce((n,x)=>n+x.armedButUnsampled,0)}];
+   })):null,
    caveats:['matched selected initial fingerprint does not ensure matched subsequent physical worlds',
     'forward/reverse phase order reduces but cannot eliminate temporal drift',
     'event age is performance.now minus DOM event.timeStamp, not hardware latency',
@@ -334,9 +360,11 @@ const round=x=>x==null?null:+x.toFixed(2);
     'Two-update frames count consecutive live Game.update calls before one final Game render; they do not prove why the scheduler permitted catch-up',
     'CPU x4 CDP throttling is not equivalent to Android thermal throttling',
     'render suppression preserves Game.update but deliberately removes presentation work, so it is not playable and cannot isolate JS canvas from compositor cost',
+    'desynchronized canvas may trade presentation ordering or tearing for latency; this is an opt-in research-only browser context and not Android proof',
     'no assertion of causal FPS benefit; compare arm distributions and replicate']};
   fs.mkdirSync('artifacts/browser',{recursive:true});
-  fs.writeFileSync(renderControl?
+  fs.writeFileSync(desyncControl?
+   'artifacts/browser/touch-desync-control-research.json':renderControl?
    'artifacts/browser/touch-render-control-research.json':
    'artifacts/browser/touch-clarity-cpu-research.json',
    JSON.stringify(report,null,2)+'\n');
