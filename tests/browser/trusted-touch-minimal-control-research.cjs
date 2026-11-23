@@ -5,9 +5,8 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const {chromium}=require('playwright');
-const {performance:clock}=require('node:perf_hooks');
 const phases=[100,80,65,65,80,100];
-const html=String.raw\`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"></head><body style="margin:0"><canvas style="width:320px;height:700px;touch-action:none"></canvas><script>
+const html=String.raw`<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"></head><body style="margin:0"><canvas style="width:320px;height:700px;touch-action:none"></canvas><script>
 window.__research={events:[],frames:[],scale:100};
 const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d');
 for(const type of ['pointerdown','pointermove','pointerup','pointercancel'])
@@ -29,7 +28,7 @@ function frame(t){
  requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
-<\/script></body></html>\`;
+<\/script></body></html>`;
 const median=a=>a.length?[...a].sort((x,y)=>x-y)[Math.floor(a.length/2)]:null;
 const round=n=>n==null?null:+n.toFixed(2);
 (async()=>{
