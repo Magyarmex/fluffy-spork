@@ -145,6 +145,18 @@ jobs:
           path: artifacts/browser/touch-clarity-cpu-research.json
           if-no-files-found: ignore
           retention-days: 14
+      - name: Research-only minimal trusted-touch batching control
+        if: ${{ github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.head_ref == 'research/touch-minimal-control-20261123') }}
+        timeout-minutes: 2
+        run: node tests/browser/trusted-touch-minimal-control-research.cjs
+      - name: Archive minimal trusted-touch control
+        if: ${{ always() && (github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.head_ref == 'research/touch-minimal-control-20261123')) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: touch-minimal-control-research
+          path: artifacts/browser/touch-minimal-control-research.json
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Run real React + Chromium smoke
         run: |
           node tests/browser/real-touch-gameplay.cjs
