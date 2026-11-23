@@ -31,13 +31,13 @@ const {performance:clock}=require('node:perf_hooks');
      return out;
     };
     this.pu=function(e){
-     const valid=e.pointerType==='touch'&&e.type==='pointerup'&&
+     const valid=e.isTrusted===true&&Number.isFinite(e.timeStamp)&&e.timeStamp>0&&\n      e.pointerType==='touch'&&e.type==='pointerup'&&
       this.stickId?.aim===e.pointerId&&this.firing&&this.aim.active&&
       Math.hypot(this.aim.dx,this.aim.dy)>=9;
      const aim=valid?{dx:this.aim.dx,dy:this.aim.dy}:null;
      const out=release.apply(this,arguments);
      if(valid&&!witness.sampled&&witness.enabled){
-      witness.pending={trial:witness.trial,aim,at:performance.now(),
+      witness.pending={trial:witness.trial,aim,at:e.timeStamp,
        player:window.__novaShotPilotGame?.player};
      }
      return out;
@@ -139,7 +139,7 @@ const {performance:clock}=require('node:perf_hooks');
      assert.equal(outcome.stuck,false,'right stick must release');
      assert.equal(outcome.pending,false,'pilot must not retain input');
      if(!enabled)assert.equal(outcome.recovered,0);
-     if(enabled)assert.ok(outcome.recovered<=1,'one recovered update maximum');
+     if(enabled){\n      assert.ok(outcome.recovered<=1,'one recovered update maximum');\n      if(outcome.recovered)assert.ok(outcome.births>=1,\n       'a recovered Scout firing opportunity must create a real projectile');\n     }
      rows.push({rate,enabled,trial,...outcome});
     }
    }
