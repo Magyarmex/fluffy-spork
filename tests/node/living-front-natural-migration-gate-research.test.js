@@ -18,8 +18,38 @@ function run(seed,observe){
    candidateBloom:0,candidateMigration:0,candidateStar:0,candidateNone:0,
    activeBloom:0,activeMigration:0,activeStar:0,
    maxOutbound:0,firstReadyAt:null,firstMigrationAt:null,
-   pausedAt:null,segments:[],activeIntentSamples:0,totalActiveIntents:0,maxActiveIntents:0};
+   pausedAt:null,segments:[],activeIntentSamples:0,totalActiveIntents:0,maxActiveIntents:0,
+   rawCrossings:0,certifiedAtOwner:0,excludedCrossings:0,excludedByType:{}};
   try{
+   if(observe){
+    const LF=g.__testLivingFront,oldBehavior=LF&&LF.behaviorTick;
+    assert.equal(typeof oldBehavior,'function','shipping behavior owner must exist');
+    // Observe the exact transition boundary: physics already moved shapes,
+    // but transition() has not yet replaced their previous-sector stamp.
+    LF.behaviorTick=function(game,st,defs,dt){
+     let raw=0,certified=0,excluded=0;
+     for(const shape of game.shapes||[]){
+      if(!shape||!(shape.hp>0)||!Number.isInteger(shape.__lfSector))continue;
+      const to=LF.sectorIndex(shape.x,shape.y);
+      if(to===shape.__lfSector)continue;
+      raw++;
+      if(shape.__lfMigrationIntent===to)certified++;
+      else{
+       excluded++;
+       const kind=String(shape.type||'unknown');
+       census.excludedByType[kind]=(census.excludedByType[kind]||0)+1;
+      }
+     }
+     const before=Number(st.migrationTransitions)||0;
+     const result=oldBehavior.apply(this,arguments);
+     assert.equal((Number(st.migrationTransitions)||0)-before,certified,
+      'read-only pre-owner crossing certificate disagrees with shipping transition');
+     census.rawCrossings+=raw;
+     census.certifiedAtOwner+=certified;
+     census.excludedCrossings+=excluded;
+     return result;
+    };
+   }
    g.status='playing';g.paused=false;
    for(let tick=0;tick<TICKS;tick++){
     g.update(1/60);
@@ -121,6 +151,11 @@ test('natural composed Director migration gate census is read-only and A/A ident
   assert.ok(observed.census.withState>0,'Director state never materialized');
   assert.ok(observed.census.heatSamples>0,'migration heat never sampled');
   assert.ok(observed.census.segments.length>0,'no time-window exposure');
+  assert.equal(observed.census.rawCrossings,
+   observed.census.certifiedAtOwner+observed.census.excludedCrossings,
+   'raw crossing partition must be complete');
+  assert.equal(observed.census.certifiedAtOwner,observed.physicalMigrationTransitions,
+   'exact owner-certified crossings must match shipping counter');
   assert.equal(observed.census.segments.reduce((n,s)=>n+s.activeIntentSum,0),
    observed.census.totalActiveIntents,'intent census must partition by time window');
   assert.equal(observed.census.segments.reduce((n,s)=>n+s.samples,0),observed.census.withState,
