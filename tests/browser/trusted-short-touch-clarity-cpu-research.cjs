@@ -201,7 +201,7 @@ const round=x=>x==null?null:+x.toFixed(2);
     'no assertion of causal FPS benefit; compare arm distributions and replicate']};
   fs.mkdirSync('artifacts/browser',{recursive:true});
   fs.writeFileSync('artifacts/browser/touch-clarity-cpu-research.json',
-   JSON.stringify(report,null,2)+'\\n');
+   JSON.stringify(report,null,2)+'\n');
   console.log('NOVA_TOUCH_CLARITY_RESEARCH '+JSON.stringify(report));
  }finally{await browser.close();}
 })().catch(e=>{console.error(e.stack||e);process.exitCode=1;});
