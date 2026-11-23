@@ -11,6 +11,8 @@ const {injectBattlefieldSeed}=require('../research/battlefield-layout-fixture.cj
 // Forward/reverse order is a drift check, not a matched-world causal estimate.
 const renderControl=process.env.NOVA_TOUCH_RENDER_CONTROL==='1';
 const desyncControl=process.env.NOVA_TOUCH_DESYNC_CONTROL==='1';
+const sequentialControl=process.env.NOVA_TOUCH_SEQUENTIAL_CONTROL==='1';
+assert.ok(!sequentialControl||desyncControl,'sequential pilot requires the same default/desync comparison');
 assert.ok(!(renderControl&&desyncControl),'research controls are mutually exclusive');
 const scales=renderControl||desyncControl?[100,100,100,100]:[100,80,65,65,80,100];
 const round=x=>x==null?null:+x.toFixed(2);
@@ -203,13 +205,26 @@ const round=x=>x==null?null:+x.toFixed(2);
       g.input.autofire=false;
      },trial);
      const before=clock.now();
-     const down=cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[origin]});
-     if(trial>=8){await down;await page.waitForTimeout(100);}
-     const move=cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[moved]});
-     await new Promise(resolve=>setTimeout(resolve,trial>=8?300:40));
-     const releaseAt=clock.now();
-     const up=cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
-     await Promise.all([down,move,up]);
+     // Transport falsifier: in the sequential arm, CDP confirms that the
+     // browser accepted the deflected move before the 40ms hold starts.
+     // The ordinary arm deliberately retains the original concurrent
+     // dispatch, where main-thread load can batch move and release.
+     let releaseAt;
+     if(sequentialControl){
+      await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[origin]});
+      await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[moved]});
+      await new Promise(resolve=>setTimeout(resolve,trial>=8?300:40));
+      releaseAt=clock.now();
+      await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+     }else{
+      const down=cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[origin]});
+      if(trial>=8){await down;await page.waitForTimeout(100);}
+      const move=cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[moved]});
+      await new Promise(resolve=>setTimeout(resolve,trial>=8?300:40));
+      releaseAt=clock.now();
+      const up=cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+      await Promise.all([down,move,up]);
+     }
      await page.waitForTimeout(120);
      const result=await page.evaluate(i=>{
       const w=window.__novaTouchClarity,g=w.game;
