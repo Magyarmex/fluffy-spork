@@ -112,3 +112,31 @@ test('a nonfinite certificate fails closed into the existing live planner',()=>{
  assert.equal(h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}}),650);
  assert.deepEqual(calls,['uncertified','waypoint','length']);
 });
+
+
+test('a near-corner exact route still allows the movement owner to advance its cursor',()=>{
+ const h=hooks(),t={...bot,x:0,y:0},p={x:400,y:0},calls=[];
+ const g={
+  time:10,hasLineOfSight:()=>false,isTerrainSafe:()=>true,
+  __v1102Routes:{'7:6':{index:0,validateAt:11,points:[{x:10,y:0}]}},
+  novaReadOnlyExactRouteLength:()=>{calls.push('certificate');return 650;},
+  novaBattlefieldWaypoint:()=>{calls.push('movement-waypoint');return{x:100,y:100};},
+  novaRouteLength:()=>{calls.push('length');return 650;}
+ };
+ assert.equal(h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}}),650);
+ assert.deepEqual(calls,['movement-waypoint','length'],
+  'strategic scoring cannot bypass a due movement-cursor advance');
+});
+
+test('a due route string-pull validation is not suppressed by strategic pricing',()=>{
+ const h=hooks(),t={...bot,x:0,y:0},p={x:400,y:0},calls=[];
+ const g={
+  time:10,hasLineOfSight:()=>false,isTerrainSafe:()=>true,
+  __v1102Routes:{'7:6':{index:0,validateAt:9.9,points:[{x:100,y:100}]}},
+  novaReadOnlyExactRouteLength:()=>{calls.push('certificate');return 650;},
+  novaBattlefieldWaypoint:()=>{calls.push('movement-waypoint');return{x:100,y:100};},
+  novaRouteLength:()=>{calls.push('length');return 650;}
+ };
+ assert.equal(h.routeDistance(g,t,p,null,{CLASSES:{guard:{size:15}}}),650);
+ assert.deepEqual(calls,['movement-waypoint','length']);
+});
