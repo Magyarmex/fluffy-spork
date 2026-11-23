@@ -55,9 +55,10 @@ const round=x=>x==null?null:+x.toFixed(2);
      };
      const originalAttach=Input.prototype.attach;
      window.__novaTouchClarity={trial:-1,events:[],edges:[],samples:[],births:[],
-      renders:[],longTasks:[],game:null};
-     if(typeof PerformanceObserver!=='undefined'&&
-        PerformanceObserver.supportedEntryTypes?.includes('longtask')){
+      renders:[],longTasks:[],game:null,
+      longTaskSupported:typeof PerformanceObserver!=='undefined'&&
+       PerformanceObserver.supportedEntryTypes?.includes('longtask')===true};
+     if(window.__novaTouchClarity.longTaskSupported){
       const observer=new PerformanceObserver(list=>{
        const w=window.__novaTouchClarity;
        for(const entry of list.getEntries())
@@ -197,6 +198,10 @@ const round=x=>x==null?null:+x.toFixed(2);
       const next=deflection?samples.find(x=>x.at>=deflection.at):null;
       const longTasks=deflection&&released?w.longTasks.filter(x=>
        x.at<released.at+120&&x.at+x.ms>deflection.at-120):[];
+      const nearTouchRaf=deflection&&released?samples.filter(x=>
+       x.at>=deflection.at-120&&x.at<=released.at+120)
+       .map(x=>x.priorRafWorkMs).filter(x=>Number.isFinite(x)&&x>=0)
+       .sort((a,b)=>a-b):[];
       const updateGaps=samples.slice(1).map((x,j)=>x.at-samples[j].at)
        .filter(x=>Number.isFinite(x)&&x>0).sort((a,b)=>a-b);
       return {events,edges,samples:samples.length,heldSamples:samples.filter(x=>x.held).length,
@@ -209,10 +214,15 @@ const round=x=>x==null?null:+x.toFixed(2);
        moveEventAgeMs:deflection?deflection.at-deflection.stamp:null,
        moveToNextUpdateMs:deflection&&next?next.at-deflection.at:null,
        updateWithinHold:!!(deflection&&released&&next&&next.at<released.at),
+       longTaskSupported:w.longTaskSupported,
        longTaskCount:longTasks.length,
-       longTaskOverlapMs:longTasks.reduce((n,x)=>n+x.ms,0),
+       longTaskOverlapMs:deflection&&released?longTasks.reduce((n,x)=>n+
+        Math.max(0,Math.min(x.at+x.ms,released.at+120)-
+         Math.max(x.at,deflection.at-120)),0):0,
        maxLongTaskMs:longTasks.length?Math.max(...longTasks.map(x=>x.ms)):0,
        medianPriorRafWorkMs:rafWork.length?rafWork[Math.floor(rafWork.length/2)]:null,
+       medianNearTouchRafWorkMs:nearTouchRaf.length?
+        nearTouchRaf[Math.floor(nearTouchRaf.length/2)]:null,
        renderCount:renders.length,medianRenderMs:renders.length?
         [...renders].sort((a,b)=>a-b)[Math.floor(renders.length/2)]:null,
        aimActive:!!g.input.aim.active,status:g.status};
@@ -240,6 +250,8 @@ const round=x=>x==null?null:+x.toFixed(2);
       maxUpdateGapMs:round(result.maxUpdateGapMs),
       medianRenderMs:round(result.medianRenderMs),
       medianPriorRafWorkMs:round(result.medianPriorRafWorkMs),
+      medianNearTouchRafWorkMs:round(result.medianNearTouchRafWorkMs),
+      longTaskSupported:result.longTaskSupported,
       longTaskCount:result.longTaskCount,
       longTaskOverlapMs:round(result.longTaskOverlapMs),
       maxLongTaskMs:round(result.maxLongTaskMs)});
