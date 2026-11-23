@@ -96,10 +96,16 @@ const {chromium}=require('playwright');
       if(!game||game.status!=='playing'||!game.player)throw Error('player no longer active');
      }
     },id);
-    await cdp.send('Input.dispatchTouchEvent',{type:'touchStart',touchPoints:[origin]});
-    await cdp.send('Input.dispatchTouchEvent',{type:'touchMove',touchPoints:[extended]});
-    await page.waitForTimeout(trial===8?300:40);
-    await cdp.send('Input.dispatchTouchEvent',{type:'touchEnd',touchPoints:[]});
+    // Queue protocol events in order without serial round-trip inflation.
+    // The measured DOM move-to-up interval, not this timer, is authoritative.
+    const startDelivery=cdp.send('Input.dispatchTouchEvent',
+     {type:'touchStart',touchPoints:[origin]});
+    const moveDelivery=cdp.send('Input.dispatchTouchEvent',
+     {type:'touchMove',touchPoints:[extended]});
+    await new Promise(resolve=>setTimeout(resolve,trial===8?300:40));
+    const endDelivery=cdp.send('Input.dispatchTouchEvent',
+     {type:'touchEnd',touchPoints:[]});
+    await Promise.all([startDelivery,moveDelivery,endDelivery]);
     await page.waitForTimeout(110);
     const result=await page.evaluate(i=>{
      const w=window.__novaPulseWitness,g=window.__novaPulseGame;
