@@ -139,7 +139,11 @@ const round=x=>x==null?null:+x.toFixed(2);
       const deflection=events.find(x=>x.type==='pointermove');
       const released=events.find(x=>x.type==='pointerup'||x.type==='pointercancel');
       const next=deflection?samples.find(x=>x.at>=deflection.at):null;
+      const updateGaps=samples.slice(1).map((x,j)=>x.at-samples[j].at)
+       .filter(x=>Number.isFinite(x)&&x>0).sort((a,b)=>a-b);
       return {events,edges,samples:samples.length,heldSamples:samples.filter(x=>x.held).length,
+       medianUpdateGapMs:updateGaps.length?updateGaps[Math.floor(updateGaps.length/2)]:null,
+       maxUpdateGapMs:updateGaps.length?updateGaps.at(-1):null,
        births:births.length,postReleaseBirths:released?
         births.filter(x=>x.at>released.at).length:null,
        deliveredHoldMs:deflection&&released?released.at-deflection.at:null,
@@ -170,6 +174,8 @@ const round=x=>x==null?null:+x.toFixed(2);
       moveToNextUpdateMs:round(result.moveToNextUpdateMs),
       updateWithinHold:result.updateWithinHold,heldSamples:result.heldSamples,
       births:result.births,renderCount:result.renderCount,
+      medianUpdateGapMs:round(result.medianUpdateGapMs),
+      maxUpdateGapMs:round(result.maxUpdateGapMs),
       medianRenderMs:round(result.medianRenderMs)});
     }
     assert.deepEqual(errors,[],'no composed game page errors');
@@ -178,6 +184,9 @@ const round=x=>x==null?null:+x.toFixed(2);
     results.push({scale,initial,cpuThrottle:4,attempts:short.length,
      armedButUnsampled:short.filter(x=>x.inputArmed&&!x.heldSamples).length,
      noProjectile:short.filter(x=>!x.births).length,
+     canceled:short.filter(x=>x.canceled).length,
+     totalBirths:short.reduce((n,x)=>n+x.births,0),
+     sampledHeldAttempts:short.filter(x=>x.heldSamples>0).length,
      control:trials.at(-1),trials,
      caveat:'CDP touch events and JS render-call time only; no physical Android latency, GPU timing, or guaranteed matched worlds'});
     console.log('NOVA_TOUCH_CLARITY_ARM '+JSON.stringify(results.at(-1)));
