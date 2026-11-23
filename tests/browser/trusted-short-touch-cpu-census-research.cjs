@@ -19,23 +19,29 @@ const {chromium}=require('playwright');
    const Game=window.__novaMakeRequire('')('game/engine').Game;
    const update=Game.prototype.update,fire=Game.prototype.tryFire;
    const Input=window.__novaMakeRequire('')('game/input').Input;
-   const originalMove=Input.prototype.pm,originalRelease=Input.prototype.pu;
+   const originalAttach=Input.prototype.attach;
    window.__novaPulseWitness={trial:-1,events:[],samples:[],births:[],inputEdges:[]};
-   Input.prototype.pm=function(e){
-    const result=originalMove.apply(this,arguments);
-    if(e.pointerType==='touch'){
-     const w=window.__novaPulseWitness;
-     w.inputEdges.push({trial:w.trial,type:'move',armed:!!this.firing,at:performance.now()});
-    }
-    return result;
-   };
-   Input.prototype.pu=function(e){
-    const result=originalRelease.apply(this,arguments);
-    if(e.pointerType==='touch'){
-     const w=window.__novaPulseWitness;
-     w.inputEdges.push({trial:w.trial,type:'release',armed:!!this.firing,at:performance.now()});
-    }
-    return result;
+   // Input.pm/pu are constructor-owned arrow functions, not prototype methods.
+   // Wrap them before attach registers their function identities with the DOM.
+   Input.prototype.attach=function(canvas){
+    const oldMove=this.pm,oldRelease=this.pu;
+    this.pm=function(e){
+     const result=oldMove.apply(this,arguments);
+     if(e.pointerType==='touch'){
+      const w=window.__novaPulseWitness;
+      w.inputEdges.push({trial:w.trial,type:'move',armed:!!this.firing,at:performance.now()});
+     }
+     return result;
+    };
+    this.pu=function(e){
+     const result=oldRelease.apply(this,arguments);
+     if(e.pointerType==='touch'){
+      const w=window.__novaPulseWitness;
+      w.inputEdges.push({trial:w.trial,type:'release',armed:!!this.firing,at:performance.now()});
+     }
+     return result;
+    };
+    return originalAttach.apply(this,arguments);
    };
    Game.prototype.update=function(...args){
     if(!this.__novaDecorativeWorld&&this.player&&this.status==='playing'){
