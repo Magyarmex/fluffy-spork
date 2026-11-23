@@ -9,7 +9,8 @@ const {chromium}=require('playwright');
 const {performance:clock}=require('node:perf_hooks');
 const {injectBattlefieldSeed}=require('../research/battlefield-layout-fixture.cjs');
 // Forward/reverse order is a drift check, not a matched-world causal estimate.
-const scales=[100,80,65,65,80,100];
+const renderControl=process.env.NOVA_TOUCH_RENDER_CONTROL==='1';
+const scales=renderControl?[100,100,100,100]:[100,80,65,65,80,100];
 const round=x=>x==null?null:+x.toFixed(2);
 (async()=>{
  const browser=await chromium.launch({headless:true,args:['--no-sandbox','--disable-dev-shm-usage']});
@@ -17,6 +18,7 @@ const round=x=>x==null?null:+x.toFixed(2);
  try{
   for(let arm=0;arm<scales.length;arm++){
    const scale=scales[arm];
+   const renderEnabled=!renderControl||arm===0||arm===3;
    const context=await browser.newContext({viewport:{width:320,height:700},
     deviceScaleFactor:2,isMobile:true,hasTouch:true,serviceWorkers:'block'});
    let layoutIntercepts=0;
@@ -40,7 +42,7 @@ const round=x=>x==null?null:+x.toFixed(2);
     await page.goto('http://127.0.0.1:8765/',{waitUntil:'domcontentloaded',timeout:45000});
     const deploy=page.getByRole('button',{name:/DEPLOY/i}).first();
     await deploy.waitFor({state:'visible',timeout:45000});
-    await page.evaluate(()=>{
+    await page.evaluate(suppressRender=>{
      const requireGame=window.__novaMakeRequire('');
      const Game=requireGame('game/engine').Game;
      const Input=requireGame('game/input').Input;
@@ -54,7 +56,7 @@ const round=x=>x==null?null:+x.toFixed(2);
       return oldSpawn.apply(this,args);
      };
      const originalAttach=Input.prototype.attach;
-     window.__novaTouchClarity={trial:-1,events:[],edges:[],samples:[],births:[],
+     window.__novaTouchClarity={trial:-1,suppressRender,events:[],edges:[],samples:[],births:[],
       renders:[],longTasks:[],game:null,updatesSinceRender:0,
       longTaskSupported:typeof PerformanceObserver!=='undefined'&&
        PerformanceObserver.supportedEntryTypes?.includes('longtask')===true};
@@ -126,7 +128,8 @@ const round=x=>x==null?null:+x.toFixed(2);
      const oldRender=renderModule.render;
      renderModule.render=function(g,...args){
       const start=performance.now();
-      try{return oldRender.call(this,g,...args);}
+      try{if(!window.__novaTouchClarity.suppressRender||g.__novaDecorativeWorld)
+       return oldRender.call(this,g,...args);}
       finally{
        if(!g.__novaDecorativeWorld&&g.status==='playing')
         window.__novaTouchClarity.renders.push({
@@ -144,7 +147,7 @@ const round=x=>x==null?null:+x.toFixed(2);
        w.events.push({trial:w.trial,type,at:performance.now(),stamp:e.timeStamp,
         trusted:e.isTrusted});
       },{capture:true,passive:true});
-    });
+    },!renderEnabled);
     await deploy.click();
     await page.waitForFunction(()=>window.__novaTouchClarity?.game?.status==='playing',
      null,{timeout:30000});
@@ -276,7 +279,7 @@ const round=x=>x==null?null:+x.toFixed(2);
     assert.ok(trials[9].inputArmed&&trials[9].heldSamples>0&&trials[9].births>0,
      'CPU x1 long control must arm, be sampled, and create a real Scout projectile');
     const short=trials.filter(x=>!x.control);
-    results.push({arm,scale,initial,cpuThrottle:4,attempts:short.length,
+    results.push({arm,scale,renderEnabled,initial,cpuThrottle:4,attempts:short.length,
      armedButUnsampled:short.filter(x=>x.inputArmed&&!x.heldSamples).length,
      noProjectile:short.filter(x=>!x.births).length,
      canceled:short.filter(x=>x.canceled).length,
@@ -292,12 +295,13 @@ const round=x=>x==null?null:+x.toFixed(2);
   }
   assert.deepEqual(results.map(x=>x.scale),scales);
   const pixels=results.map(x=>x.initial.backing[0]*x.initial.backing[1]);
-  assert.ok(pixels[0]>pixels[1]&&pixels[1]>pixels[2]&&
+  if(!renderControl)assert.ok(pixels[0]>pixels[1]&&pixels[1]>pixels[2]&&
    pixels[3]<pixels[4]&&pixels[4]<pixels[5],
    'forward/reverse clarity arms must change real canvas backing area');
-  for(const scale of [100,80,65]){
+  for(const scale of (renderControl?[100]:[100,80,65])){
    const group=results.filter(x=>x.scale===scale);
-   assert.equal(group.length,2,'each clarity arm needs a forward and reverse observation');
+   assert.equal(group.length,renderControl?4:2,
+    'each research condition must have the expected repeated observations');
    assert.equal(group[0].initial.backing.join(','),group[1].initial.backing.join(','),
     'same clarity must have same backing across order reversal');
   }
@@ -305,7 +309,7 @@ const round=x=>x==null?null:+x.toFixed(2);
    'do not confound clarity with quality mode');
   assert.equal(new Set(results.map(x=>x.initial.initialFingerprint)).size,1,
    'research clarity arms must start from the same selected physical world');
-  const grouped=Object.fromEntries([100,80,65].map(scale=>{
+  const grouped=Object.fromEntries((renderControl?[100]:[100,80,65]).map(scale=>{
    const arms=results.filter(x=>x.scale===scale);
    return [scale,{runs:arms.length,attempts:arms.reduce((n,x)=>n+x.attempts,0),
     armedButUnsampled:arms.reduce((n,x)=>n+x.armedButUnsampled,0),
@@ -313,7 +317,7 @@ const round=x=>x==null?null:+x.toFixed(2);
     totalBirths:arms.reduce((n,x)=>n+x.totalBirths,0)}];
   }));
   const report={
-   researchOnly:true,phaseOrder:scales,grouped,results,backingPixels:pixels,
+   researchOnly:true,renderControl,phaseOrder:scales,grouped,results,backingPixels:pixels,
    caveats:['matched selected initial fingerprint does not ensure matched subsequent physical worlds',
     'forward/reverse phase order reduces but cannot eliminate temporal drift',
     'event age is performance.now minus DOM event.timeStamp, not hardware latency',
@@ -321,9 +325,12 @@ const round=x=>x==null?null:+x.toFixed(2);
     'Long Tasks are main-thread tasks of at least 50ms, not a complete browser scheduling or compositor trace; window is move minus 120ms to release plus 120ms',
     'Two-update frames count consecutive live Game.update calls before one final Game render; they do not prove why the scheduler permitted catch-up',
     'CPU x4 CDP throttling is not equivalent to Android thermal throttling',
+    'render suppression preserves Game.update but deliberately removes presentation work, so it is not playable and cannot isolate JS canvas from compositor cost',
     'no assertion of causal FPS benefit; compare arm distributions and replicate']};
   fs.mkdirSync('artifacts/browser',{recursive:true});
-  fs.writeFileSync('artifacts/browser/touch-clarity-cpu-research.json',
+  fs.writeFileSync(renderControl?
+   'artifacts/browser/touch-render-control-research.json':
+   'artifacts/browser/touch-clarity-cpu-research.json',
    JSON.stringify(report,null,2)+'\n');
   console.log('NOVA_TOUCH_CLARITY_RESEARCH '+JSON.stringify(report));
  }finally{await browser.close();}
