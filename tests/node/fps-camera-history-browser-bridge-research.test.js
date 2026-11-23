@@ -177,7 +177,7 @@ test('scaled CSS pointer survives browser replay into actual player projectile b
  const {ChronologicalInput}=require('../research/fixed-step-dom-input.cjs');
  const g=bootGame(),i=g.input,win=g.__testWindow,doc=win.document;
  g.sfx.muted=true;i.autofire=false;g.status='playing';g.paused=false;
- g.w=800;g.h=600;Object.assign(g.cam,{x:0,y:0,zoom:1});
+ g.w=800;g.h=600;g.zoom=1;Object.assign(g.cam,{x:0,y:0,zoom:1});
  // A CSS transform halves the presented rectangle without changing Game.w.
  i.canvas.getBoundingClientRect=()=>({left:100,top:50,width:400,height:300});
  const history=new PresentedCameraHistory({maxAgeMs:120});
