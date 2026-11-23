@@ -67,6 +67,17 @@ test('secondary release does not cancel primary fire, touch input stays owned',(
  assert.equal(input.firing,true,'mouse events cannot steal active touch input');
  input.detach();assert.equal(count('mouseup'),0);
 });
+test('right-first chord retains right-origin fire when left is released',()=>{
+ const {input,emit}=fixture();
+ input.pd({pointerType:'mouse',button:2,buttons:2,clientX:100,clientY:100});
+ assert.equal(input.firing,true,'right mouse was the original fire owner');
+ input.pm({pointerType:'mouse',button:0,buttons:3,clientX:100,clientY:100});
+ emit('mouseup',{button:0,buttons:2});
+ assert.equal(input.firing,true,'releasing a later left button must not steal right-origin fire');
+ input.pu({pointerType:'mouse',button:2,buttons:0});
+ assert.equal(input.firing,false,'final right release stops firing');
+ input.detach();
+});
 test('reattach does not duplicate native mouseup owners',()=>{
  const {input,count}=fixture();
  assert.equal(count('mouseup'),1);
