@@ -19,7 +19,7 @@ const {performance:clock}=require('node:perf_hooks');
    const Input=req('game/input').Input,attach=Input.prototype.attach;
    const update=Game.prototype.update,fire=Game.prototype.tryFire;
    const witness=window.__novaShotPilot={trial:-1,enabled:false,armed:false,
-    sampled:false,pending:null,lastAimStamp:null,events:[],births:[],recovered:[],rejected:[]};
+    sampled:false,pending:null,lastAimStamp:null,events:[],births:[],recovered:[],rejected:[],candidates:[]};
    Input.prototype.attach=function(...args){
     const move=this.pm,release=this.pu;
     this.pm=function(e){
@@ -41,6 +41,7 @@ const {performance:clock}=require('node:perf_hooks');
      const aim=valid?{dx:this.aim.dx,dy:this.aim.dy}:null;
      const out=release.apply(this,arguments);
      if(valid&&!witness.sampled&&witness.enabled){
+      witness.candidates.push({trial:witness.trial,releaseAt:e.timeStamp,handledAt:performance.now()});
       witness.pending={trial:witness.trial,aim,at:e.timeStamp,
        player:window.__novaShotPilotGame?.player};
      }
@@ -133,6 +134,8 @@ const {performance:clock}=require('node:perf_hooks');
        deliveredHoldMs:move&&release?release.at-move.at:null,
        eventStampHoldMs:move&&release?release.stamp-move.stamp:null,
        recovered:w.recovered.filter(x=>x.trial===id).length,
+       candidate:w.candidates.filter(x=>x.trial===id).length,
+       rejected:w.rejected.filter(x=>x.trial===id).map(x=>x.age),
        births:w.births.filter(x=>x.trial===id).length,
        canceled:events.some(x=>x.type==='pointercancel'),
        trusted:events.every(x=>x.trusted),
@@ -164,6 +167,8 @@ const {performance:clock}=require('node:perf_hooks');
     attempts:group.length,armed:group.filter(x=>x.armed).length,
     sampled:group.filter(x=>x.sampled).length,
     recovered:group.reduce((n,x)=>n+x.recovered,0),
+    candidates:group.reduce((n,x)=>n+x.candidate,0),
+    rejectedAgesMs:group.flatMap(x=>x.rejected),
     births:group.reduce((n,x)=>n+x.births,0),
     armedUnsampled:group.filter(x=>x.armed&&!x.sampled).length,
     compressedRecovered:group.filter(x=>x.recovered&&x.deliveredHoldMs!==null&&x.deliveredHoldMs<2&&x.eventStampHoldMs>=30).length,
