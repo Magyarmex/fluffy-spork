@@ -58,6 +58,7 @@ function scene({width=1000,cover=false}={}){
  self.ai.__v181ObservedShotAngle=0;
  self.ai.__v181ObservedShotX=target.x;
  self.ai.__v181ObservedShotY=target.y;
+ self.ai.__v181ObservedShotVictims=new WeakSet([duelist]);
  g.tanks=[self,target,duelist];
  if(cover)g.hasLineOfSight=(ax,ay,bx,by)=>!(
   ax===target.x&&ay===target.y&&bx===duelist.x&&by===duelist.y);
@@ -95,6 +96,7 @@ for(const hz of [30,60,120,240]){
   const target=g.tanks[1],duelist=g.tanks[2];
   target.x=110;target.y=0;target.ai.__v180TargetId=-1;
   duelist.x=0;duelist.y=130;
+  self.ai.__v181ObservedShotVictims=null;
   const third=tank(4,'twin',-110,0);
   g.tanks.push(third);
   ai.updateAI(self,g,1/hz);
@@ -110,6 +112,7 @@ test('covered opponents do not inflate tactical decompression pressure',()=>{
  const target=g.tanks[1],duelist=g.tanks[2];
  target.x=110;target.y=0;target.ai.__v180TargetId=-1;
  duelist.x=0;duelist.y=130;
+ self.ai.__v181ObservedShotVictims=null;
  const third=tank(4,'twin',-110,0);g.tanks.push(third);
  g.hasLineOfSight=(_ax,_ay,bx,by)=>bx===110&&by===0;
  ai.updateAI(self,g,1/60);
@@ -163,6 +166,7 @@ test('private rival target plans alone do not grant crossfire knowledge',()=>{
 test('witnessed fire aimed away from the duelist does not imply a duel',()=>{
  const {g,ai,self}=scene();
  self.ai.__v181ObservedShotAngle=Math.PI;
+ self.ai.__v181ObservedShotVictims=null;
  ai.updateAI(self,g,1/60);
  assert.notEqual(self.ai.__v181Mode,'crossfire');
 });
@@ -217,6 +221,9 @@ test('real AI firing witness drives another observer crossfire without target-pl
  assert.equal(self.ai.__v181ObservedShotAngle,0);
  assert.equal(self.ai.__v181ObservedShotX,target.x);
  assert.equal(self.ai.__v181ObservedShotY,target.y);
+ assert.equal(typeof self.ai.__v181ObservedShotVictims?.has,'function');
+ assert.ok(self.ai.__v181ObservedShotVictims.has(duelist),
+  'fair full witness roster must preserve a visible non-primary duelist during narrowed AI fire');
  g.__fireDuringAI=false;
  ai.updateAI(self,g,1/60);
  assert.equal(self.ai.__v1112TargetId,target.id);
